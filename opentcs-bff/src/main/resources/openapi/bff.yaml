@@ -1,0 +1,143 @@
+# SPDX-FileCopyrightText: The openTCS Authors
+# SPDX-License-Identifier: CC-BY-4.0
+
+openapi: 3.0.3
+info:
+  title: openTCS BFF API
+  description: >-
+    Backend-For-Frontend (BFF) HTTP API consumed by the openTCS SPA.
+    Bodies of HTTP requests and responses are JSON.
+  version: 0.1.0
+servers:
+  - url: http://localhost:8090
+    description: openTCS BFF running on localhost
+tags:
+  - name: Vehicles
+    description: Working with vehicles
+paths:
+  /api/v1/vehicles:
+    get:
+      tags:
+        - Vehicles
+      summary: List all vehicles known to the kernel.
+      operationId: listVehicles
+      responses:
+        '200':
+          description: The list of vehicles.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vehicle'
+        '503':
+          description: The kernel is currently unreachable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/vehicles/{name}:
+    get:
+      tags:
+        - Vehicles
+      summary: Get a single vehicle by its name.
+      operationId: getVehicleByName
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: The name of the vehicle.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The requested vehicle.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+        '404':
+          description: No vehicle with the given name exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: The kernel is currently unreachable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    Vehicle:
+      type: object
+      description: A vehicle managed by the openTCS kernel.
+      required:
+        - name
+        - state
+        - procState
+        - integrationLevel
+        - paused
+        - energyLevel
+      properties:
+        name:
+          type: string
+          description: The unique name of the vehicle.
+        state:
+          $ref: '#/components/schemas/VehicleState'
+        procState:
+          $ref: '#/components/schemas/VehicleProcState'
+        integrationLevel:
+          $ref: '#/components/schemas/VehicleIntegrationLevel'
+        paused:
+          type: boolean
+          description: Whether the vehicle is currently paused.
+        energyLevel:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 100
+          description: Remaining energy in percent of the maximum.
+        currentPosition:
+          type: string
+          nullable: true
+          description: The name of the point the vehicle currently occupies, or null if unknown.
+    VehicleState:
+      type: string
+      description: The vehicle's current state.
+      enum:
+        - UNKNOWN
+        - UNAVAILABLE
+        - ERROR
+        - IDLE
+        - EXECUTING
+        - CHARGING
+    VehicleProcState:
+      type: string
+      description: The vehicle's processing state as seen by the dispatcher.
+      enum:
+        - IDLE
+        - AWAITING_ORDER
+        - PROCESSING_ORDER
+    VehicleIntegrationLevel:
+      type: string
+      description: The vehicle's integration level.
+      enum:
+        - TO_BE_IGNORED
+        - TO_BE_NOTICED
+        - TO_BE_RESPECTED
+        - TO_BE_UTILIZED
+    ErrorResponse:
+      type: object
+      description: An error returned by the BFF.
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: A machine-readable error code.
+        message:
+          type: string
+          description: A human-readable error description.
