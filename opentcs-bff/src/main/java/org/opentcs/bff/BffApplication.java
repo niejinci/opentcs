@@ -137,7 +137,12 @@ public class BffApplication {
         // Echo a trace id back so callers can correlate logs even on success.
         ctx.header(ErrorResponses.TRACE_ID_HEADER, ErrorResponses.traceIdFor(ctx));
         if (ctx.path().startsWith(API_PATH_PREFIX) && !authenticator.isAuthenticated(ctx)) {
-          throw new UnauthorizedException("Missing or invalid API access key.");
+          String provided = ctx.header(AccessKeyAuthenticator.ACCESS_KEY_HEADER);
+          throw new UnauthorizedException(
+              provided == null || provided.isEmpty()
+                  ? "Missing API access key header."
+                  : "Invalid API access key."
+          );
         }
       });
 

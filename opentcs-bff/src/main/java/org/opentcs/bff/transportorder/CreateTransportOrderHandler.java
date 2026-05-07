@@ -41,7 +41,7 @@ public class CreateTransportOrderHandler
       request = ctx.bodyAsClass(TransportOrderRequest.class);
     }
     catch (Exception e) {
-      throw new IllegalArgumentException("Malformed request body: " + e.getMessage(), e);
+      throw new IllegalArgumentException("Invalid JSON in request body.", e);
     }
     if (request == null) {
       throw new IllegalArgumentException("Request body must not be empty.");
