@@ -12,6 +12,7 @@ jakarta-annotation = "3.0.0"
 jakarta-inject = "2.0.1"
 javalin = "7.1.0"
 javalin-ssl-plugin = "7.1.0"
+javalin-testtools = "7.1.0"
 jaxb = "4.0.6"
 jgrapht-core = "1.5.2"
 jhotdraw = "7.6.20190506"
@@ -72,6 +73,7 @@ junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engi
 junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit" }
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junit-platform-launcher" }
 mockito = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
+javalin-testtools = { group = "io.javalin", name = "javalin-testtools", version.ref = "javalin-testtools" }
 
 [plugins]
 asciidocor-jvm-convert = { id = "org.asciidoctor.jvm.convert", version.ref = "asciidoctor" }
