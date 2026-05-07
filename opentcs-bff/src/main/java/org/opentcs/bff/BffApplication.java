@@ -3,11 +3,13 @@
 package org.opentcs.bff;
 
 import static io.javalin.apibuilder.ApiBuilder.get;
+import static io.javalin.apibuilder.ApiBuilder.path;
 import static java.util.Objects.requireNonNull;
 
 import io.javalin.Javalin;
 import jakarta.inject.Inject;
 import org.opentcs.bff.health.HealthHandler;
+import org.opentcs.bff.plantmodel.PlantModelSummaryHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,17 +33,29 @@ public class BffApplication {
    *
    * @param configuration The configuration to bind the HTTP server with.
    * @param healthHandler The handler serving {@code GET /health}.
+   * @param plantModelSummaryHandler The handler serving
+   * {@code GET /api/v1/plant-model/summary}.
    */
   @Inject
-  public BffApplication(BffConfiguration configuration, HealthHandler healthHandler) {
+  public BffApplication(
+      BffConfiguration configuration,
+      HealthHandler healthHandler,
+      PlantModelSummaryHandler plantModelSummaryHandler
+  ) {
     this.configuration = requireNonNull(configuration, "configuration");
     requireNonNull(healthHandler, "healthHandler");
+    requireNonNull(plantModelSummaryHandler, "plantModelSummaryHandler");
     this.javalin = Javalin.create(cfg -> {
       cfg.startup.showJavalinBanner = false;
       cfg.jetty.host = configuration.bindAddress();
       cfg.jetty.port = configuration.bindPort();
       cfg.routes.apiBuilder(() -> {
         get("/health", healthHandler);
+        path("/api/v1", () -> {
+          path("/plant-model", () -> {
+            get("/summary", plantModelSummaryHandler);
+          });
+        });
       });
     });
   }

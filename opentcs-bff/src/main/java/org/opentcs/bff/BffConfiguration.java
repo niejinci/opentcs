@@ -2,49 +2,37 @@
 // SPDX-License-Identifier: MIT
 package org.opentcs.bff;
 
-import static java.util.Objects.requireNonNull;
+import org.opentcs.configuration.ConfigurationEntry;
+import org.opentcs.configuration.ConfigurationPrefix;
 
 /**
  * Runtime configuration for the BFF process.
  *
- * <p>For milestone M1 this is a plain immutable value object; M2 will swap the bindings to a
- * Gestalt-backed {@code @ConfigurationPrefix("bff")} interface so the rest of the code does not
- * need to change.
- *
- * @param bindAddress The address the HTTP server binds to.
- * @param bindPort The port the HTTP server binds to. Use {@code 0} to let the OS pick a free port.
+ * <p>Bound by Gestalt at startup using the {@link #PREFIX} prefix. Default values are shipped in
+ * {@code opentcs-bff-defaults-baseline.properties}; users override them in a sibling
+ * {@code opentcs-bff.properties} file.
  */
-public record BffConfiguration(String bindAddress, int bindPort) {
+@ConfigurationPrefix(BffConfiguration.PREFIX)
+public interface BffConfiguration {
 
   /**
-   * The default port the BFF binds to.
+   * This configuration's prefix.
    */
-  public static final int DEFAULT_PORT = 8090;
-  /**
-   * The default address the BFF binds to.
-   */
-  public static final String DEFAULT_BIND_ADDRESS = "0.0.0.0";
+  String PREFIX = "bff";
 
-  /**
-   * Creates a new instance.
-   *
-   * @param bindAddress The address the HTTP server binds to.
-   * @param bindPort The port the HTTP server binds to. Use {@code 0} to let the OS pick a free
-   * port.
-   */
-  public BffConfiguration {
-    requireNonNull(bindAddress, "bindAddress");
-    if (bindPort < 0 || bindPort > 65535) {
-      throw new IllegalArgumentException("bindPort out of range: " + bindPort);
-    }
-  }
+  @ConfigurationEntry(
+      type = "String",
+      description = "The address the HTTP server binds to.",
+      changesApplied = ConfigurationEntry.ChangesApplied.ON_APPLICATION_START,
+      orderKey = "0_address_0"
+  )
+  String bindAddress();
 
-  /**
-   * Returns a configuration with the default bind address and port.
-   *
-   * @return A configuration with the default bind address and port.
-   */
-  public static BffConfiguration defaults() {
-    return new BffConfiguration(DEFAULT_BIND_ADDRESS, DEFAULT_PORT);
-  }
+  @ConfigurationEntry(
+      type = "Integer",
+      description = "The port the HTTP server binds to. Use 0 to let the OS pick a free port.",
+      changesApplied = ConfigurationEntry.ChangesApplied.ON_APPLICATION_START,
+      orderKey = "0_address_1"
+  )
+  int bindPort();
 }

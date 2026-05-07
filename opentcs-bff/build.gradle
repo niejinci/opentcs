@@ -14,6 +14,8 @@ application.mainClass = ext.mainClass
 ext.collectableDistDir = new File(buildDir, 'install')
 
 dependencies {
+  api project(':opentcs-impl-configuration-gestalt')
+
   api libs.guice
 
   api libs.javalin
@@ -26,6 +28,14 @@ dependencies {
   testImplementation libs.javalin.testtools
 }
 
+distributions {
+  main {
+    contents {
+      from "${sourceSets.main.resources.srcDirs[0]}/org/opentcs/bff/distribution"
+    }
+  }
+}
+
 distTar.enabled = false
 
 task release {
@@ -34,5 +44,13 @@ task release {
 }
 
 run {
-  systemProperties(['java.util.logging.config.file': './config/logging.config'])
+  systemProperties(
+      [
+        'java.util.logging.config.file': './config/logging.config',
+        'opentcs.base': '.',
+        'opentcs.home': '.',
+        'opentcs.configuration.reload.interval': '10000',
+        'opentcs.configuration.provider': 'gestalt'
+      ]
+  )
 }
