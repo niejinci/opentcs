@@ -12,6 +12,9 @@ import org.junit.jupiter.api.Test;
 import org.opentcs.bff.health.HealthHandler;
 import org.opentcs.bff.kernel.KernelClient;
 import org.opentcs.bff.plantmodel.PlantModelSummaryHandler;
+import org.opentcs.bff.swagger.OpenApiSpecHandler;
+import org.opentcs.bff.vehicle.GetVehicleHandler;
+import org.opentcs.bff.vehicle.ListVehiclesHandler;
 import org.opentcs.data.model.PlantModel;
 
 /**
@@ -51,6 +54,38 @@ class BffApplicationTest {
   }
 
   @Test
+  void exposesOpenApiSpecOnConfiguredPath() {
+    BffApplication app = newApp();
+
+    JavalinTest.test(
+        app.javalin(), (server, client) -> {
+          var response = client.get("/openapi/bff.yaml");
+
+          assertThat(response.code()).isEqualTo(200);
+          assertThat(response.body()).isNotNull();
+          String body = response.body().string();
+          assertThat(body).contains("openapi: 3.0.3");
+          assertThat(body).contains("/api/v1/vehicles");
+        }
+    );
+  }
+
+  @Test
+  void servesSwaggerUiInitializerOverride() {
+    BffApplication app = newApp();
+
+    JavalinTest.test(
+        app.javalin(), (server, client) -> {
+          var response = client.get("/swagger-ui/swagger-initializer.js");
+
+          assertThat(response.code()).isEqualTo(200);
+          assertThat(response.body()).isNotNull();
+          assertThat(response.body().string()).contains("/openapi/bff.yaml");
+        }
+    );
+  }
+
+  @Test
   void portIsMinusOneBeforeStart() {
     BffApplication app = newApp();
 
@@ -63,7 +98,10 @@ class BffApplicationTest {
     return new BffApplication(
         bff("127.0.0.1", 0),
         new HealthHandler(),
-        new PlantModelSummaryHandler(kernelClient)
+        new PlantModelSummaryHandler(kernelClient),
+        new ListVehiclesHandler(kernelClient),
+        new GetVehicleHandler(kernelClient),
+        new OpenApiSpecHandler()
     );
   }
 }

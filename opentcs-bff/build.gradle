@@ -1,6 +1,10 @@
 // SPDX-FileCopyrightText: The openTCS Authors
 // SPDX-License-Identifier: MIT
 
+plugins {
+  alias(libs.plugins.openapi.generator)
+}
+
 apply from: "${rootDir}/gradle/java-project.gradle"
 apply from: "${rootDir}/gradle/java-codequality.gradle"
 apply from: "${rootDir}/gradle/guice-application.gradle"
@@ -13,6 +17,88 @@ application.mainClass = ext.mainClass
 
 ext.collectableDistDir = new File(buildDir, 'install')
 
+// --- OpenAPI code generation -------------------------------------------------
+// Generated DTOs land in their own source set so that the project's strict
+// checkstyle / spotless / `-Werror` rules apply only to hand-written code.
+def generatedOpenApiDir = file("${buildDir}/generated/openapi")
+def generatedJavaDir = file("${generatedOpenApiDir}/src/main/java")
+
+sourceSets {
+  generatedOpenApi {
+    java {
+      srcDirs = [generatedJavaDir]
+    }
+  }
+}
+
+configurations {
+  generatedOpenApiCompileOnly.extendsFrom(compileOnly)
+}
+
+dependencies {
+  generatedOpenApiCompileOnly libs.jakarta.annotation
+  generatedOpenApiImplementation libs.jackson.databind
+  generatedOpenApiImplementation libs.jackson.datatype.jsr310
+}
+
+openApiGenerate {
+  generatorName = 'java'
+  library = 'native'
+  inputSpec = file('src/main/resources/openapi/bff.yaml').toString()
+  outputDir = generatedOpenApiDir.toString()
+  modelPackage = 'org.opentcs.bff.api.v1.model'
+  apiPackage = 'org.opentcs.bff.api.v1'
+  invokerPackage = 'org.opentcs.bff.api.v1.invoker'
+  generateApiTests = false
+  generateApiDocumentation = false
+  generateModelTests = false
+  generateModelDocumentation = false
+  configOptions = [
+    serializationLibrary: 'jackson',
+    annotationLibrary: 'none',
+    documentationProvider: 'none',
+    useJakartaEe: 'true',
+    dateLibrary: 'java8',
+    openApiNullable: 'false',
+    hideGenerationTimestamp: 'true'
+  ]
+  globalProperties = [
+    modelDocs: 'false',
+    modelTests: 'false',
+    apiTests: 'false',
+    apiDocs: 'false'
+  ]
+}
+
+compileGeneratedOpenApiJava {
+  dependsOn 'openApiGenerate'
+  // Generated code is intentionally exempt from -Werror / -Xlint:all.
+  options.release = 21
+  options.compilerArgs = []
+}
+
+// Make generated DTOs visible from main and test code.
+sourceSets.main.compileClasspath += sourceSets.generatedOpenApi.output
+sourceSets.main.runtimeClasspath += sourceSets.generatedOpenApi.output
+sourceSets.test.compileClasspath += sourceSets.generatedOpenApi.output
+sourceSets.test.runtimeClasspath += sourceSets.generatedOpenApi.output
+
+compileJava.dependsOn compileGeneratedOpenApiJava
+
+jar {
+  from sourceSets.generatedOpenApi.output
+}
+
+// Skip code-quality checks for generated code.
+spotless {
+  java {
+    target 'src/**/*.java'
+  }
+}
+project.afterEvaluate {
+  tasks.matching { it.name == 'checkstyleGeneratedOpenApi' }.configureEach { enabled = false }
+}
+
 dependencies {
   api project(':opentcs-impl-configuration-gestalt')
 
@@ -24,6 +110,7 @@ dependencies {
   api libs.jackson.datatype.jsr310
 
   runtimeOnly libs.slf4j.jdk14
+  runtimeOnly libs.swagger.ui
 
   testImplementation libs.javalin.testtools
 }

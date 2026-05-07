@@ -14,8 +14,9 @@ import org.opentcs.bff.kernel.KernelServicePortalFactory;
  *
  * <p>Binds the runtime configuration values (resolved by the entry point from a
  * {@link org.opentcs.configuration.ConfigurationBindingProvider}) and the kernel client wiring.
- * Subsequent milestones will add bindings for the generated OpenAPI handlers (M3),
- * authentication (M4) and the SSE bridge (M5).
+ * The OpenAPI-driven handlers introduced in M3 are auto-wired by Guice via {@code @Inject} and do
+ * not require explicit bindings here. Subsequent milestones will add bindings for authentication
+ * (M4) and the SSE bridge (M5).
  */
 public class BffModule
     extends

@@ -6,9 +6,12 @@ import static java.util.Objects.requireNonNull;
 
 import com.google.inject.Singleton;
 import jakarta.inject.Inject;
+import java.util.Optional;
+import java.util.Set;
 import org.opentcs.access.KernelRuntimeException;
 import org.opentcs.access.KernelServicePortal;
 import org.opentcs.data.model.PlantModel;
+import org.opentcs.data.model.Vehicle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +58,28 @@ public class KernelClient {
    */
   public PlantModel getPlantModel() {
     return ensureConnected().getPlantModelService().getPlantModel();
+  }
+
+  /**
+   * Returns all vehicles currently known to the Kernel.
+   *
+   * @return All vehicles currently known to the Kernel.
+   * @throws KernelRuntimeException If the Kernel cannot be reached or the request fails.
+   */
+  public Set<Vehicle> listVehicles() {
+    return ensureConnected().getVehicleService().fetch(Vehicle.class);
+  }
+
+  /**
+   * Returns the vehicle with the given name, if it exists.
+   *
+   * @param name The name of the vehicle to look up.
+   * @return An {@link Optional} containing the vehicle, or empty if no such vehicle exists.
+   * @throws KernelRuntimeException If the Kernel cannot be reached or the request fails.
+   */
+  public Optional<Vehicle> findVehicle(String name) {
+    requireNonNull(name, "name");
+    return ensureConnected().getVehicleService().fetch(Vehicle.class, name);
   }
 
   /**

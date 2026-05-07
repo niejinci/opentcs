@@ -12,12 +12,17 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.LinkedHashSet;
+import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.opentcs.access.KernelRuntimeException;
 import org.opentcs.access.KernelServicePortal;
 import org.opentcs.components.kernel.services.PlantModelService;
+import org.opentcs.components.kernel.services.VehicleService;
 import org.opentcs.data.model.PlantModel;
+import org.opentcs.data.model.Vehicle;
 
 /**
  * Tests for {@link KernelClient}.
@@ -26,6 +31,7 @@ class KernelClientTest {
 
   private KernelServicePortal portal;
   private PlantModelService plantModelService;
+  private VehicleService vehicleService;
   private KernelServicePortalFactory portalFactory;
   private BffKernelConfiguration configuration;
   private KernelClient kernelClient;
@@ -35,6 +41,8 @@ class KernelClientTest {
     portal = mock(KernelServicePortal.class);
     plantModelService = mock(PlantModelService.class);
     when(portal.getPlantModelService()).thenReturn(plantModelService);
+    vehicleService = mock(VehicleService.class);
+    when(portal.getVehicleService()).thenReturn(vehicleService);
 
     portalFactory = mock(KernelServicePortalFactory.class);
     when(portalFactory.create(anyString(), anyString())).thenReturn(portal);
@@ -118,5 +126,30 @@ class KernelClientTest {
     assertThatThrownBy(() -> kernelClient.getPlantModel())
         .isInstanceOf(KernelRuntimeException.class)
         .hasMessageContaining("nope");
+  }
+
+  @Test
+  void listVehiclesDelegatesToVehicleService() {
+    Set<Vehicle> vehicles = new LinkedHashSet<>();
+    vehicles.add(new Vehicle("v1"));
+    vehicles.add(new Vehicle("v2"));
+    when(vehicleService.fetch(Vehicle.class)).thenReturn(vehicles);
+
+    Set<Vehicle> result = kernelClient.listVehicles();
+
+    assertThat(result).isSameAs(vehicles);
+    verify(vehicleService, times(1)).fetch(Vehicle.class);
+  }
+
+  @Test
+  void findVehicleDelegatesToVehicleService() {
+    Vehicle v = new Vehicle("alpha");
+    when(vehicleService.fetch(Vehicle.class, "alpha")).thenReturn(Optional.of(v));
+    when(vehicleService.fetch(Vehicle.class, "ghost")).thenReturn(Optional.empty());
+
+    assertThat(kernelClient.findVehicle("alpha")).contains(v);
+    assertThat(kernelClient.findVehicle("ghost")).isEmpty();
+    verify(vehicleService, times(1)).fetch(Vehicle.class, "alpha");
+    verify(vehicleService, times(1)).fetch(Vehicle.class, "ghost");
   }
 }
