@@ -4,16 +4,25 @@ package org.opentcs.bff;
 
 import static io.javalin.apibuilder.ApiBuilder.get;
 import static io.javalin.apibuilder.ApiBuilder.path;
+import static io.javalin.apibuilder.ApiBuilder.post;
 import static java.util.Objects.requireNonNull;
 
 import io.javalin.Javalin;
+import io.javalin.http.HttpStatus;
 import io.javalin.http.staticfiles.Location;
 import jakarta.inject.Inject;
+import org.opentcs.access.KernelRuntimeException;
+import org.opentcs.bff.error.ErrorResponses;
 import org.opentcs.bff.health.HealthHandler;
 import org.opentcs.bff.plantmodel.PlantModelSummaryHandler;
+import org.opentcs.bff.security.AccessKeyAuthenticator;
+import org.opentcs.bff.security.UnauthorizedException;
 import org.opentcs.bff.swagger.OpenApiSpecHandler;
+import org.opentcs.bff.transportorder.CreateTransportOrderHandler;
 import org.opentcs.bff.vehicle.GetVehicleHandler;
 import org.opentcs.bff.vehicle.ListVehiclesHandler;
+import org.opentcs.data.ObjectExistsException;
+import org.opentcs.data.ObjectUnknownException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +55,12 @@ public class BffApplication {
    */
   static final String OPENAPI_SPEC_PATH = "/openapi/bff.yaml";
 
+  /**
+   * URL prefix for all paths that require authentication. The {@code /health} endpoint and the
+   * Swagger UI / OpenAPI spec are intentionally not protected.
+   */
+  static final String API_PATH_PREFIX = "/api/";
+
   private static final Logger LOG = LoggerFactory.getLogger(BffApplication.class);
 
   private final BffConfiguration configuration;
@@ -56,27 +71,34 @@ public class BffApplication {
    * Creates a new instance.
    *
    * @param configuration The configuration to bind the HTTP server with.
+   * @param authenticator Authenticates incoming API requests.
    * @param healthHandler The handler serving {@code GET /health}.
    * @param plantModelSummaryHandler The handler serving
    * {@code GET /api/v1/plant-model/summary}.
    * @param listVehiclesHandler The handler serving {@code GET /api/v1/vehicles}.
    * @param getVehicleHandler The handler serving {@code GET /api/v1/vehicles/{name}}.
+   * @param createTransportOrderHandler The handler serving
+   * {@code POST /api/v1/transport-orders}.
    * @param openApiSpecHandler The handler serving the OpenAPI specification.
    */
   @Inject
   public BffApplication(
       BffConfiguration configuration,
+      AccessKeyAuthenticator authenticator,
       HealthHandler healthHandler,
       PlantModelSummaryHandler plantModelSummaryHandler,
       ListVehiclesHandler listVehiclesHandler,
       GetVehicleHandler getVehicleHandler,
+      CreateTransportOrderHandler createTransportOrderHandler,
       OpenApiSpecHandler openApiSpecHandler
   ) {
     this.configuration = requireNonNull(configuration, "configuration");
+    requireNonNull(authenticator, "authenticator");
     requireNonNull(healthHandler, "healthHandler");
     requireNonNull(plantModelSummaryHandler, "plantModelSummaryHandler");
     requireNonNull(listVehiclesHandler, "listVehiclesHandler");
     requireNonNull(getVehicleHandler, "getVehicleHandler");
+    requireNonNull(createTransportOrderHandler, "createTransportOrderHandler");
     requireNonNull(openApiSpecHandler, "openApiSpecHandler");
     this.javalin = Javalin.create(cfg -> {
       cfg.startup.showJavalinBanner = false;
@@ -105,7 +127,45 @@ public class BffApplication {
             get(listVehiclesHandler);
             get("/{" + GetVehicleHandler.NAME_PARAM + "}", getVehicleHandler);
           });
+          path("/transport-orders", () -> {
+            post(createTransportOrderHandler);
+          });
         });
+      });
+
+      cfg.routes.beforeMatched(ctx -> {
+        // Echo a trace id back so callers can correlate logs even on success.
+        ctx.header(ErrorResponses.TRACE_ID_HEADER, ErrorResponses.traceIdFor(ctx));
+        if (ctx.path().startsWith(API_PATH_PREFIX) && !authenticator.isAuthenticated(ctx)) {
+          String provided = ctx.header(AccessKeyAuthenticator.ACCESS_KEY_HEADER);
+          throw new UnauthorizedException(
+              provided == null || provided.isEmpty()
+                  ? "Missing API access key header."
+                  : "Invalid API access key."
+          );
+        }
+      });
+
+      cfg.routes.exception(UnauthorizedException.class, (e, ctx) -> {
+        ErrorResponses.write(ctx, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", e.getMessage());
+      });
+      cfg.routes.exception(IllegalArgumentException.class, (e, ctx) -> {
+        ErrorResponses.write(ctx, HttpStatus.BAD_REQUEST, "BAD_REQUEST", e.getMessage());
+      });
+      cfg.routes.exception(ObjectUnknownException.class, (e, ctx) -> {
+        ErrorResponses.write(ctx, HttpStatus.NOT_FOUND, "NOT_FOUND", e.getMessage());
+      });
+      cfg.routes.exception(ObjectExistsException.class, (e, ctx) -> {
+        ErrorResponses.write(ctx, HttpStatus.CONFLICT, "ALREADY_EXISTS", e.getMessage());
+      });
+      cfg.routes.exception(KernelRuntimeException.class, (e, ctx) -> {
+        LOG.warn("Kernel call failed (trace {})", ErrorResponses.traceIdFor(ctx), e);
+        ErrorResponses.write(
+            ctx,
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "KERNEL_UNAVAILABLE",
+            "Kernel call failed: " + e.getMessage()
+        );
       });
     });
   }

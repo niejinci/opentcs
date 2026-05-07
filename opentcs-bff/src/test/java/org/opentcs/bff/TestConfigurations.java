@@ -30,4 +30,15 @@ final class TestConfigurations {
       }
     };
   }
+
+  /**
+   * Returns a {@link org.opentcs.bff.security.BffSecurityConfiguration} configured with the given
+   * access key. An empty / {@code null} key disables authentication.
+   *
+   * @param accessKey The configured access key.
+   * @return The configuration.
+   */
+  static org.opentcs.bff.security.BffSecurityConfiguration security(String accessKey) {
+    return () -> accessKey == null ? "" : accessKey;
+  }
 }
