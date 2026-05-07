@@ -14,6 +14,10 @@ servers:
 tags:
   - name: Vehicles
     description: Working with vehicles
+  - name: Transport orders
+    description: Working with transport orders
+security:
+  - ApiKeyAuth: []
 paths:
   /api/v1/vehicles:
     get:
@@ -30,12 +34,10 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Vehicle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '503':
-          description: The kernel is currently unreachable.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/KernelUnavailable'
   /api/v1/vehicles/{name}:
     get:
       tags:
@@ -56,6 +58,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Vehicle'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           description: No vehicle with the given name exists.
           content:
@@ -63,11 +67,41 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
-          description: The kernel is currently unreachable.
+          $ref: '#/components/responses/KernelUnavailable'
+  /api/v1/transport-orders:
+    post:
+      tags:
+        - Transport orders
+      summary: Create a new transport order.
+      description: >-
+        Creates a new transport order in the kernel from the given request body. The created order
+        is returned with the (possibly server-completed) generated name.
+      operationId: createTransportOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransportOrderRequest'
+      responses:
+        '200':
+          description: The transport order has been created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransportOrder'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: A referenced object (intended vehicle, dependency, location...) does not exist.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/KernelUnavailable'
 components:
   schemas:
     Vehicle:
@@ -141,3 +175,136 @@ components:
         message:
           type: string
           description: A human-readable error description.
+        traceId:
+          type: string
+          nullable: true
+          description: >-
+            A correlation ID identifying this request in server-side logs. Echoed back in the
+            `X-Trace-Id` response header.
+    Destination:
+      type: object
+      description: A destination of a transport order's drive order.
+      required:
+        - locationName
+        - operation
+      properties:
+        locationName:
+          type: string
+          description: The name of the destination location (or point).
+        operation:
+          type: string
+          description: The operation to be performed at the destination.
+        properties:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+          description: Optional key/value properties attached to the destination.
+    TransportOrderRequest:
+      type: object
+      description: The body for creating a transport order.
+      required:
+        - name
+        - destinations
+      properties:
+        name:
+          type: string
+          description: The name of the transport order.
+        incompleteName:
+          type: boolean
+          default: false
+          description: >-
+            If true, the kernel may complete the given name (e.g. by appending a unique suffix).
+        dispensable:
+          type: boolean
+          default: false
+          description: Whether the transport order may be withdrawn by the dispatcher.
+        intendedVehicle:
+          type: string
+          nullable: true
+          description: The (optional) name of the vehicle that should execute the order.
+        type:
+          type: string
+          nullable: true
+          description: The (optional) type of the transport order. Defaults to "-" if omitted.
+        deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: The (optional) deadline by which the order should be completed.
+        destinations:
+          type: array
+          minItems: 1
+          description: The destinations to drive to.
+          items:
+            $ref: '#/components/schemas/Destination'
+        dependencies:
+          type: array
+          nullable: true
+          description: The (optional) names of transport orders this order depends on.
+          items:
+            type: string
+        wrappingSequence:
+          type: string
+          nullable: true
+          description: The (optional) name of the wrapping order sequence.
+        peripheralReservationToken:
+          type: string
+          nullable: true
+          description: The (optional) reservation token for peripheral devices.
+        properties:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+          description: Optional key/value properties attached to the order.
+    TransportOrder:
+      type: object
+      description: A transport order managed by the openTCS kernel.
+      required:
+        - name
+        - type
+        - destinations
+      properties:
+        name:
+          type: string
+          description: The unique name of the transport order.
+        type:
+          type: string
+          description: The type of the transport order.
+        intendedVehicle:
+          type: string
+          nullable: true
+          description: The name of the vehicle intended to execute the order.
+        destinations:
+          type: array
+          description: The destinations of the transport order.
+          items:
+            $ref: '#/components/schemas/Destination'
+  responses:
+    BadRequest:
+      description: The request body is malformed or fails validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: The request did not provide valid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    KernelUnavailable:
+      description: The kernel is currently unreachable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Access-Key
+      description: >-
+        Static access key configured via `bff.security.accessKey`. If the configured key is empty,
+        no authentication is required and this header is ignored.

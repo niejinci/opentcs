@@ -10,8 +10,10 @@ import java.util.Optional;
 import java.util.Set;
 import org.opentcs.access.KernelRuntimeException;
 import org.opentcs.access.KernelServicePortal;
+import org.opentcs.access.to.order.TransportOrderCreationTO;
 import org.opentcs.data.model.PlantModel;
 import org.opentcs.data.model.Vehicle;
+import org.opentcs.data.order.TransportOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,6 +82,19 @@ public class KernelClient {
   public Optional<Vehicle> findVehicle(String name) {
     requireNonNull(name, "name");
     return ensureConnected().getVehicleService().fetch(Vehicle.class, name);
+  }
+
+  /**
+   * Creates a new transport order in the Kernel from the given creation TO.
+   *
+   * @param to The transport order to create.
+   * @return The created transport order.
+   * @throws KernelRuntimeException If the Kernel cannot be reached or the request fails (e.g. a
+   * referenced object does not exist or the order's name is already taken).
+   */
+  public TransportOrder createTransportOrder(TransportOrderCreationTO to) {
+    requireNonNull(to, "to");
+    return ensureConnected().getTransportOrderService().createTransportOrder(to);
   }
 
   /**

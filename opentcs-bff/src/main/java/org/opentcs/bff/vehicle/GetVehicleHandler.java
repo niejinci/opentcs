@@ -6,9 +6,8 @@ import static java.util.Objects.requireNonNull;
 
 import io.javalin.http.Context;
 import io.javalin.http.Handler;
-import io.javalin.http.HttpStatus;
 import jakarta.inject.Inject;
-import org.opentcs.bff.api.v1.model.ErrorResponse;
+import org.opentcs.bff.error.ErrorResponses;
 import org.opentcs.bff.kernel.KernelClient;
 
 /**
@@ -46,13 +45,12 @@ public class GetVehicleHandler
               ctx.status(200);
               ctx.json(VehicleConverter.toDto(vehicle));
             },
-            () -> {
-              ErrorResponse error = new ErrorResponse();
-              error.setCode("VEHICLE_NOT_FOUND");
-              error.setMessage("No vehicle named '" + name + "' exists.");
-              ctx.status(HttpStatus.NOT_FOUND);
-              ctx.json(error);
-            }
+            () -> ErrorResponses.write(
+                ctx,
+                io.javalin.http.HttpStatus.NOT_FOUND,
+                "VEHICLE_NOT_FOUND",
+                "No vehicle named '" + name + "' exists."
+            )
         );
   }
 }
