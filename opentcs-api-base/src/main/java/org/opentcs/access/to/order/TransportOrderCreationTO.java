@@ -529,4 +529,21 @@ public class TransportOrderCreationTO
         dispensable
     );
   }
+
+  @Override
+  public String toString() {
+    return "TransportOrderCreationTO{"
+        + "name='" + getName() + '\''
+        + ", incompleteName=" + incompleteName
+        + ", intendedVehicleName='" + intendedVehicleName + '\''
+        + ", destinations=" + destinations
+        + ", type='" + type + '\''
+        + ", deadline=" + deadline
+        + ", dispensable=" + dispensable
+        + ", wrappingSequence='" + wrappingSequence + '\''
+        + ", dependencyNames=" + dependencyNames
+        + ", peripheralReservationToken='" + peripheralReservationToken + '\''
+        + ", properties=" + getProperties()
+        + '}';
+  }
 }

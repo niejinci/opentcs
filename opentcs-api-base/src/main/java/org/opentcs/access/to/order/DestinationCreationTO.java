@@ -174,4 +174,14 @@ public class DestinationCreationTO
         getModifiableProperties()
     );
   }
+
+  @Override
+  public String toString() {
+    return "DestinationCreationTO{"
+        + "destLocationName='" + destLocationName + '\''
+        + ", destOperation='" + destOperation + '\''
+        + ", name='" + getName() + '\''
+        + ", properties=" + getProperties()
+        + '}';
+  }
 }

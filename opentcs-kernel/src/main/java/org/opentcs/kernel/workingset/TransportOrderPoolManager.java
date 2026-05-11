@@ -133,7 +133,7 @@ public class TransportOrderPoolManager
         .withWrappingSequence(getWrappingSequence(to))
         .withDependencies(getDependencies(to))
         .withProperties(to.getProperties());
-
+    LOG.info("------Create order----- {}", to);
     LOG.info(
         "Transport order is being created: {} -- details: {}",
         newOrder.getName(),
