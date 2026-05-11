@@ -329,6 +329,8 @@ public class V1RequestHandler
         IllegalArgumentException,
         IllegalStateException {
     ctx.contentType(HttpConstants.CONTENT_TYPE_APPLICATION_JSON_UTF8);
+    // 打印请求体内容以调试
+    LOG.info("Received request body for creating transport order: {}", ctx.body());
     ctx.result(
         jsonBinder.toJson(
             transportOrderConverter.toGetTransportOrderResponse(
