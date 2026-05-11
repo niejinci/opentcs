@@ -25,6 +25,10 @@ dependencies {
 
   implementation libs.huxhorn.sulky.ulid
 
+  // 添加本地的 VDA 5050 适配器源码依赖
+  // 依赖坐标跟本地源码项目中的 group, name 一致时，才会进行本地源码替换
+  implementation 'org.opentcs.commadapter.vehicle.vda5050:openTCS-CommAdapter-VDA5050'
+
   runtimeOnly libs.slf4j.jdk14
 }
 
