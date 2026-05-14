@@ -9,6 +9,8 @@ import static org.opentcs.bff.TestConfigurations.bff;
 
 import io.javalin.testtools.JavalinTest;
 import org.junit.jupiter.api.Test;
+import org.opentcs.bff.events.KernelEventPoller;
+import org.opentcs.bff.events.SseEventBridge;
 import org.opentcs.bff.health.HealthHandler;
 import org.opentcs.bff.kernel.KernelClient;
 import org.opentcs.bff.plantmodel.PlantModelSummaryHandler;
@@ -172,7 +174,9 @@ class BffApplicationTest {
         new ListVehiclesHandler(kernelClient),
         new GetVehicleHandler(kernelClient),
         new CreateTransportOrderHandler(kernelClient),
-        new OpenApiSpecHandler()
+        new OpenApiSpecHandler(),
+        new SseEventBridge(),
+        new KernelEventPoller(kernelClient, new SseEventBridge())
     );
   }
 }
