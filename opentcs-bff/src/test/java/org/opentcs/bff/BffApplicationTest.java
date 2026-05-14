@@ -9,6 +9,8 @@ import static org.opentcs.bff.TestConfigurations.bff;
 
 import io.javalin.testtools.JavalinTest;
 import org.junit.jupiter.api.Test;
+import org.opentcs.bff.events.KernelEventPoller;
+import org.opentcs.bff.events.SseEventBridge;
 import org.opentcs.bff.health.HealthHandler;
 import org.opentcs.bff.kernel.KernelClient;
 import org.opentcs.bff.plantmodel.PlantModelSummaryHandler;
@@ -164,6 +166,7 @@ class BffApplicationTest {
     when(kernelClient.getPlantModel()).thenReturn(new PlantModel("empty"));
     when(kernelClient.listVehicles()).thenReturn(java.util.Set.of());
     BffSecurityConfiguration securityConfig = TestConfigurations.security(accessKey);
+    SseEventBridge sseEventBridge = new SseEventBridge();
     return new BffApplication(
         bff("127.0.0.1", 0),
         new AccessKeyAuthenticator(securityConfig),
@@ -172,7 +175,9 @@ class BffApplicationTest {
         new ListVehiclesHandler(kernelClient),
         new GetVehicleHandler(kernelClient),
         new CreateTransportOrderHandler(kernelClient),
-        new OpenApiSpecHandler()
+        new OpenApiSpecHandler(),
+        sseEventBridge,
+        new KernelEventPoller(kernelClient, sseEventBridge)
     );
   }
 }

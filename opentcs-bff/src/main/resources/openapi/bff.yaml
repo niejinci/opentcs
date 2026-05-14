@@ -16,6 +16,8 @@ tags:
     description: Working with vehicles
   - name: Transport orders
     description: Working with transport orders
+  - name: Events
+    description: Server-Sent Events (SSE) for real-time object state updates
 security:
   - ApiKeyAuth: []
 paths:
@@ -102,6 +104,45 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/KernelUnavailable'
+  /api/v1/sse:
+    get:
+      tags:
+        - Events
+      summary: Subscribe to real-time object events via Server-Sent Events.
+      description: >-
+        Opens a long-lived `text/event-stream` connection. Each event the BFF receives from the
+        kernel is forwarded as a single SSE message whose `event:` field is one of
+        `/events/vehicles` or `/events/transportOrders` (matching the openTCS Kernel's
+        service-web-api SSE convention) and whose `data:` field is a JSON
+        [`SseEventEnvelope`](#/components/schemas/SseEventEnvelope).
+        Use the boolean query parameters below to opt in to specific event types; types whose
+        parameter is absent or `false` are not sent on the connection.
+      operationId: streamEvents
+      parameters:
+        - name: vehicles
+          in: query
+          required: false
+          description: When `true`, vehicle change events are streamed.
+          schema:
+            type: boolean
+            default: false
+        - name: transportOrders
+          in: query
+          required: false
+          description: When `true`, transport-order change events are streamed.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: SSE stream successfully established.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: A stream of SSE messages (see endpoint description for the payload format).
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 components:
   schemas:
     Vehicle:
@@ -281,6 +322,25 @@ components:
           description: The destinations of the transport order.
           items:
             $ref: '#/components/schemas/Destination'
+    SseEventEnvelope:
+      type: object
+      description: >-
+        Envelope for object-state events sent over the `/api/v1/sse` stream. Both fields may be
+        `null`: `currentObjectState` is `null` for object-removed events; `previousObjectState`
+        is `null` for object-created events.
+      properties:
+        currentObjectState:
+          description: The object state after the change, or `null` if the object was removed.
+          oneOf:
+            - $ref: '#/components/schemas/Vehicle'
+            - $ref: '#/components/schemas/TransportOrder'
+          nullable: true
+        previousObjectState:
+          description: The object state before the change, or `null` if the object was just created.
+          oneOf:
+            - $ref: '#/components/schemas/Vehicle'
+            - $ref: '#/components/schemas/TransportOrder'
+          nullable: true
   responses:
     BadRequest:
       description: The request body is malformed or fails validation.
