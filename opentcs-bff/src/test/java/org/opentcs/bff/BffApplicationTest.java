@@ -166,6 +166,7 @@ class BffApplicationTest {
     when(kernelClient.getPlantModel()).thenReturn(new PlantModel("empty"));
     when(kernelClient.listVehicles()).thenReturn(java.util.Set.of());
     BffSecurityConfiguration securityConfig = TestConfigurations.security(accessKey);
+    SseEventBridge sseEventBridge = new SseEventBridge();
     return new BffApplication(
         bff("127.0.0.1", 0),
         new AccessKeyAuthenticator(securityConfig),
@@ -175,8 +176,8 @@ class BffApplicationTest {
         new GetVehicleHandler(kernelClient),
         new CreateTransportOrderHandler(kernelClient),
         new OpenApiSpecHandler(),
-        new SseEventBridge(),
-        new KernelEventPoller(kernelClient, new SseEventBridge())
+        sseEventBridge,
+        new KernelEventPoller(kernelClient, sseEventBridge)
     );
   }
 }

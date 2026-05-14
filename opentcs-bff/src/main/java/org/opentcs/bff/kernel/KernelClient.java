@@ -170,10 +170,10 @@ public class KernelClient {
 
   /**
    * Drops the cached portal without attempting to log out, so that the next call to
-   * {@link #ensureConnected()} re-establishes the connection. Intended for use by long-running
-   * callers (e.g. the SSE event poller) that have detected a stale portal.
+   * {@link #ensureConnected()} re-establishes the connection. Used internally when a request
+   * fails so that subsequent operations can transparently reconnect.
    */
-  void invalidate() {
+  private void invalidate() {
     synchronized (lock) {
       portal = null;
     }
