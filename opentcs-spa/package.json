@@ -1,0 +1,35 @@
+{
+  "name": "opentcs-spa",
+  "version": "0.1.0-SNAPSHOT",
+  "private": true,
+  "description": "openTCS Single-Page Application frontend (Vue 3 + TypeScript + Vite). MVP: map import -> editor -> publish to Kernel -> orders + SSE.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.1.4",
+    "@vue/eslint-config-prettier": "^10.1.0",
+    "@vue/eslint-config-typescript": "^14.1.3",
+    "eslint": "^9.13.0",
+    "eslint-plugin-vue": "^9.30.0",
+    "prettier": "^3.3.3",
+    "typescript": "~5.6.3",
+    "vite": "^5.4.10",
+    "vue-tsc": "^2.1.10"
+  },
+  "packageManager": "pnpm@9.12.3",
+  "engines": {
+    "node": ">=20.10.0"
+  }
+}

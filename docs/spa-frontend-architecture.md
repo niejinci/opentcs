@@ -276,3 +276,19 @@ S7 BFF 接口实现要点：① 全部走流式 IO；② `meta.json` 写入用 "
 - 已完成：本文件 + `spa-frontend-roadmap.md` + `opentcs-spa/README.md` 占位
 - 已知坑：BFF SSE 鉴权当前依赖 header（`X-Api-Access-Key`），EventSource 不能带 header；若 prod 启用鉴权，S2 之前需让 BFF 支持 `?accessKey=…` query 形式，或改用 `@microsoft/fetch-event-source`
 - 下一阶段入口文件：`opentcs-spa/package.json`（S1 起手）
+
+### S1（2026-05-14）项目脚手架 + Hello World
+- 已完成模块：
+  - `opentcs-spa/package.json`（vue 3.5、vite 5.4、typescript 5.6、vue-tsc 2.2、eslint 9 flat、prettier 3、@vitejs/plugin-vue；`packageManager` 锁 pnpm 9.12.3，`engines.node` ≥ 20.10）
+  - `vite.config.ts`：`server.proxy` 反代 `/api`、`/health`、`/openapi` → `http://localhost:8090`，`@/* → src/*` alias，`build.target=es2022`
+  - `tsconfig.json` + `tsconfig.node.json`（strict + noUnused* + Bundler 解析 + project references）
+  - `index.html` + `src/main.ts` + `src/App.vue` + `src/styles/global.css` + `src/env.d.ts` + `public/favicon.svg`：`pnpm dev` 浏览器看到 "openTCS SPA"
+  - `.env.example`（`VITE_BFF_BASE_URL` / `VITE_BFF_ACCESS_KEY` 占位 + 注释）
+  - `eslint.config.js`（flat config：`eslint-plugin-vue/flat/recommended` + `@vue/eslint-config-typescript` + `@vue/eslint-config-prettier/skip-formatting`）+ `.prettierrc.json` + `.prettierignore` + `opentcs-spa/.gitignore`
+  - `opentcs-spa/README.md` 更新 Quickstart（`pnpm install / dev / build / typecheck / lint / format`）与 BFF 联调说明
+- 已验证命令（沙箱内全部成功）：`pnpm install` → `pnpm typecheck` → `pnpm build`（产出 `dist/index.html` + `assets/index-*.js` 61.6 kB gzip 24.8 kB）→ `pnpm lint` → `pnpm format:check` → `pnpm dev`（5173 端口起服务，`curl /` 200，`curl /api/v1/vehicles` 经代理转发，BFF 未起返回 500——证明代理已生效）
+- 已知坑 / 待办：
+  - **未引入** vue-router / Pinia / Element Plus / vue-konva / openapi-typescript / vitest，留给 S2+ 按需引入；S1 不写 `<RouterView />`，避免空路由配置噪音
+  - sandbox 默认 `npm` 但本工程钉死 `pnpm 9`；新机器需先 `corepack enable && corepack prepare pnpm@9.12.3 --activate`，已写进 README
+  - lockfile（`pnpm-lock.yaml`）已提交，遵循"L0 基线 PR 一次性大 PR"约定；S2+ 任何依赖新增/升级走单独 PR 评审
+- 下一阶段入口文件：`opentcs-spa/src/api/client.ts`（S2 起手 —— HTTP wrapper + `X-Api-Access-Key` 注入 + 统一错误）
