@@ -5,6 +5,7 @@ package org.opentcs.bff;
 import static io.javalin.apibuilder.ApiBuilder.get;
 import static io.javalin.apibuilder.ApiBuilder.path;
 import static io.javalin.apibuilder.ApiBuilder.post;
+import static io.javalin.apibuilder.ApiBuilder.sse;
 import static java.util.Objects.requireNonNull;
 
 import io.javalin.Javalin;
@@ -13,6 +14,8 @@ import io.javalin.http.staticfiles.Location;
 import jakarta.inject.Inject;
 import org.opentcs.access.KernelRuntimeException;
 import org.opentcs.bff.error.ErrorResponses;
+import org.opentcs.bff.events.KernelEventPoller;
+import org.opentcs.bff.events.SseEventBridge;
 import org.opentcs.bff.health.HealthHandler;
 import org.opentcs.bff.plantmodel.PlantModelSummaryHandler;
 import org.opentcs.bff.security.AccessKeyAuthenticator;
@@ -65,6 +68,8 @@ public class BffApplication {
 
   private final BffConfiguration configuration;
   private final Javalin javalin;
+  private final KernelEventPoller kernelEventPoller;
+  private final SseEventBridge sseEventBridge;
   private volatile boolean started;
 
   /**
@@ -80,6 +85,8 @@ public class BffApplication {
    * @param createTransportOrderHandler The handler serving
    * {@code POST /api/v1/transport-orders}.
    * @param openApiSpecHandler The handler serving the OpenAPI specification.
+   * @param sseEventBridge The bridge that broadcasts kernel events to connected SSE clients.
+   * @param kernelEventPoller The poller that fetches kernel events and feeds the bridge.
    */
   @Inject
   public BffApplication(
@@ -90,7 +97,9 @@ public class BffApplication {
       ListVehiclesHandler listVehiclesHandler,
       GetVehicleHandler getVehicleHandler,
       CreateTransportOrderHandler createTransportOrderHandler,
-      OpenApiSpecHandler openApiSpecHandler
+      OpenApiSpecHandler openApiSpecHandler,
+      SseEventBridge sseEventBridge,
+      KernelEventPoller kernelEventPoller
   ) {
     this.configuration = requireNonNull(configuration, "configuration");
     requireNonNull(authenticator, "authenticator");
@@ -100,6 +109,8 @@ public class BffApplication {
     requireNonNull(getVehicleHandler, "getVehicleHandler");
     requireNonNull(createTransportOrderHandler, "createTransportOrderHandler");
     requireNonNull(openApiSpecHandler, "openApiSpecHandler");
+    this.sseEventBridge = requireNonNull(sseEventBridge, "sseEventBridge");
+    this.kernelEventPoller = requireNonNull(kernelEventPoller, "kernelEventPoller");
     this.javalin = Javalin.create(cfg -> {
       cfg.startup.showJavalinBanner = false;
       cfg.jetty.host = configuration.bindAddress();
@@ -130,6 +141,7 @@ public class BffApplication {
           path("/transport-orders", () -> {
             post(createTransportOrderHandler);
           });
+          sse("/sse", sseEventBridge::register);
         });
       });
 
@@ -178,6 +190,7 @@ public class BffApplication {
       return;
     }
     javalin.start();
+    kernelEventPoller.start();
     started = true;
     LOG.info(
         "BFF started on {}:{} (configured port: {})",
@@ -194,6 +207,8 @@ public class BffApplication {
     if (!started) {
       return;
     }
+    kernelEventPoller.stop();
+    sseEventBridge.closeAll();
     javalin.stop();
     started = false;
     LOG.info("BFF stopped");

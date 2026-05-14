@@ -13,7 +13,7 @@ import org.opentcs.bff.api.v1.model.VehicleState;
  * Converts between the openTCS kernel's {@link org.opentcs.data.model.Vehicle} domain object and
  * the BFF API's generated {@link Vehicle} DTO.
  */
-final class VehicleConverter {
+public final class VehicleConverter {
 
   private VehicleConverter() {
   }
@@ -24,7 +24,7 @@ final class VehicleConverter {
    * @param vehicle The kernel-side vehicle.
    * @return The corresponding DTO.
    */
-  static Vehicle toDto(org.opentcs.data.model.Vehicle vehicle) {
+  public static Vehicle toDto(org.opentcs.data.model.Vehicle vehicle) {
     requireNonNull(vehicle, "vehicle");
     Vehicle dto = new Vehicle();
     dto.setName(vehicle.getName());

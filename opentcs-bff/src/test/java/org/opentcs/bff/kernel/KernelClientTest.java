@@ -152,4 +152,32 @@ class KernelClientTest {
     verify(vehicleService, times(1)).fetch(Vehicle.class, "alpha");
     verify(vehicleService, times(1)).fetch(Vehicle.class, "ghost");
   }
+
+  @Test
+  void fetchEventsDelegatesToPortal() {
+    java.util.List<Object> events = java.util.List.of(new Object(), new Object());
+    when(portal.fetchEvents(750L)).thenReturn(events);
+
+    java.util.List<Object> result = kernelClient.fetchEvents(750L);
+
+    assertThat(result).isSameAs(events);
+    verify(portal, times(1)).fetchEvents(750L);
+  }
+
+  @Test
+  void fetchEventsInvalidatesPortalOnError() {
+    when(plantModelService.getPlantModel()).thenReturn(new PlantModel("test"));
+    // Force an initial connection so we can verify a second login on the next call.
+    kernelClient.getPlantModel();
+    when(portal.fetchEvents(org.mockito.ArgumentMatchers.anyLong()))
+        .thenThrow(new KernelRuntimeException("boom"));
+
+    assertThatThrownBy(() -> kernelClient.fetchEvents(100L))
+        .isInstanceOf(KernelRuntimeException.class);
+
+    // The next call must re-create + re-login a fresh portal because the previous one was dropped.
+    kernelClient.getPlantModel();
+    verify(portalFactory, times(2)).create(anyString(), anyString());
+    verify(portal, times(2)).login(anyString(), anyInt());
+  }
 }

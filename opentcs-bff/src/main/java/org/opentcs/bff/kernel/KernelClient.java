@@ -6,6 +6,7 @@ import static java.util.Objects.requireNonNull;
 
 import com.google.inject.Singleton;
 import jakarta.inject.Inject;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.opentcs.access.KernelRuntimeException;
@@ -98,6 +99,26 @@ public class KernelClient {
   }
 
   /**
+   * Fetches events buffered for this client at the kernel side.
+   *
+   * <p>If the underlying portal call fails (e.g. because the kernel went away), the cached portal
+   * is invalidated so that the next call to {@link #ensureConnected()} reconnects from scratch.
+   *
+   * @param timeout Maximum time (in ms) to wait for events to arrive.
+   * @return The list of events that arrived.
+   * @throws KernelRuntimeException If the Kernel cannot be reached or the request fails.
+   */
+  public List<Object> fetchEvents(long timeout) {
+    try {
+      return ensureConnected().fetchEvents(timeout);
+    }
+    catch (KernelRuntimeException e) {
+      invalidate();
+      throw e;
+    }
+  }
+
+  /**
    * Ensures the underlying portal is logged in, creating and connecting it on first use.
    *
    * @return The (now logged-in) portal.
@@ -144,6 +165,17 @@ public class KernelClient {
     }
     catch (KernelRuntimeException e) {
       LOG.warn("Error while logging out from the Kernel; ignoring.", e);
+    }
+  }
+
+  /**
+   * Drops the cached portal without attempting to log out, so that the next call to
+   * {@link #ensureConnected()} re-establishes the connection. Used internally when a request
+   * fails so that subsequent operations can transparently reconnect.
+   */
+  private void invalidate() {
+    synchronized (lock) {
+      portal = null;
     }
   }
 }
