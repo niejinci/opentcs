@@ -1,0 +1,13 @@
+node_modules/
+dist/
+dist-ssr/
+.vite/
+
+# Local env overrides (never commit secrets).
+.env.local
+.env.*.local
+
+# Editor / OS noise
+.DS_Store
+*.log
+*.tsbuildinfo
