@@ -2,12 +2,13 @@
 
 > openTCS 单页前端（Single-Page Application）。MVP 目标：地图三件套上传 → 画布编辑工厂模型 → 发布到 openTCS Kernel → 创建运输订单 → 通过 BFF 的 SSE 实时观察 AGV 状态。
 
-**当前状态：S1（项目脚手架 + Hello World）已完成；本目录已具备最小可运行的 Vue 3 + TypeScript + Vite 工程。**
+**当前状态：S2（基础设施层：HTTP / SSE / 统一错误 / Toast / 运行时配置）已完成；启动后默认进入 BFF Debug 自检页。**
 
 ## 文档入口
 
 - 主时间线：[`/docs/spa-frontend-roadmap.md`](../docs/spa-frontend-roadmap.md)
 - 架构 / 技术栈 / 目录 / 接口契约 / ADR：[`/docs/spa-frontend-architecture.md`](../docs/spa-frontend-architecture.md)
+- BFF 接口清单 / mock：[`docs/api-contract.md`](./docs/api-contract.md)（S2 起）
 - 配套 BFF 模块：[`/opentcs-bff`](../opentcs-bff)
 - 共识基线：[`/chat-with-ai/20-agv地图适配到opentcs.md`](../chat-with-ai/20-agv地图适配到opentcs.md)
 

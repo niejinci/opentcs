@@ -292,3 +292,22 @@ S7 BFF 接口实现要点：① 全部走流式 IO；② `meta.json` 写入用 "
   - sandbox 默认 `npm` 但本工程钉死 `pnpm 9`；新机器需先 `corepack enable && corepack prepare pnpm@9.12.3 --activate`，已写进 README
   - lockfile（`pnpm-lock.yaml`）已提交，遵循"L0 基线 PR 一次性大 PR"约定；S2+ 任何依赖新增/升级走单独 PR 评审
 - 下一阶段入口文件：`opentcs-spa/src/api/client.ts`（S2 起手 —— HTTP wrapper + `X-Api-Access-Key` 注入 + 统一错误）
+
+### S2（2026-05-15）BFF 接口对接基础设施
+- 已完成模块：
+  - `src/config/runtime.ts`：集中读取 `VITE_BFF_BASE_URL` / `VITE_BFF_ACCESS_KEY`，`bffUrl(path)` 同时兼容"dev 同源 + Vite proxy" 与 "prod 绝对地址"
+  - `src/api/types/bff.ts`：手写 OpenAPI schema 镜像（`HealthResponse` / `Vehicle` / `Destination` / `TransportOrder` / `SseEventEnvelope<T>` / `BffErrorResponse` + 常量 `SSE_EVENT_VEHICLES` `SSE_EVENT_TRANSPORT_ORDERS`）；S2 不引 `openapi-typescript` 以保持基础设施层零新依赖，留给后续 sub-PR
+  - `src/api/errors.ts`：`ApiError` / `HttpError`(含 `payload: BffErrorResponse | null` + `traceId`) / `NetworkError` / `ParseError` + `isApiError`
+  - `src/api/client.ts`：唯一 `fetch` 包装；自动 `X-Api-Access-Key`、`Accept: application/json`；2xx 解析 JSON、非 2xx 解析 BFF `ErrorResponse` 抛 `HttpError`、`fetch` 自身失败抛 `NetworkError`；尊重 `AbortError` 透传；默认 `toastOnError: true`，可关闭
+  - `src/api/sse.ts`：`SseClient` 状态机 `idle / connecting / open / reconnecting / closed`；按事件名（`/events/vehicles` / `/events/transportOrders`）分发并解析 `SseEventEnvelope`；指数退避 1→2→4→…→30s ±20% 抖动；`close()` 后不再重连
+  - `src/api/endpoints/{health,vehicles}.ts` + `src/api/index.ts` 集中再导出
+  - `src/ui/toast/{toastBus,ToastContainer.vue}`：极简 reactive 实现（无 Element Plus 依赖），分级 info/success/warning/error，`error` 默认粘性
+  - `src/views/DebugView.vue`：`/health` 调用按钮 + SSE 连接/断开 + 实时事件日志 + 运行时配置展示，`App.vue` 挂载 DebugView 与 ToastContainer
+  - `opentcs-spa/docs/api-contract.md`：S2 已封装 endpoint 清单 + curl 示例 + mock JSON
+- 已验证命令（沙箱内全部成功）：`pnpm typecheck` → `pnpm lint`（0 errors / 0 warnings）→ `pnpm format:check` → `pnpm build`（产出 `dist/index.html` + `assets/index-*.js` 71.99 kB gzip 28.79 kB；CSS 3.82 kB gzip 1.29 kB）→ `pnpm dev`（5173 端口，`curl /` 200，`curl /api/v1/vehicles` 与 `curl /health` 经代理转发，BFF 未起返回 500/ECONNREFUSED——证明 client + 代理链路通）
+- 已知坑 / 待办：
+  - 仍未引 vue-router / Pinia / Element Plus / vitest；S3 起按需补
+  - SSE 鉴权 query 参数 BFF 侧未支持，MVP dev 默认鉴权关闭；上 prod 前需 BFF 补 `?accessKey=` 或 SPA 改用 `@microsoft/fetch-event-source`
+  - `BffErrorResponse` 等 schema 当前手写镜像，BFF 侧 `bff.yaml` 改动需在同一 PR 内同步本仓 `src/api/types/bff.ts`；S6+ 引入 `openapi-typescript` 后此约束消失
+  - SSE 客户端尚无单测（`Math.random` 注入与 `EventSource` mock 留给 vitest 落地后补）
+- 下一阶段入口文件：`opentcs-spa/src/views/ImportView.vue`（S3 起手 —— 三件套上传 + `parseRosMapYaml` + 仿射映射 + Konva 只读底图）
