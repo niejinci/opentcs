@@ -1,7 +1,7 @@
 # opentcs-spa · 中间态数据模型（活文档）
 
 > 配套：[`spa-frontend-architecture.md`](../../docs/spa-frontend-architecture.md) §3.3、ADR-0003。
-> 本文件**从 S3 起持续演进**；S5 起补 Point / Path，S6 补 Location / Block / Vehicle，每个 S 内追加一节。
+> 本文件**从 S3 起持续演进**；S5 落 Point / Path，S6 补 Location / LocationType / Block / Vehicle，每个 S 内追加一节。
 
 ## 1. 设计原则（强约束，复述 ADR-0003）
 
@@ -129,10 +129,149 @@ interface DraftPath {
 
 ---
 
-## 5. 待落（按里程碑）
+## 5. S6 已落地：`DraftLocationType` / `DraftLocation` / `DraftBlock` / `DraftVehicle`
 
-| 里程碑 | 新增结构                                                                                       | 对齐的 TO 类                    |
-| :----- | :--------------------------------------------------------------------------------------------- | :------------------------------ |
-| S6     | `LocationTypeCreationTO` / `LocationCreationTO` / `BlockCreationTO` / `VehicleCreationTO` 镜像 | `org.opentcs.access.to.model.*` |
-| S7     | `ProjectDraft`：`{ id, name, backgroundMap, points[], paths[], ... }` 整体 schema              | —                               |
-| S8     | `PlantModelTO` 镜像（顶层），加发布请求外壳 `{projectId, plantModel}`                          | `PlantModelCreationTO`          |
+源文件：[`src/domain/model/types.ts`](../src/domain/model/types.ts)。规则同 §4：**字段名 / 嵌套结构 / 单位**严格镜像 `org.opentcs.access.to.model.{LocationType,Location,Block,Vehicle}CreationTO`，仅在必要处补「编辑期辅助字段」并明示。
+
+### 5.1 `DraftLocationType` ↔ `LocationTypeCreationTO`
+
+```ts
+interface DraftLocationType {
+  name: string;
+  allowedOperations: string[];
+  allowedPeripheralOperations: string[];
+  layout: { locationRepresentation: LocationRepresentation };
+}
+```
+
+| Draft 字段                      | TO 字段                                                | 单位 / 备注                                                 |
+| :------------------------------ | :----------------------------------------------------- | :---------------------------------------------------------- |
+| `name`                          | `LocationTypeCreationTO.name`                          | 自动名 `LocType-N`；改名级联到所有 `DraftLocation.typeName` |
+| `allowedOperations`             | `LocationTypeCreationTO.allowedOperations`             | 自由字符串列表；store 在 commit 时 `trim + dedupe`          |
+| `allowedPeripheralOperations`   | `LocationTypeCreationTO.allowedPeripheralOperations`   | MVP 通常留空                                                |
+| `layout.locationRepresentation` | `LocationTypeCreationTO.Layout.locationRepresentation` | 14 值枚举 `LocationRepresentation`（全集见类型文件）        |
+| _未实现_                        | `properties`                                           | 留 S7+；S8 用 TO 默认                                       |
+
+### 5.2 `DraftLocation` ↔ `LocationCreationTO`
+
+```ts
+interface DraftLocation {
+  name: string;
+  typeName: string; // 必须命中既有 DraftLocationType.name
+  position: { x: number; y: number; z: number }; // TripleCreationTO (mm, integer)
+  locked: boolean;
+  links: { pointName: string; allowedOperations: string[] }[];
+  layout: {
+    pixelX: number;
+    pixelY: number; // 编辑期辅助
+    locationRepresentation: LocationRepresentation; // 覆盖 LocationType 的同名字段
+  };
+}
+```
+
+| Draft 字段                                 | TO 字段                                                 | 单位 / 备注                                                                      |
+| :----------------------------------------- | :------------------------------------------------------ | :------------------------------------------------------------------------------- |
+| `name`                                     | `LocationCreationTO.name`                               | 自动名 `Location-N`；改名级联到 `Block.memberNames`                              |
+| `typeName`                                 | `LocationCreationTO.typeName`                           | 首次添加 Location 时若 store 为空，自动创建一个默认 `LocType-1`                  |
+| `position`                                 | `LocationCreationTO.position`（`TripleCreationTO`）     | mm，integer                                                                      |
+| `locked`                                   | `LocationCreationTO.locked`                             | 锁定后订单不会以此为目的地；AnnotationLayer 用灰色填充                           |
+| `links[i].pointName` / `allowedOperations` | `LocationCreationTO.links` (`Map<String, Set<String>>`) | SPA 用数组保有序便于 UI；S8 转 Map；`allowedOperations` 留空 = 继承 LocationType |
+| `layout.pixelX/pixelY`                     | —                                                       | **编辑期辅助**；由 AffineMapping 反算可得，S8 转换层丢弃                         |
+| `layout.locationRepresentation`            | `LocationCreationTO.Layout.locationRepresentation`      | 仅本 Location 覆盖 `LocationType.layout.locationRepresentation`                  |
+| _未实现_                                   | `Layout.labelOffset / layerId / properties`             | 留 S7+；S8 用 TO 默认                                                            |
+
+### 5.3 `DraftBlock` ↔ `BlockCreationTO`
+
+```ts
+type BlockType = 'SINGLE_VEHICLE_ONLY' | 'SAME_DIRECTION_ONLY';
+
+interface DraftBlock {
+  name: string;
+  type: BlockType;
+  memberNames: string[]; // 引用 Point / Path / Location 的 name
+  layout: { colorRgb: string }; // '#RRGGBB' 小写，无 alpha
+}
+```
+
+| Draft 字段        | TO 字段                             | 单位 / 备注                                                                    |
+| :---------------- | :---------------------------------- | :----------------------------------------------------------------------------- |
+| `name`            | `BlockCreationTO.name`              | 自动名 `Block-N`                                                               |
+| `type`            | `BlockCreationTO.Type`              | `SINGLE_VEHICLE_ONLY`（默认） / `SAME_DIRECTION_ONLY`                          |
+| `memberNames`     | `BlockCreationTO.memberNames` (Set) | 引用 Point / Path / Location 的 `name`；删除被引实体或重命名时 store 级联更新  |
+| `layout.colorRgb` | `BlockCreationTO.Layout.color`      | `#RRGGBB` → S8 用 `Integer.parseInt(rgb.substring(1), 16)` 转 `java.awt.Color` |
+| _未实现_          | `properties`                        | 留 S7+                                                                         |
+
+### 5.4 `DraftVehicle` ↔ `VehicleCreationTO`
+
+```ts
+interface DraftVehicle {
+  name: string;
+  boundingBox: { length: number; width: number; height: number }; // mm, long
+  energyLevelThresholdSet: {
+    energyLevelCritical: number; // 0-100
+    energyLevelGood: number;
+    energyLevelSufficientlyRecharged: number;
+    energyLevelFullyRecharged: number;
+  };
+  maxVelocity: number; // mm/s
+  maxReverseVelocity: number; // mm/s
+  envelopeKey: string; // '' = 默认
+  layout: {
+    pixelX: number;
+    pixelY: number; // 编辑期辅助
+    orientationDeg: number; // 编辑期辅助（图标朝向）
+    routeColorRgb: string; // '#RRGGBB'
+  };
+}
+```
+
+| Draft 字段                                | TO 字段                                                    | 单位 / 备注                                                                                                    |
+| :---------------------------------------- | :--------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------- |
+| `name`                                    | `VehicleCreationTO.name`                                   | 自动名 `Vehicle-N`                                                                                             |
+| `boundingBox.{length,width,height}`       | `VehicleCreationTO.boundingBox`（`BoundingBoxCreationTO`） | mm，long；默认 1000/1000/1000                                                                                  |
+| `energyLevelThresholdSet.*`               | `VehicleCreationTO.energyLevelThresholdSet`                | 百分比 0-100；默认 30/90/30/90 与 TO 一致                                                                      |
+| `maxVelocity` / `maxReverseVelocity`      | 同名字段                                                   | mm/s；默认 1000                                                                                                |
+| `envelopeKey`                             | `VehicleCreationTO.envelopeKey`                            | 字符串；MVP 通常留空                                                                                           |
+| `layout.routeColorRgb`                    | `VehicleCreationTO.Layout.routeColor`                      | `#RRGGBB` → `java.awt.Color`                                                                                   |
+| **`layout.pixelX/pixelY/orientationDeg`** | —                                                          | **编辑期辅助**：TO 不带初始位姿（运行时由 Kernel 给出），SPA 仅用于画布渲染；**S8 publish 转换器必须显式丢弃** |
+| _未实现_                                  | `properties`                                               | 留 S7+                                                                                                         |
+
+### 5.5 `localStorage` envelope v2
+
+S6 把 envelope 从 v1 升到 v2（key 仍是 `opentcs-spa.draftV1`，避免不必要的命名漂移）：
+
+```ts
+interface PersistedDraft {
+  v: 2;
+  points: DraftPoint[];
+  paths: DraftPath[];
+  locationTypes: DraftLocationType[];
+  locations: DraftLocation[];
+  blocks: DraftBlock[];
+  vehicles: DraftVehicle[];
+  selection: SelectionRef | null;
+}
+```
+
+向后兼容：`loadPersisted` 同时接受 `v=1` 与 `v=2`，对 v1 用空数组补齐 S6 四个集合——已有 S5 草稿无缝迁移。
+
+### 5.6 删除 / 重命名级联约定
+
+| 触发                                                     | 自动级联                                                                                                  |
+| :------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------- |
+| 删 Point                                                 | 关联 Path 一并删；从 `Location.links[].pointName` 中剔除；从 `Block.memberNames` 中剔除                   |
+| 删 Path                                                  | 从 `Block.memberNames` 中剔除                                                                             |
+| 删 Location                                              | 从 `Block.memberNames` 中剔除                                                                             |
+| 改 Point.name                                            | 更新所有引用它的 `Path.{srcPointName,destPointName}` / `Location.links[].pointName` / `Block.memberNames` |
+| 改 LocationType.name                                     | 更新所有 `Location.typeName`                                                                              |
+| 改 Path.name / Location.name / Block.name / Vehicle.name | 更新 `Block.memberNames` 中的同名引用；改名前 `nameTaken` 全六类去重                                      |
+| 删 LocationType                                          | 若仍有 Location 引用 → 软失败（属性面板提示先改类型再删）                                                 |
+
+---
+
+## 6. 待落（按里程碑）
+
+| 里程碑 | 新增结构                                                                          | 对齐的 TO 类           |
+| :----- | :-------------------------------------------------------------------------------- | :--------------------- |
+| S7     | `ProjectDraft`：`{ id, name, backgroundMap, points[], paths[], ... }` 整体 schema | —                      |
+| S8     | `PlantModelTO` 镜像（顶层），加发布请求外壳 `{projectId, plantModel}`             | `PlantModelCreationTO` |

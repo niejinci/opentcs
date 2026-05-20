@@ -395,3 +395,24 @@ S7 BFF 接口实现要点：① 全部走流式 IO；② `meta.json` 写入用 "
   - 渲染层 `safeScale = max(scale, 1e-4)` 防止极小缩放下尺寸除以 0 爆 Infinity；MIN_SCALE=0.05 实际不会触发，但留 belt-and-braces
   - vue-router 切换路由后 Pinia store 仍单例，跨页面 selection 会保留——目前观感正常（用户切回 editor 看到上次选中），需要时再加 `router.afterEach` 清理
 - 下一阶段入口文件：`opentcs-spa/src/components/property/LocationForm.vue`（S6 起手 —— 在 PropertyPanel 中新增 Location/LocationType/Block/Vehicle 分支；同步在 `src/domain/model/types.ts` 补 `DraftLocation` / `DraftLocationType` / `DraftBlock` / `DraftVehicle` 镜像；AnnotationLayer 加方块 / 矩形 / 车辆 icon 渲染）
+
+### S6（2026-05-20）Location + Block + Vehicle
+
+- 已完成：
+  - `src/domain/model/types.ts`：新增 `DraftLocationType / DraftLocation / DraftBlock / DraftVehicle` TS 镜像 + `LocationRepresentation` (14 值) / `BlockType` 枚举；`EntityKind` 由 `'point' | 'path'` 扩展到 6 种
+  - `src/stores/project.ts`：在 S5 的 store 上追加 `locationTypes / locations / blocks / vehicles` 四个数组 + 全套 add/move/rename/updateFields/delete + `toggleLocationLink / setLocationLinkOperations / toggleBlockMember` action；`nameTaken` 改为对所有六类实体去重；`blockMemberCandidates()` 帮 BlockForm 列出可勾选成员
+  - `localStorage` envelope 升级到 v2（key 仍是 `opentcs-spa.draftV1`）；`loadPersisted` 同时接受 v=1 与 v=2 的 payload，对缺失的 S6 数组以空数组兜底——已有 S5 草稿无缝迁移
+  - 删除 / 重命名级联：删 Point → 同时清理引用它的 Path / Location.links / Block.members；删 Path / Location → 同时清理 Block.members；改 LocationType 名称 → 所有 Location.typeName 跟随；删 LocationType 时若仍被 Location 引用则软失败（属性面板拦截并提示）
+  - `src/domain/editor/tools.ts`：加 `location(O) / block(B) / vehicle(K)` 三种工具；既有 `select(V) / point(P) / path(L)` 的 cursor/hint 文案小幅更新
+  - `src/components/canvas/AnnotationLayer.vue`：渲染 Location 方块（紫色，可拖动）+ Vehicle 带朝向矩形（按 routeColor 着色，可拖动）+ Location ↔ Point 虚线 link；选中 Block 时画 member 包络框 + 高亮成员描边；保留 Point / Path / Path 橡皮筋的全部 S5 行为
+  - `src/components/property/{LocationTypeForm,LocationForm,BlockForm,VehicleForm}.vue` 四个子组件按 `selection.kind` 分发；`PropertyPanel.vue` 改为顶部计数 + `+ LocationType / + Block` 快捷按钮 + 6 路 branch
+  - `src/views/EditorView.vue` 标题升级为 S6，`onToolFire` 分发到新三个工具（Block 直接在空白处 click 新建空 Block；Vehicle 在 click 落点放置；Location 复用 `addLocation` 的首类型自动 bootstrap）
+  - 文档：`opentcs-spa/docs/data-model.md` 追加 §5 S6 节（四类 Draft 与 TO 字段映射表 + envelope v2 约定）；`docs/spa-frontend-roadmap.md` S6 行打勾
+- 已知坑 / 显式权衡：
+  - VehicleCreationTO 本身没有位姿字段，SPA 为画布显示新增 `layout.pixelX/Y/orientationDeg` 三个**编辑期辅助字段**；S8 publish 转换器必须显式丢弃，否则 RMI 会被 Jackson 拒（已在 data-model §5.4 标注）
+  - Block 没有几何，画布上仅在**选中时**画虚线包络框；非选中 Block 完全靠属性面板里"成员勾选"管理——刻意保持 MVP 简单，v2 起再考虑右键菜单/直接框选
+  - `LocationRepresentation` 暴露的 14 个值是 `LocationRepresentationTO` 的全集；后续若 openTCS 升级新增值，需要同步 `LOCATION_REPRESENTATIONS` 与 TS 联合类型（一处即可）
+  - `links.allowedOperations` 留空 = "继承 LocationType 的 allowedOperations"——这是 SPA 的语义习惯，S8 publish 转换器要按这条规则做兜底
+  - Block / Vehicle 的颜色用 `#RRGGBB`（小写），不带 alpha；S8 转换器直接 `Integer.parseInt(rgb.substring(1), 16)` 即可喂给 `java.awt.Color`
+  - 拖动 Vehicle 当前只改 `layout.pixelXY`，不改 orientation；orientation 仍靠 VehicleForm 数字输入框编辑，无旋转控柄（v2）
+- 下一阶段入口文件：`opentcs-bff/src/main/java/org/opentcs/bff/projects/`（S7 起手 —— 在 BFF 新建工程目录服务，落 `data/projects/<id>/draft.json` + `assets/`，并新增 `GET/PUT /api/v1/projects/{id}/draft` 与 OpenAPI；SPA 同步在 `src/api/endpoints/projects.ts` 引契约，把 `useProjectStore()` 的 `localStorage` 持久化改为远程读写，envelope schema 保持 v2 不变以便机械迁移）

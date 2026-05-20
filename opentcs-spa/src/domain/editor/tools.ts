@@ -7,7 +7,7 @@
 // stores, hotkey maps, and analytics can pin to. Keep additions strictly
 // additive.
 
-export type EditorToolId = 'select' | 'point' | 'path';
+export type EditorToolId = 'select' | 'point' | 'path' | 'location' | 'block' | 'vehicle';
 
 export interface EditorToolMeta {
   id: EditorToolId;
@@ -29,7 +29,7 @@ export const EDITOR_TOOLS: readonly EditorToolMeta[] = Object.freeze([
     label: '选择',
     hotkey: 'V',
     cursor: 'default',
-    hint: '选择 / 拖动既有 Point；点击 Path 选中以编辑属性；Delete 删除',
+    hint: '选择 / 拖动既有实体；点击实体编辑属性；Delete 删除',
     milestone: 'S5',
   },
   {
@@ -47,6 +47,30 @@ export const EDITOR_TOOLS: readonly EditorToolMeta[] = Object.freeze([
     cursor: 'crosshair',
     hint: '依次点击两个 Point 创建有向 Path；Esc 取消',
     milestone: 'S5',
+  },
+  {
+    id: 'location',
+    label: '画站点',
+    hotkey: 'O',
+    cursor: 'crosshair',
+    hint: '点击空白处新建 Location；首次会自动创建一个 LocationType',
+    milestone: 'S6',
+  },
+  {
+    id: 'block',
+    label: '画区块',
+    hotkey: 'B',
+    cursor: 'crosshair',
+    hint: '点击画布新建空 Block；在属性面板勾选 Point / Path / Location 作为成员',
+    milestone: 'S6',
+  },
+  {
+    id: 'vehicle',
+    label: '画车',
+    hotkey: 'K',
+    cursor: 'crosshair',
+    hint: '点击空白处放置一台 Vehicle；属性面板编辑尺寸 / 朝向 / 速度等',
+    milestone: 'S6',
   },
 ]);
 
