@@ -3,18 +3,23 @@
 // the PNG as a read-only background with a pixel↔meter affine mapping.
 //
 // MVP decisions:
-//   - Native <canvas> + a single Image draw. Konva / vue-konva lands in S4
-//     when we need real layering / zoom-pan / shape editing — pulling it in
-//     here would just be dead weight.
+//   - Native <canvas> + a single Image draw. The full Konva editor lives in
+//     EditorView (S4); this view stays a thin preview to keep the import
+//     loop cheap and visually distinct from the editor.
 //   - PGM is uploaded for archival / S7 BFF storage; SPA does not render it
 //     (browsers can't natively decode P5 PGM). We only checksum-pair it with
 //     the yaml via filename matching.
 //   - Everything is in-browser: nothing is uploaded to BFF yet (S7 lands
 //     the multipart endpoints). Files live in component state.
 //   - No localStorage persistence here — drafts persist starting at S5.
+//   - S4 addition: on successful import, publish the decoded image +
+//     AffineMapping into `useBackgroundMap()` so EditorView can pick it up
+//     without re-uploading.
 
 import { computed, onBeforeUnmount, ref, shallowRef, useTemplateRef } from 'vue';
+import { useRouter } from 'vue-router';
 
+import { useBackgroundMap } from '@/composables/useBackgroundMap';
 import { buildAffine, pixelToWorld, type AffineMapping } from '@/domain/geometry/affine';
 import {
   parseRosMapYaml,
@@ -30,11 +35,17 @@ interface UploadedFile {
   sizeBytes: number;
 }
 
+const router = useRouter();
+const { setBackgroundMap, clearBackgroundMap } = useBackgroundMap();
+
 const pngFile = ref<UploadedFile | null>(null);
 const pgmFile = ref<UploadedFile | null>(null);
 const yamlFile = ref<UploadedFile | null>(null);
 
 const pngObjectUrl = ref<string | null>(null);
+// Most-recently decoded PNG, kept around so we can publish to the shared
+// background-map composable once yaml + image are both present.
+const decodedImage = shallowRef<HTMLImageElement | null>(null);
 
 const yamlMeta = shallowRef<RosMapMetadata | null>(null);
 const affine = shallowRef<AffineMapping | null>(null);
@@ -73,7 +84,9 @@ function revokePngObjectUrl(): void {
 function resetMappingState(): void {
   affine.value = null;
   imageNaturalSize.value = null;
+  decodedImage.value = null;
   hoverPixel.value = null;
+  clearBackgroundMap();
 }
 
 function recomputeAffine(): void {
@@ -85,9 +98,28 @@ function recomputeAffine(): void {
       imageWidth: imageNaturalSize.value.width,
       imageHeight: imageNaturalSize.value.height,
     });
+    publishBackgroundIfReady();
   } else {
     affine.value = null;
+    clearBackgroundMap();
   }
+}
+
+function publishBackgroundIfReady(): void {
+  const img = decodedImage.value;
+  const meta = yamlMeta.value;
+  const aff = affine.value;
+  if (!img || !meta || !aff || !pngFile.value || !yamlFile.value) return;
+  setBackgroundMap({
+    image: img,
+    pngName: pngFile.value.name,
+    pgmName: pgmFile.value?.name ?? null,
+    yamlName: yamlFile.value.name,
+    width: aff.imageWidth,
+    height: aff.imageHeight,
+    yaml: meta,
+    affine: aff,
+  });
 }
 
 function recomputeFileNameWarnings(): void {
@@ -136,6 +168,7 @@ async function onPngChange(e: Event): Promise<void> {
   const img = new Image();
   img.onload = () => {
     imageNaturalSize.value = { width: img.naturalWidth, height: img.naturalHeight };
+    decodedImage.value = img;
     paintImage(img);
     recomputeAffine();
     toastSuccess(`PNG 解码成功：${img.naturalWidth} × ${img.naturalHeight} px`, file.name);
@@ -340,6 +373,16 @@ onBeforeUnmount(() => {
           >) m
         </span>
       </footer>
+      <div v-if="affine" class="open-editor">
+        <button
+          type="button"
+          class="cta-btn"
+          aria-label="打开画布编辑器"
+          @click="router.push('/editor')"
+        >
+          底图已就绪 — 打开「画布编辑器」 →
+        </button>
+      </div>
     </article>
   </section>
 </template>
@@ -459,5 +502,23 @@ h3 {
   background: #f6f8fa;
   padding: 0.05rem 0.3rem;
   border-radius: 3px;
+}
+
+.open-editor {
+  margin-top: 0.75rem;
+  text-align: right;
+}
+.cta-btn {
+  padding: 0.45rem 0.9rem;
+  border: none;
+  background: #1a7f37;
+  color: #ffffff;
+  border-radius: 5px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cta-btn:hover {
+  background: #14702f;
 }
 </style>

@@ -46,7 +46,28 @@ world_y = origin.y + (H - py)   * resolution    // py 是 top-left 系
 
 ---
 
-## 3. 待落（按里程碑）
+## 3. S4 已落地：编辑器框架（暂无新模型）
+
+S4 只交付画布框架（Konva 多图层 / 缩放 / 平移 / 工具栏切换），**未引入任何新的中间态实体**。但为承接 S5 起的 Pinia store，落了一个临时的「跨视图共享态」结构（见 `src/composables/useBackgroundMap.ts`）：
+
+```ts
+interface BackgroundMapState {
+  image: HTMLImageElement; // 已解码的 PNG（仅运行时，非持久化字段）
+  pngName: string;
+  pgmName: string | null;
+  yamlName: string;
+  width: number; // px == affine.imageWidth
+  height: number; // px == affine.imageHeight
+  yaml: RosMapMetadata; // 见 §2 中的 BackgroundMap 字段拍平
+  affine: AffineMapping; // 见 src/domain/geometry/affine.ts
+}
+```
+
+> 这是**进程内**的状态，不进入 `ProjectDraft` JSON。S7 持久化时只落 `BackgroundMap`（§2）的"可序列化部分"——`image` 由资产文件 + 浏览器解码重建。
+
+---
+
+## 4. 待落（按里程碑）
 
 | 里程碑 | 新增结构                                                                                       | 对齐的 TO 类                                     |
 | :----- | :--------------------------------------------------------------------------------------------- | :----------------------------------------------- |

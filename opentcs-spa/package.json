@@ -16,7 +16,9 @@
   },
   "dependencies": {
     "js-yaml": "^4.1.0",
+    "konva": "^9.3.20",
     "vue": "^3.5.13",
+    "vue-konva": "^3.2.1",
     "vue-router": "^4.4.5"
   },
   "devDependencies": {
