@@ -112,6 +112,26 @@ function onToolFire(payload: {
     }
     return;
   }
+  if (payload.tool === 'location') {
+    const created = store.addLocation(payload.pixel);
+    if (created) {
+      toastInfo(
+        `已创建 ${created.name}（type=${created.typeName}）@ (${payload.world.x.toFixed(3)}, ${payload.world.y.toFixed(3)}) m`,
+        'Location',
+      );
+    }
+    return;
+  }
+  if (payload.tool === 'block') {
+    const created = store.addBlock();
+    toastInfo(`已创建 ${created.name}（在右侧面板勾选成员）`, 'Block');
+    return;
+  }
+  if (payload.tool === 'vehicle') {
+    const created = store.addVehicle(payload.pixel);
+    toastInfo(`已创建 ${created.name}（拖动可调整初始位置 / 朝向在面板编辑）`, 'Vehicle');
+    return;
+  }
   // select tool: clicking empty canvas clears selection.
   if (payload.tool === 'select') {
     store.select(null);
@@ -127,11 +147,11 @@ function pointTypeBadge(): string {
 <template>
   <section class="editor">
     <header class="editor__header">
-      <h2>S5 · 画布编辑器（Point + Path）</h2>
+      <h2>S6 · 画布编辑器（Point / Path / Location / Block / Vehicle）</h2>
       <p class="hint">
-        点击 <kbd>P</kbd> + 画布空白处新建 Point；切到 <kbd>L</kbd> 依次点击两个 Point 创建有向
-        Path；<kbd>V</kbd> 选择 + 拖动；<kbd>Delete</kbd> 删除选中；<kbd>Esc</kbd> 取消。
-        草稿自动落本机 <code>localStorage</code>（刷新页面不丢）。
+        <kbd>V</kbd> 选择 · <kbd>P</kbd> Point · <kbd>L</kbd> Path · <kbd>O</kbd> Location ·
+        <kbd>B</kbd> Block · <kbd>K</kbd> Vehicle；<kbd>Delete</kbd> 删除选中 ·
+        <kbd>Esc</kbd> 取消半态。草稿自动落本机 <code>localStorage</code>（刷新页面不丢）。
       </p>
     </header>
 

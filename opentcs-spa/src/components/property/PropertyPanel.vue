@@ -21,6 +21,10 @@
 
 import { computed, ref, watch } from 'vue';
 
+import BlockForm from '@/components/property/BlockForm.vue';
+import LocationForm from '@/components/property/LocationForm.vue';
+import LocationTypeForm from '@/components/property/LocationTypeForm.vue';
+import VehicleForm from '@/components/property/VehicleForm.vue';
 import { useProjectStore } from '@/stores/project';
 import { toastError } from '@/ui/toast/toastBus';
 
@@ -198,6 +202,15 @@ function commitPathLocked(): void {
 function onDelete(): void {
   store.deleteSelected();
 }
+
+function onAddLocationType(): void {
+  const created = store.addLocationType();
+  store.select({ kind: 'locationType', name: created.name });
+}
+
+function onAddBlock(): void {
+  store.addBlock();
+}
 </script>
 
 <template>
@@ -205,9 +218,17 @@ function onDelete(): void {
     <header class="property-panel__header">
       <h3>属性面板</h3>
       <p class="hint">
-        共 <strong>{{ store.points.length }}</strong> 个 Point ·
-        <strong>{{ store.paths.length }}</strong> 条 Path
+        <strong>{{ store.points.length }}</strong> Point ·
+        <strong>{{ store.paths.length }}</strong> Path ·
+        <strong>{{ store.locations.length }}</strong> Location ·
+        <strong>{{ store.locationTypes.length }}</strong> LocType ·
+        <strong>{{ store.blocks.length }}</strong> Block ·
+        <strong>{{ store.vehicles.length }}</strong> Vehicle
       </p>
+      <div class="quick-actions">
+        <button type="button" @click="onAddLocationType">+ LocationType</button>
+        <button type="button" @click="onAddBlock">+ Block</button>
+      </div>
     </header>
 
     <!-- Point editor -->
@@ -265,7 +286,7 @@ function onDelete(): void {
         {{ selectedPoint.pose.position.z }})
       </p>
       <button class="danger" type="button" @click="onDelete">
-        删除此 Point（级联删除其相关 Path）
+        删除此 Point（级联删除其相关 Path / Location.links / Block.members）
       </button>
     </section>
 
@@ -319,13 +340,20 @@ function onDelete(): void {
       <button class="danger" type="button" @click="onDelete">删除此 Path</button>
     </section>
 
+    <!-- S6: LocationType / Location / Block / Vehicle editors -->
+    <LocationTypeForm v-else-if="store.selection?.kind === 'locationType'" />
+    <LocationForm v-else-if="store.selection?.kind === 'location'" />
+    <BlockForm v-else-if="store.selection?.kind === 'block'" />
+    <VehicleForm v-else-if="store.selection?.kind === 'vehicle'" />
+
     <section v-else class="empty">
       <p class="hint">未选中实体。</p>
       <ul class="howto">
-        <li>切到 <kbd>P</kbd> · 画点，点击画布空白处新建 Point</li>
-        <li>切到 <kbd>L</kbd> · 画路径，依次点击两个 Point</li>
-        <li>切到 <kbd>V</kbd> · 选择，点击实体编辑属性 / 拖动 Point</li>
-        <li>按 <kbd>Delete</kbd> 删除选中；按 <kbd>Esc</kbd> 取消 Path 半态</li>
+        <li><kbd>V</kbd> 选择 / 拖动 · 点击实体编辑属性</li>
+        <li><kbd>P</kbd> Point · <kbd>L</kbd> Path · <kbd>O</kbd> Location</li>
+        <li><kbd>B</kbd> Block · <kbd>K</kbd> Vehicle</li>
+        <li>按 <kbd>Delete</kbd> 删除选中；按 <kbd>Esc</kbd> 取消 Path 半态 / 取消选中</li>
+        <li>用上方 <code>+ LocationType</code> / <code>+ Block</code> 直接新建</li>
       </ul>
     </section>
   </aside>
@@ -347,6 +375,24 @@ function onDelete(): void {
 .property-panel__header h3 {
   margin: 0;
   font-size: 1rem;
+}
+.quick-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  flex-wrap: wrap;
+}
+.quick-actions button {
+  padding: 0.25rem 0.55rem;
+  border: 1px solid #d0d7de;
+  background: #f6f8fa;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+}
+.quick-actions button:hover {
+  background: #eaeef2;
 }
 .hint {
   color: #57606a;
