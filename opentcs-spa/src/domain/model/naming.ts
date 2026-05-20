@@ -33,9 +33,13 @@ export function nextAutoName(prefix: string, existing: Iterable<string>): string
 
 /**
  * Validate a user-edited entity name. openTCS does not enforce a strict
- * regex on names, but for MVP we require non-empty + no whitespace + no
- * forward-slash (the BFF file-storage layer at S7 will use names as path
- * segments under `data/projects/{id}/`).
+ * regex on names, but for MVP we require:
+ *   - non-empty
+ *   - ≤ 128 chars (a defensive upper bound; long names break the property
+ *     panel layout and may exceed filesystem path-segment limits when the
+ *     S7 BFF persists drafts under `data/projects/{id}/`)
+ *   - no whitespace, no forward/backward slash, no ASCII control chars
+ *     (slash exclusion is what the S7 file-storage layer relies on).
  */
 export function isValidEntityName(name: string): boolean {
   if (!name || name.length === 0) return false;

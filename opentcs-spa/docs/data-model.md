@@ -85,14 +85,14 @@ interface DraftPoint {
 }
 ```
 
-| Draft 字段                          | TO 字段                                                      | 单位 / 备注                                                  |
-| :---------------------------------- | :----------------------------------------------------------- | :----------------------------------------------------------- |
-| `name`                              | `PointCreationTO.name`                                       | 编辑器内必须唯一；S5 自动名 `Point-N`                        |
-| `type`                              | `PointCreationTO.type`                                       | `HALT_POSITION` / `PARK_POSITION`                            |
-| `pose.position.{x,y,z}`             | `TripleCreationTO`                                           | mm，integer；S5 中 `z=0`                                     |
-| `pose.orientationAngle`             | `PoseCreationTO.orientationAngle`                            | degrees；`NaN` = 未设置（与 TO 默认一致）                    |
-| `layout.pixelX/pixelY`              | —                                                            | **编辑期辅助**，由 AffineMapping 反算可得；S8 转换层丢弃     |
-| _未实现_                            | `vehicleEnvelopes` / `maxVehicleBoundingBox` / `Layout`      | 留 S6+；S8 转换层用 TO 的默认值                              |
+| Draft 字段              | TO 字段                                                 | 单位 / 备注                                              |
+| :---------------------- | :------------------------------------------------------ | :------------------------------------------------------- |
+| `name`                  | `PointCreationTO.name`                                  | 编辑器内必须唯一；S5 自动名 `Point-N`                    |
+| `type`                  | `PointCreationTO.type`                                  | `HALT_POSITION` / `PARK_POSITION`                        |
+| `pose.position.{x,y,z}` | `TripleCreationTO`                                      | mm，integer；S5 中 `z=0`                                 |
+| `pose.orientationAngle` | `PoseCreationTO.orientationAngle`                       | degrees；`NaN` = 未设置（与 TO 默认一致）                |
+| `layout.pixelX/pixelY`  | —                                                       | **编辑期辅助**，由 AffineMapping 反算可得；S8 转换层丢弃 |
+| _未实现_                | `vehicleEnvelopes` / `maxVehicleBoundingBox` / `Layout` | 留 S6+；S8 转换层用 TO 的默认值                          |
 
 ### 4.2 `DraftPath` ↔ `PathCreationTO`
 
@@ -108,15 +108,15 @@ interface DraftPath {
 }
 ```
 
-| Draft 字段                                | TO 字段                                                                                            | 单位 / 备注                                                                                                                 |
-| :---------------------------------------- | :------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------- |
-| `name`                                    | `PathCreationTO.name`                                                                              | 自动名 `Path-N`                                                                                                             |
-| `srcPointName` / `destPointName`          | `PathCreationTO.srcPointName` / `destPointName`                                                    | 必须命中既有 Point；Point 改名时由 store 级联更新                                                                           |
-| `length`                                  | `PathCreationTO.length` (`long`)                                                                   | mm，integer；store `addPoint/movePoint/setPointWorldMeters` 后自动用 `distanceMm` 重算（手工编辑会被覆盖，MVP 权衡）         |
-| `maxVelocity`                             | `PathCreationTO.maxVelocity` (`int`)                                                               | mm/s；S5 默认 `1000` (= 1 m/s)；`0` = 禁止正向                                                                              |
-| `maxReverseVelocity`                      | `PathCreationTO.maxReverseVelocity` (`int`)                                                        | mm/s；S5 默认 `0` = 禁止反向                                                                                                |
-| `locked`                                  | `PathCreationTO.locked`                                                                            | 锁定后 AGV 不会经过；AnnotationLayer 用虚线 + 灰色                                                                          |
-| _未实现_                                  | `peripheralOperations` / `vehicleEnvelopes` / `Layout`                                             | 留 S6+；S8 用 TO 默认                                                                                                       |
+| Draft 字段                       | TO 字段                                                | 单位 / 备注                                                                                                          |
+| :------------------------------- | :----------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------- |
+| `name`                           | `PathCreationTO.name`                                  | 自动名 `Path-N`                                                                                                      |
+| `srcPointName` / `destPointName` | `PathCreationTO.srcPointName` / `destPointName`        | 必须命中既有 Point；Point 改名时由 store 级联更新                                                                    |
+| `length`                         | `PathCreationTO.length` (`long`)                       | mm，integer；store `addPoint/movePoint/setPointWorldMeters` 后自动用 `distanceMm` 重算（手工编辑会被覆盖，MVP 权衡） |
+| `maxVelocity`                    | `PathCreationTO.maxVelocity` (`int`)                   | mm/s；S5 默认 `1000` (= 1 m/s)；`0` = 禁止正向                                                                       |
+| `maxReverseVelocity`             | `PathCreationTO.maxReverseVelocity` (`int`)            | mm/s；S5 默认 `0` = 禁止反向                                                                                         |
+| `locked`                         | `PathCreationTO.locked`                                | 锁定后 AGV 不会经过；AnnotationLayer 用虚线 + 灰色                                                                   |
+| _未实现_                         | `peripheralOperations` / `vehicleEnvelopes` / `Layout` | 留 S6+；S8 用 TO 默认                                                                                                |
 
 ### 4.3 localStorage 持久化约定
 
@@ -131,8 +131,8 @@ interface DraftPath {
 
 ## 5. 待落（按里程碑）
 
-| 里程碑 | 新增结构                                                                                       | 对齐的 TO 类                                     |
-| :----- | :--------------------------------------------------------------------------------------------- | :----------------------------------------------- |
-| S6     | `LocationTypeCreationTO` / `LocationCreationTO` / `BlockCreationTO` / `VehicleCreationTO` 镜像 | `org.opentcs.access.to.model.*`                  |
-| S7     | `ProjectDraft`：`{ id, name, backgroundMap, points[], paths[], ... }` 整体 schema              | —                                                |
-| S8     | `PlantModelTO` 镜像（顶层），加发布请求外壳 `{projectId, plantModel}`                          | `PlantModelCreationTO`                           |
+| 里程碑 | 新增结构                                                                                       | 对齐的 TO 类                    |
+| :----- | :--------------------------------------------------------------------------------------------- | :------------------------------ |
+| S6     | `LocationTypeCreationTO` / `LocationCreationTO` / `BlockCreationTO` / `VehicleCreationTO` 镜像 | `org.opentcs.access.to.model.*` |
+| S7     | `ProjectDraft`：`{ id, name, backgroundMap, points[], paths[], ... }` 整体 schema              | —                               |
+| S8     | `PlantModelTO` 镜像（顶层），加发布请求外壳 `{projectId, plantModel}`                          | `PlantModelCreationTO`          |
