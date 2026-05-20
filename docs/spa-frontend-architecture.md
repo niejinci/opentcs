@@ -334,3 +334,31 @@ S7 BFF 接口实现要点：① 全部走流式 IO；② `meta.json` 写入用 "
   - SS27 实际样本里 origin 数值非常大（-195.2 m），上 S4 缩放/平移时要注意默认视口要居中或自适应，否则用户打开就看不到图
   - vue-router catch-all 在 SPA 静态托管下需要 nginx `try_files $uri /index.html;`（已在 S1 备忘 / S10 docker-compose 待办里）
 - 下一阶段入口文件：`opentcs-spa/src/components/canvas/MapStage.vue`（S4 起手 —— 引入 vue-konva 9 / Konva 9，多图层 Stage + 缩放/平移 + 工具栏切换，从 `ImportView` 把原生 `<canvas>` 升级为 Konva BackgroundLayer）
+
+### S4（2026-05-20）画布编辑器框架
+- 已完成模块：
+  - `src/composables/useBackgroundMap.ts`：模块级单例（`shallowRef<BackgroundMapState | null>` + `version` 计数）。S4 暂代 Pinia 充当 ImportView ↔ EditorView 的共享态；导出 `background`（`shallowReadonly`）/ `hasBackground` / `setBackgroundMap` / `clearBackgroundMap`。S5 起手将被 `useProjectStore()` 替换，API 形状刻意保持小以便机械迁移
+  - `src/domain/editor/tools.ts`：编辑器工具枚举（`select` / `point` / `path`）+ `EditorToolMeta`（label / hotkey V/P/L / cursor / hint / milestone）+ `editorToolForHotkey()`，工具数据全部冻结
+  - `src/components/canvas/MapStage.vue`：根 `<v-stage>`，**核心约定 Stage 局部坐标 ≡ 自然 PNG 像素坐标**（BackgroundLayer 始终在 (0,0) × imageWidth/Height 绘制；缩放/平移通过 Stage 的 scale + position 完成）。滚轮聚焦光标缩放（`[MIN_SCALE=0.05, MAX_SCALE=20]`，ZOOM_STEP=1.1）；按住 `Space` 把 `draggable=true` 翻成 `true` 触发 Konva 原生拖拽，`dragend` 同步回 `stageX/Y` ref；`ResizeObserver` 让 Stage 自适应容器；`fitToContainer()`（首次度量 + 图像换源时自动重拟，向外通过 `defineExpose` 暴露为 `resetView`）；`#status` 作用域插槽向父组件提供 `scale / pixel / world / panning`
+  - `src/components/canvas/BackgroundLayer.vue`：单 `<v-image>` 渲染 PNG，`listening: false` 杜绝事件穿透
+  - `src/components/canvas/AnnotationLayer.vue`：空 `<v-layer>` 占位，S5+ 在此挂 Point/Path 形状（保住图层栈顺序）
+  - `src/components/canvas/HoverLayer.vue`：创建型工具激活时画 12px 十字光标（`strokeWidth` / `halfSize` 反比缩放，保持屏上恒定大小）
+  - `src/components/canvas/EditorToolbar.vue`：左侧竖向工具按钮组，纯展示，向上 emit `switch-tool`
+  - `src/views/EditorView.vue`：3 列布局（工具栏 / Stage / 信息侧栏），全局热键 V/P/L 切换工具（`<input>/<textarea>/contentEditable` 时屏蔽）；S4 严格边界 —— `tool-fire` 事件只 `toastInfo` 回显「像素 → 世界 m」，**不创建任何实体**；未导入底图时回退 CTA 跳 `/import`
+  - `src/views/ImportView.vue` 增量改造：解码完 PNG + 解析完 yaml 后通过 `setBackgroundMap()` 推到共享态；导入就绪时在状态栏下方追加「打开画布编辑器」绿色 CTA；`resetMappingState()` 同步 `clearBackgroundMap()`
+  - `src/router/index.ts`：新增 `/editor` 路由（lazy import）；`src/App.vue` 顶导补 `画布编辑器` 链接；`src/main.ts` 多 `.use(VueKonva)` 注册全局 `<v-stage>/<v-layer>/<v-image>/<v-line>` 等组件
+- 已新增依赖（advisory 检查无漏洞）：
+  - `konva@^9.3.20`（实装 9.3.22）
+  - `vue-konva@^3.2.1`（实装 3.4.0）
+- 已验证命令（沙箱内全部成功）：
+  - `pnpm typecheck`（0 错；坑：`readonly()` 会把 `HTMLImageElement` 也 DeepReadonly 化，必须改用 `shallowReadonly()`）→ `pnpm lint`（0 错 0 警）→ `pnpm format:check`（全部符合）→ `pnpm build`（238 modules：index chunk 291.19 kB gzip 96.10 kB，**konva+vue-konva 全量进 index 是已知后果**，EditorView chunk 9.25 kB gzip 4.13 kB；ImportView chunk 49.11 kB 不变）
+  - `pnpm dev`：`curl /editor → 200`，`curl /src/views/EditorView.vue` 经 vite transform 返回有效 ESM
+- 已知坑 / 待办：
+  - vue-konva 全局注册 = konva 整包进 index 主 chunk（gzip 96 kB）；S10 收尾可改 `app.use(VueKonva)` 走动态 `import()` + EditorView 路由级懒加载分包，目前 MVP 体积可接受
+  - 共享态用 `shallowRef + shallowReadonly`，**不**用 `readonly()`：后者会让 DOM 元素被 DeepReadonly 化，传入 `MapStage.image: HTMLImageElement` 时类型不兼容
+  - S4 不引 Pinia / Element Plus / vitest，全部留 S5+；S5 起手第一步是把 `useBackgroundMap()` 升级为 `useProjectStore()`（包住 background + points + paths 等）
+  - 工具点击仅 `toastInfo` 回显，**未**任何模型变更；S5 落地后把 `tool-fire` handler 替换成实际创建动作并把 toast 降级为 dev-only 调试输出
+  - `HoverLayer` 仅画十字，未做 path 工具的"上一锚点 → 鼠标"橡皮筋预览（S5 起补，连同 path 拖拽预览一起）
+  - SS27 实际样本 origin = (-195.2, -33.6) m，对应像素坐标范围在 (0..imageWidth, 0..imageHeight)；`fitToContainer()` 已在首次度量与 `image` 换源时自动重拟，首次打开看得到全图
+  - Konva 的 `imageSmoothingEnabled` 未关闭，深度放大时 PNG 会被插值；MVP 不修，S6+ 视效果再决定
+- 下一阶段入口文件：`opentcs-spa/src/stores/project.ts`（S5 起手 —— 引入 Pinia 2，把 `useBackgroundMap` 并入新建的 `useProjectStore()`，并新增 `points` / `paths` 数组 + 自动落 `localStorage`；同时新增 `src/components/canvas/tools/PointTool.vue` 把 EditorView 的 `tool-fire` 真正转成 PointCreationTO 镜像）

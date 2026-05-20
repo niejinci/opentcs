@@ -2,7 +2,7 @@
 
 > openTCS 单页前端（Single-Page Application）。MVP 目标：地图三件套上传 → 画布编辑工厂模型 → 发布到 openTCS Kernel → 创建运输订单 → 通过 BFF 的 SSE 实时观察 AGV 状态。
 
-**当前状态：S2（基础设施层：HTTP / SSE / 统一错误 / Toast / 运行时配置）已完成；启动后默认进入 BFF Debug 自检页。**
+**当前状态：S4（画布编辑器框架：Konva 多图层 + 滚轮缩放 + 空格平移 + 工具栏）已完成；启动后默认进入「地图导入」页，导入三件套后点绿色 CTA 进入「画布编辑器」。**
 
 ## 文档入口
 
@@ -14,7 +14,7 @@
 
 ## 技术栈一句话
 
-Vue 3 + TypeScript + Vite + Pinia + vue-konva + Element Plus + js-yaml + openapi-typescript / openapi-fetch + Vitest。
+Vue 3 + TypeScript + Vite + Pinia + Konva + vue-konva + Element Plus + js-yaml + openapi-typescript / openapi-fetch + Vitest。
 
 ## Quickstart
 

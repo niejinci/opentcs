@@ -17,12 +17,18 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '地图导入' },
   },
   {
+    path: '/editor',
+    name: 'editor',
+    component: () => import('@/views/EditorView.vue'),
+    meta: { title: '画布编辑器' },
+  },
+  {
     path: '/debug',
     name: 'debug',
     component: () => import('@/views/DebugView.vue'),
     meta: { title: 'BFF 调试' },
   },
-  // Catch-all → import. Editor / orders views land in S4–S9.
+  // Catch-all → import. Orders view lands in S9.
   { path: '/:pathMatch(.*)*', redirect: '/import' },
 ];
 
