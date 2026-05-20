@@ -311,3 +311,26 @@ S7 BFF 接口实现要点：① 全部走流式 IO；② `meta.json` 写入用 "
   - `BffErrorResponse` 等 schema 当前手写镜像，BFF 侧 `bff.yaml` 改动需在同一 PR 内同步本仓 `src/api/types/bff.ts`；S6+ 引入 `openapi-typescript` 后此约束消失
   - SSE 客户端尚无单测（`Math.random` 注入与 `EventSource` mock 留给 vitest 落地后补）
 - 下一阶段入口文件：`opentcs-spa/src/views/ImportView.vue`（S3 起手 —— 三件套上传 + `parseRosMapYaml` + 仿射映射 + Konva 只读底图）
+
+### S3（2026-05-20）地图导入：三件套上传 + yaml 解析 + 仿射映射
+- 已完成模块：
+  - `src/domain/yaml/parseRosMapYaml.ts`：ROS `map.yaml` 纯函数解析器（resolution / origin / image / negate / occupied_thresh / free_thresh），`RosMapYamlError` 统一报错，未知 key 与 `theta ≠ 0` 作软警告；**兼容 SS27 实际样本的非标准 `%YAML:1.0` 指令**（js-yaml 4 会拒绝，预处理时整行剥离，YAML 语义不受影响）
+  - `src/domain/geometry/affine.ts`：`AffineMapping` + `pixelToWorld` / `worldToPixel` / `buildAffine`；遵循 ROS 约定（origin = 图像左下角的世界坐标，y 轴向上；image 像素系 y 轴向下），公式 `world = origin + (px, H - py) * resolution`；MVP 仅支持 theta = 0
+  - `src/router/index.ts`：首次引入 vue-router 4（`createWebHistory`），路由 `/import`（默认）+ `/debug`，catch-all 回退到 `/import`；其余视图（editor / orders / dashboard）留给 S4+ 注册
+  - `src/views/ImportView.vue`：三个 `<input type="file">` 分别接 png / pgm / yaml；PNG 通过 `URL.createObjectURL` + `<img>` 解码后绘制到原生 `<canvas>`（imageSmoothingEnabled = false，最长边自适应 ≤ 800 CSS px，不影响仿射数学）；mousemove 监听把 CSS 像素映射回自然像素再走 `pixelToWorld`；状态栏实时显示 `(px) → (m)`；文件名前缀对不上时弹软警告（`yaml.image` ↔ pgm 名、png ↔ pgm 名）；PNG 超 50 MiB 走 toastWarning 提醒（roadmap S3 风险行）；`onBeforeUnmount` 必 `revokeObjectURL` 防泄漏
+  - `src/App.vue` 改为顶部导航 + `<RouterView />`；`src/main.ts` 接入 `router`
+  - `opentcs-spa/docs/data-model.md`：中间态活文档占位，先描述 `BackgroundMap`（S3 唯一落地结构），后续 S5/S6/S7/S8 按表追加
+- 已新增依赖（首次有 advisory 检查）：
+  - `vue-router@^4.4.5`（GitHub advisory DB 无漏洞）
+  - `js-yaml@^4.1.0` + `@types/js-yaml@^4.0.9`（无漏洞）
+- 已验证命令（沙箱内全部成功）：
+  - `pnpm typecheck` → 0 错；`pnpm lint` → 0 错；`pnpm format:check` → 全部符合；`pnpm build`（49 modules，`ImportView` chunk 49.10 kB gzip 17.52 kB；index chunk 92.09 kB gzip 36.27 kB）
+  - 用 `tsx` 直接跑解析器 + 仿射对 `SS27/SS27.yaml` 做了正确性自检：`resolution=0.05, origin=(-195.2, -33.6)`；H=2000 时像素 (0, 2000) → 世界 (-195.2, -33.6)（左下角），像素 (0, 0) → 世界 (-195.2, 66.4)（左上角，y 翻转正确）；world↔pixel 往返误差 < 1e-13
+- 已知坑 / 待办：
+  - 仍未引 Konva / vue-konva（S4 起手再引）、Pinia（S5 起手）、Element Plus、vitest；S3 用原生 `<canvas>` 仅画一张图就够，避免提前架构化
+  - 仿射 theta ≠ 0 当前只软警告并按 0 处理；rotated map 留 v2
+  - PGM 不在前端渲染（浏览器无原生 P5 解码）；目前仅记录文件名 + 体积，留待 S7 与 png/yaml 一起 multipart 上 BFF
+  - 三件套尚未上传到 BFF（草稿持久化是 S7 任务）；浏览器刷新即丢
+  - SS27 实际样本里 origin 数值非常大（-195.2 m），上 S4 缩放/平移时要注意默认视口要居中或自适应，否则用户打开就看不到图
+  - vue-router catch-all 在 SPA 静态托管下需要 nginx `try_files $uri /index.html;`（已在 S1 备忘 / S10 docker-compose 待办里）
+- 下一阶段入口文件：`opentcs-spa/src/components/canvas/MapStage.vue`（S4 起手 —— 引入 vue-konva 9 / Konva 9，多图层 Stage + 缩放/平移 + 工具栏切换，从 `ImportView` 把原生 `<canvas>` 升级为 Konva BackgroundLayer）
