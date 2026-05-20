@@ -48,30 +48,91 @@ world_y = origin.y + (H - py)   * resolution    // py 是 top-left 系
 
 ## 3. S4 已落地：编辑器框架（暂无新模型）
 
-S4 只交付画布框架（Konva 多图层 / 缩放 / 平移 / 工具栏切换），**未引入任何新的中间态实体**。但为承接 S5 起的 Pinia store，落了一个临时的「跨视图共享态」结构（见 `src/composables/useBackgroundMap.ts`）：
+S4 只交付画布框架（Konva 多图层 / 缩放 / 平移 / 工具栏切换），**未引入任何新的中间态实体**。S5 起 `BackgroundMapState` 已搬到 `useProjectStore().background`，原 `useBackgroundMap` 退化为 thin compat 层；持久化层只落「可序列化部分」——`image` 由资产文件 + 浏览器解码重建。
 
 ```ts
 interface BackgroundMapState {
-  image: HTMLImageElement; // 已解码的 PNG（仅运行时，非持久化字段）
+  image: HTMLImageElement; // 进程内，非持久化
   pngName: string;
   pgmName: string | null;
   yamlName: string;
   width: number; // px == affine.imageWidth
-  height: number; // px == affine.imageHeight
-  yaml: RosMapMetadata; // 见 §2 中的 BackgroundMap 字段拍平
-  affine: AffineMapping; // 见 src/domain/geometry/affine.ts
+  height: number;
+  yaml: RosMapMetadata;
+  affine: AffineMapping;
 }
 ```
 
-> 这是**进程内**的状态，不进入 `ProjectDraft` JSON。S7 持久化时只落 `BackgroundMap`（§2）的"可序列化部分"——`image` 由资产文件 + 浏览器解码重建。
+---
+
+## 4. S5 已落地：`DraftPoint` / `DraftPath`
+
+源文件：[`src/domain/model/types.ts`](../src/domain/model/types.ts)。**字段名与单位严格镜像** `org.opentcs.access.to.model.PointCreationTO` / `PathCreationTO` / `PoseCreationTO` / `TripleCreationTO`，除明示标注的「编辑期辅助字段」外其余字段在 S8 publish 层一比一打包成 RMI 入参。
+
+### 4.1 `DraftPoint` ↔ `PointCreationTO`
+
+```ts
+type PointType = 'HALT_POSITION' | 'PARK_POSITION';
+
+interface DraftPoint {
+  name: string; // PointCreationTO.name
+  type: PointType; // PointCreationTO.type
+  pose: {
+    position: { x: number; y: number; z: number }; // TripleCreationTO (mm, integer)
+    orientationAngle: number; // PoseCreationTO.orientationAngle (degrees; NaN = 未设置)
+  };
+  layout: { pixelX: number; pixelY: number }; // 编辑期辅助：不进入 TO
+}
+```
+
+| Draft 字段              | TO 字段                                                 | 单位 / 备注                                              |
+| :---------------------- | :------------------------------------------------------ | :------------------------------------------------------- |
+| `name`                  | `PointCreationTO.name`                                  | 编辑器内必须唯一；S5 自动名 `Point-N`                    |
+| `type`                  | `PointCreationTO.type`                                  | `HALT_POSITION` / `PARK_POSITION`                        |
+| `pose.position.{x,y,z}` | `TripleCreationTO`                                      | mm，integer；S5 中 `z=0`                                 |
+| `pose.orientationAngle` | `PoseCreationTO.orientationAngle`                       | degrees；`NaN` = 未设置（与 TO 默认一致）                |
+| `layout.pixelX/pixelY`  | —                                                       | **编辑期辅助**，由 AffineMapping 反算可得；S8 转换层丢弃 |
+| _未实现_                | `vehicleEnvelopes` / `maxVehicleBoundingBox` / `Layout` | 留 S6+；S8 转换层用 TO 的默认值                          |
+
+### 4.2 `DraftPath` ↔ `PathCreationTO`
+
+```ts
+interface DraftPath {
+  name: string;
+  srcPointName: string;
+  destPointName: string;
+  length: number; // mm
+  maxVelocity: number; // mm/s
+  maxReverseVelocity: number; // mm/s
+  locked: boolean;
+}
+```
+
+| Draft 字段                       | TO 字段                                                | 单位 / 备注                                                                                                          |
+| :------------------------------- | :----------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------- |
+| `name`                           | `PathCreationTO.name`                                  | 自动名 `Path-N`                                                                                                      |
+| `srcPointName` / `destPointName` | `PathCreationTO.srcPointName` / `destPointName`        | 必须命中既有 Point；Point 改名时由 store 级联更新                                                                    |
+| `length`                         | `PathCreationTO.length` (`long`)                       | mm，integer；store `addPoint/movePoint/setPointWorldMeters` 后自动用 `distanceMm` 重算（手工编辑会被覆盖，MVP 权衡） |
+| `maxVelocity`                    | `PathCreationTO.maxVelocity` (`int`)                   | mm/s；S5 默认 `1000` (= 1 m/s)；`0` = 禁止正向                                                                       |
+| `maxReverseVelocity`             | `PathCreationTO.maxReverseVelocity` (`int`)            | mm/s；S5 默认 `0` = 禁止反向                                                                                         |
+| `locked`                         | `PathCreationTO.locked`                                | 锁定后 AGV 不会经过；AnnotationLayer 用虚线 + 灰色                                                                   |
+| _未实现_                         | `peripheralOperations` / `vehicleEnvelopes` / `Layout` | 留 S6+；S8 用 TO 默认                                                                                                |
+
+### 4.3 localStorage 持久化约定
+
+- key：`opentcs-spa.draftV1`
+- envelope：`{ v: 1, points: DraftPoint[], paths: DraftPath[], selection: SelectionRef | null }`
+- 写入时机：`watch([points, paths, selection], deep:true)` 触发后 debounce 200ms（避免高频拖拽抖动写盘）
+- 读取时机：首次 `useProjectStore()` 调用；`v` 不等于当前版本 / JSON 损坏 / 数组缺失 = 安静丢弃并以空草稿继续
+- 不持久化：`background`（含 `HTMLImageElement`） / `pathDraftSrc`（path 工具半态）
+- S7 计划：保持本节 schema 不变，但把读写从 `localStorage` 切到 BFF `PUT /api/v1/projects/{id}/draft` —— actions 形状刻意保持稳定以便机械迁移
 
 ---
 
-## 4. 待落（按里程碑）
+## 5. 待落（按里程碑）
 
-| 里程碑 | 新增结构                                                                                       | 对齐的 TO 类                                     |
-| :----- | :--------------------------------------------------------------------------------------------- | :----------------------------------------------- |
-| S5     | `PointCreationTO` 镜像 + `PathCreationTO` 镜像                                                 | `org.opentcs.access.to.model.PointCreationTO` 等 |
-| S6     | `LocationTypeCreationTO` / `LocationCreationTO` / `BlockCreationTO` / `VehicleCreationTO` 镜像 | 同上                                             |
-| S7     | `ProjectDraft`：`{ id, name, backgroundMap, points[], paths[], ... }` 整体 schema              | —                                                |
-| S8     | `PlantModelTO` 镜像（顶层），加发布请求外壳 `{projectId, plantModel}`                          | `PlantModelCreationTO`                           |
+| 里程碑 | 新增结构                                                                                       | 对齐的 TO 类                    |
+| :----- | :--------------------------------------------------------------------------------------------- | :------------------------------ |
+| S6     | `LocationTypeCreationTO` / `LocationCreationTO` / `BlockCreationTO` / `VehicleCreationTO` 镜像 | `org.opentcs.access.to.model.*` |
+| S7     | `ProjectDraft`：`{ id, name, backgroundMap, points[], paths[], ... }` 整体 schema              | —                               |
+| S8     | `PlantModelTO` 镜像（顶层），加发布请求外壳 `{projectId, plantModel}`                          | `PlantModelCreationTO`          |

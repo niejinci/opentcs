@@ -3,10 +3,6 @@
 //
 // Canvas editor tool definitions.
 //
-// S4 deliberately only ships the tool-switching framework — picking a tool
-// changes the active cursor and the click-dispatch label, but no Point /
-// Path entity is created yet (those land in S5/S6).
-//
 // Tool IDs (`select` / `point` / `path`) are stable strings that future
 // stores, hotkey maps, and analytics can pin to. Keep additions strictly
 // additive.
@@ -33,7 +29,7 @@ export const EDITOR_TOOLS: readonly EditorToolMeta[] = Object.freeze([
     label: '选择',
     hotkey: 'V',
     cursor: 'default',
-    hint: '选择 / 拖动既有实体（S5 起生效）',
+    hint: '选择 / 拖动既有 Point；点击 Path 选中以编辑属性；Delete 删除',
     milestone: 'S5',
   },
   {
@@ -41,7 +37,7 @@ export const EDITOR_TOOLS: readonly EditorToolMeta[] = Object.freeze([
     label: '画点',
     hotkey: 'P',
     cursor: 'crosshair',
-    hint: '点击空白处新建 Point（S5 起生效）',
+    hint: '点击空白处新建 Point（默认 HALT_POSITION）',
     milestone: 'S5',
   },
   {
@@ -49,7 +45,7 @@ export const EDITOR_TOOLS: readonly EditorToolMeta[] = Object.freeze([
     label: '画路径',
     hotkey: 'L',
     cursor: 'crosshair',
-    hint: '依次点击两个 Point 创建 Path（S5 起生效）',
+    hint: '依次点击两个 Point 创建有向 Path；Esc 取消',
     milestone: 'S5',
   },
 ]);

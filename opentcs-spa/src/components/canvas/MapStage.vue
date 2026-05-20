@@ -154,7 +154,17 @@ function onStageClick(): void {
   // Konva differentiates click vs drag automatically; this handler only
   // fires for taps that did not move past the drag threshold.
   if (isPanning.value) return;
-  if (props.tool === 'select') return;
+  // If the click landed on a Point or a Path (handled by AnnotationLayer),
+  // suppress the stage-level "create / deselect" reaction.
+  if (entityClickPending) {
+    entityClickPending = false;
+    return;
+  }
+  if (props.tool === 'select') {
+    // Click on empty canvas in select tool = clear selection (handled by
+    // EditorView via tool-fire emit). We still emit tool-fire so the
+    // parent can decide; here we just leave it to the existing emit below.
+  }
   const cursor = cursorStage.value;
   if (!cursor) return;
   emit('tool-fire', {
@@ -162,6 +172,13 @@ function onStageClick(): void {
     pixel: cursor,
     world: pixelToWorld(props.affine, cursor),
   });
+}
+
+// Set by AnnotationLayer just before the Konva click bubble reaches the
+// Stage, so we know to swallow the matching stage click below.
+let entityClickPending = false;
+function onEntityClick(): void {
+  entityClickPending = true;
 }
 
 function onStageDragEnd(): void {
@@ -268,7 +285,7 @@ defineSlots<{
       @dragend="onStageDragEnd"
     >
       <BackgroundLayer :image="image" :width="imageWidth" :height="imageHeight" />
-      <AnnotationLayer />
+      <AnnotationLayer :tool="tool" :scale="scale" @entity-click="onEntityClick" />
       <HoverLayer :cursor="cursorStage" :tool="tool" :scale="scale" />
     </v-stage>
     <slot

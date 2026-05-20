@@ -362,3 +362,35 @@ S7 BFF 接口实现要点：① 全部走流式 IO；② `meta.json` 写入用 "
   - SS27 实际样本 origin = (-195.2, -33.6) m，对应像素坐标范围在 (0..imageWidth, 0..imageHeight)；`fitToContainer()` 已在首次度量与 `image` 换源时自动重拟，首次打开看得到全图
   - Konva 的 `imageSmoothingEnabled` 未关闭，深度放大时 PNG 会被插值；MVP 不修，S6+ 视效果再决定
 - 下一阶段入口文件：`opentcs-spa/src/stores/project.ts`（S5 起手 —— 引入 Pinia 2，把 `useBackgroundMap` 并入新建的 `useProjectStore()`，并新增 `points` / `paths` 数组 + 自动落 `localStorage`；同时新增 `src/components/canvas/tools/PointTool.vue` 把 EditorView 的 `tool-fire` 真正转成 PointCreationTO 镜像）
+
+### S5（2026-05-20）Point + Path 绘制 + 属性面板
+- 已完成模块：
+  - `src/domain/model/types.ts`：`DraftPoint` / `DraftPath` / `PointType` / `Triple` / `Pose` / `SelectionRef` —— 字段名与单位严格镜像 `PointCreationTO` / `PathCreationTO` / `PoseCreationTO` / `TripleCreationTO`（mm + degrees + locked + maxReverseVelocity；编辑期辅助字段仅 `DraftPoint.layout.pixelXY`，S8 转换层会丢弃）
+  - `src/domain/model/naming.ts`：`nextAutoName('Point', existing)` 跳过被占用的 N；`isValidEntityName` 拒空白 / 斜杠 / 控制字符（为 S7 BFF 文件存储路径段做前置防御）
+  - `src/domain/model/path.ts`：`distanceMm(Triple,Triple)` 整数 mm 欧氏距离（`PathCreationTO.length` 是 `long`）
+  - `src/stores/project.ts`：Pinia store。`background` 仍是 `shallowRef`（`HTMLImageElement` 不能 deep-reactive）；`points/paths/selection` 通过 `watch([...], deep:true)` 防抖 200ms 落 `localStorage`，key=`opentcs-spa.draftV1`，envelope=`{v:1, points, paths, selection}`。Actions：`addPoint(pixel)` / `movePoint` / `renamePoint`（级联改 Path src/dest 名）/ `updatePointFields` / `setPointWorldMeters` / `startPath` + `completePath` + `cancelPathDraft` / `renamePath` / `updatePathFields` / `select` / `deleteSelected`（删 Point 级联删其相关 Path） / `clearAll`
+  - `src/composables/useBackgroundMap.ts`：退化为 thin compat 层，内部 `storeToRefs(useProjectStore())`，对外 API 完全不变，让 ImportView / EditorView 的 S3/S4 调用点零改动
+  - `src/components/canvas/AnnotationLayer.vue`：从空 placeholder 升级为真正渲染层。Point=圆 + name 标签，select 工具下 `draggable=true`，PARK_POSITION 用绿色 / 选中用品红 / path 工具半态高亮 path 起点为橙色；Path=`<v-arrow>` 带方向箭头，`locked` 时虚线 + 灰色；通过 `entity-click` 事件向 MapStage 抑制 stage-level "create / deselect" 反应
+  - `src/components/canvas/HoverLayer.vue`：path 工具拾起源 Point 后，从源点到鼠标画橙色虚线橡皮筋
+  - `src/components/canvas/MapStage.vue`：增加 `entityClickPending` flag（AnnotationLayer 命中实体时置位，下一次 stage click 吞掉）；`onStageClick` 不再对 select 工具早返回 —— 空白处 click 也会 `tool-fire`，由 EditorView 翻成 `store.select(null)`
+  - `src/components/property/PropertyPanel.vue`：按选中实体类型分支。所有 input 用 `@change`（blur / Enter）提交而非 `@input`，避免半路输入触发 `recomputeAttachedPathLengths`；非法值（空名 / 重名 / 非数字 / 负数）走 `toastError` 并回滚字段；提供「删除此 Point（级联）」/「删除此 Path」按钮
+  - `src/views/EditorView.vue`：把右侧栏换成 `<PropertyPanel>`，底图信息与快捷键收进 `<details>`；新加全局键 `Delete` / `Backspace` 删除选中、`Esc` 取消 path 半态 / 取消选中；`onToolFire` 真正派发 `addPoint` / `select(null)` / 通知用户「请点击一个 Point 作为路径起点」
+  - `src/main.ts`：注册 `createPinia()`（在 router 之前安装，确保 lazy-loaded EditorView 在 setup 期可拿到 store）
+  - `src/domain/editor/tools.ts`：把 tool 的 `hint` 文案从「S5 起生效」改成实际操作说明
+  - `opentcs-spa/docs/data-model.md`：追加 §3 S5 节，列出 `DraftPoint` / `DraftPath` TS shape + 与 `PointCreationTO` / `PathCreationTO` 的字段映射、`layout.pixelXY` 是编辑期辅助、localStorage envelope 约定
+- 已新增依赖（advisory 检查无漏洞）：
+  - `pinia@^2.2.6`（实装 2.3.1）
+- 已验证命令（沙箱内全部成功）：
+  - `pnpm typecheck` → 0 错（坑：Vue template 内联箭头函数的 Konva event 参数必须显式 `: KonvaEventObject<MouseEvent>` / `<DragEvent>`，否则 `noImplicitAny` 触发 TS7006）
+  - `pnpm lint` → 0 错 0 警；`pnpm format:check` → 全部符合；`pnpm build`（246 modules：index 298.95 kB gzip 99.16 kB；**EditorView chunk 涨到 20.17 kB gzip 7.52 kB**；ImportView 49.14 kB / DebugView 8.27 kB 基本不变；CSS 在 EditorView 5.19 kB）
+  - `pnpm dev` → `curl /editor → 200`，`curl /import → 200`，`curl /src/stores/project.ts` 经 vite transform 返回有效 ESM（已 import pinia）
+  - 纯函数自检（`tsx`-style 临时脚本）：`nextAutoName` 跳号正确；`isValidEntityName` 拒非法；`distanceMm` 3-4-5 直角三角形=5000；`pixelToWorld`/`worldToPixel` 往返误差 < 1e-9
+- 已知坑 / 待办：
+  - **手动改了 Path.length 后，端点 Point 一旦再移动，长度会被自动重算覆盖**——MVP 显式权衡（避免长度悄悄与几何不一致）；若需要"手动覆盖"语义，S6 起补 `lengthOverridden:boolean` 字段
+  - localStorage 持久化只在用户**当前浏览器+域名**下不丢；跨浏览器 / 跨机器要等 S7 BFF 持久化；超出 ~5 MB 浏览器配额会静默丢弃（捕获异常但不告警），目前画 3 点 2 路径只占数百字节，留 S7 解决
+  - Pinia store 暂未做撤销/重做栈；MVP 之外项，v2 上 immer + 命令栈
+  - `Backspace` 全局拦截了删除，输入框聚焦时通过 `isEditableTarget` 短路，避免误删字符；若未来 PropertyPanel 引入复杂富文本组件需扩展短路条件
+  - Konva `v-arrow` 的 `hitStrokeWidth` 必须显式调大，否则 1.5 px 的 path 线太细很难点中；当前用 `Math.max(8, pathStroke * 4)` 做下限，已实测可用
+  - 渲染层 `safeScale = max(scale, 1e-4)` 防止极小缩放下尺寸除以 0 爆 Infinity；MIN_SCALE=0.05 实际不会触发，但留 belt-and-braces
+  - vue-router 切换路由后 Pinia store 仍单例，跨页面 selection 会保留——目前观感正常（用户切回 editor 看到上次选中），需要时再加 `router.afterEach` 清理
+- 下一阶段入口文件：`opentcs-spa/src/components/property/LocationForm.vue`（S6 起手 —— 在 PropertyPanel 中新增 Location/LocationType/Block/Vehicle 分支；同步在 `src/domain/model/types.ts` 补 `DraftLocation` / `DraftLocationType` / `DraftBlock` / `DraftVehicle` 镜像；AnnotationLayer 加方块 / 矩形 / 车辆 icon 渲染）
