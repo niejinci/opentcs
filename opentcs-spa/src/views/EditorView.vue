@@ -2,20 +2,25 @@
 // SPDX-FileCopyrightText: The openTCS Authors
 // SPDX-License-Identifier: MIT
 //
-// EditorView — S4 entry view. Wires up:
-//   - the toolbar (Select / Point / Path)
-//   - the Konva MapStage (zoom / pan / hover)
-//   - tool hotkeys (V / P / L), space-pan hint, reset-view button
-//   - a status bar showing zoom %, current tool, pixel and world coords
+// EditorView — S4 introduced the Konva canvas framework; S5 wires the
+// first real entities (Point + Path) onto it.
 //
-// When no map has been imported yet, render a CTA pointing back to /import.
-// S5+ will layer real Point/Path creation on top of `tool-fire` events.
+// Responsibilities:
+//   - Toolbar (Select / Point / Path) state
+//   - Konva MapStage with hover/click dispatch
+//   - Tool hotkeys (V / P / L), Delete/Backspace, Escape
+//   - Dispatching `tool-fire` into `useProjectStore()`:
+//       * `point` tool → addPoint
+//       * `path`  tool → background click while picking dest = cancel half-state
+//       * `select` tool → empty-canvas click = clear selection
+//   - Right-hand PropertyPanel for the currently selected entity
 
 import { onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
 import { RouterLink } from 'vue-router';
 
 import EditorToolbar from '@/components/canvas/EditorToolbar.vue';
 import MapStage from '@/components/canvas/MapStage.vue';
+import PropertyPanel from '@/components/property/PropertyPanel.vue';
 import { useBackgroundMap } from '@/composables/useBackgroundMap';
 import {
   EDITOR_TOOLS,
@@ -23,15 +28,21 @@ import {
   getEditorTool,
   type EditorToolId,
 } from '@/domain/editor/tools';
+import { useProjectStore } from '@/stores/project';
 import { toastInfo } from '@/ui/toast/toastBus';
 
 const { background, hasBackground } = useBackgroundMap();
+const store = useProjectStore();
 
 const activeTool = ref<EditorToolId>('select');
 const mapStageRef = useTemplateRef<{ resetView: () => void } | null>('mapStageRef');
 
 function setTool(id: EditorToolId): void {
   if (id === activeTool.value) return;
+  // Switching away from path tool while a source is half-picked = cancel.
+  if (activeTool.value === 'path' && store.pathDraftSrc !== null) {
+    store.cancelPathDraft();
+  }
   activeTool.value = id;
 }
 
@@ -44,12 +55,30 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 function onKeyDown(e: KeyboardEvent): void {
-  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (isEditableTarget(e.target)) return;
-  const meta = editorToolForHotkey(e.key);
-  if (meta) {
+  // Tool switching (V/P/L)
+  if (!e.repeat) {
+    const meta = editorToolForHotkey(e.key);
+    if (meta) {
+      e.preventDefault();
+      setTool(meta.id);
+      return;
+    }
+  }
+  // Delete / Backspace = delete selection
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (store.selection !== null) {
+      e.preventDefault();
+      store.deleteSelected();
+    }
+    return;
+  }
+  // Escape = cancel path half-state and clear selection
+  if (e.key === 'Escape') {
     e.preventDefault();
-    setTool(meta.id);
+    if (store.pathDraftSrc !== null) store.cancelPathDraft();
+    else store.select(null);
   }
 }
 
@@ -63,25 +92,46 @@ function onToolFire(payload: {
   pixel: { x: number; y: number };
   world: { x: number; y: number };
 }): void {
-  const meta = getEditorTool(payload.tool);
-  // S4 boundary: do NOT mutate any model — only acknowledge the click so
-  // testers can verify wheel zoom, space pan, and tool dispatch end-to-end.
-  toastInfo(
-    `像素 (${payload.pixel.x.toFixed(1)}, ${payload.pixel.y.toFixed(1)})` +
-      ` → 世界 (${payload.world.x.toFixed(3)}, ${payload.world.y.toFixed(3)}) m`,
-    `${meta.label} · 将在 ${meta.milestone} 落地`,
-  );
+  if (payload.tool === 'point') {
+    const created = store.addPoint(payload.pixel);
+    if (created) {
+      toastInfo(
+        `已创建 ${created.name} @ (${payload.world.x.toFixed(3)}, ${payload.world.y.toFixed(3)}) m`,
+        'Point',
+      );
+    }
+    return;
+  }
+  if (payload.tool === 'path') {
+    // Clicking empty canvas during a path-in-progress cancels it.
+    if (store.pathDraftSrc !== null) {
+      store.cancelPathDraft();
+      toastInfo('已取消路径绘制（点击空白处）', 'Path');
+    } else {
+      toastInfo('请点击一个 Point 作为路径起点', 'Path');
+    }
+    return;
+  }
+  // select tool: clicking empty canvas clears selection.
+  if (payload.tool === 'select') {
+    store.select(null);
+  }
+}
+
+/* ------------------ Pretty-print helper for status bar ------------------ */
+function pointTypeBadge(): string {
+  return getEditorTool(activeTool.value).label;
 }
 </script>
 
 <template>
   <section class="editor">
     <header class="editor__header">
-      <h2>S4 · 画布编辑器框架</h2>
+      <h2>S5 · 画布编辑器（Point + Path）</h2>
       <p class="hint">
-        多图层 Konva Stage + 滚轮缩放（聚焦光标）+ 按住
-        <kbd>空格</kbd> 拖动平移 + 工具栏切换。<strong>S4 仅落框架</strong>，Point / Path 实体在 S5
-        起手；当前工具点击只回显坐标。
+        点击 <kbd>P</kbd> + 画布空白处新建 Point；切到 <kbd>L</kbd> 依次点击两个 Point 创建有向
+        Path；<kbd>V</kbd> 选择 + 拖动；<kbd>Delete</kbd> 删除选中；<kbd>Esc</kbd> 取消。
+        草稿自动落本机 <code>localStorage</code>（刷新页面不丢）。
       </p>
     </header>
 
@@ -107,12 +157,15 @@ function onToolFire(payload: {
           <template #status="{ scale, pixel, world, panning }">
             <footer class="statusbar">
               <span
-                >当前工具：<strong>{{ getEditorTool(activeTool).label }}</strong></span
+                >当前工具：<strong>{{ pointTypeBadge() }}</strong></span
               >
               <span
                 >缩放：<code>{{ (scale * 100).toFixed(0) }}%</code></span
               >
               <span v-if="panning" class="pan-hint">↔ 平移中（释放空格退出）</span>
+              <span v-else-if="store.pathDraftSrc" class="pan-hint">
+                Path 起点：<code>{{ store.pathDraftSrc }}</code> · 再点一个 Point 完成
+              </span>
               <span v-else class="pan-hint--muted">提示：按住空格 + 拖动 = 平移</span>
               <span v-if="pixel">
                 像素：(<code>{{ pixel.x.toFixed(1) }}</code
@@ -137,28 +190,31 @@ function onToolFire(payload: {
         </MapStage>
       </div>
 
-      <aside class="editor__sidebar">
-        <h3>底图信息</h3>
-        <dl v-if="background">
-          <dt>文件</dt>
-          <dd>{{ background.pngName }}</dd>
-          <dt>尺寸</dt>
-          <dd>{{ background.width }} × {{ background.height }} px</dd>
-          <dt>resolution</dt>
-          <dd>{{ background.yaml.resolution }} m/px</dd>
-          <dt>origin</dt>
-          <dd>({{ background.yaml.origin.x }}, {{ background.yaml.origin.y }})</dd>
-        </dl>
-
-        <h3>快捷键</h3>
-        <ul class="hotkeys">
-          <li v-for="t in EDITOR_TOOLS" :key="t.id">
-            <kbd>{{ t.hotkey }}</kbd> {{ t.label }}
-          </li>
-          <li><kbd>空格</kbd> + 拖动 = 平移</li>
-          <li>滚轮 = 缩放</li>
-        </ul>
-      </aside>
+      <div class="editor__sidebar">
+        <PropertyPanel />
+        <details class="meta">
+          <summary>底图 / 快捷键</summary>
+          <dl v-if="background">
+            <dt>文件</dt>
+            <dd>{{ background.pngName }}</dd>
+            <dt>尺寸</dt>
+            <dd>{{ background.width }} × {{ background.height }} px</dd>
+            <dt>resolution</dt>
+            <dd>{{ background.yaml.resolution }} m/px</dd>
+            <dt>origin</dt>
+            <dd>({{ background.yaml.origin.x }}, {{ background.yaml.origin.y }})</dd>
+          </dl>
+          <ul class="hotkeys">
+            <li v-for="t in EDITOR_TOOLS" :key="t.id">
+              <kbd>{{ t.hotkey }}</kbd> {{ t.label }}
+            </li>
+            <li><kbd>Delete</kbd> 删除选中</li>
+            <li><kbd>Esc</kbd> 取消 Path 半态 / 取消选中</li>
+            <li><kbd>空格</kbd> + 拖动 = 平移</li>
+            <li>滚轮 = 缩放</li>
+          </ul>
+        </details>
+      </div>
     </div>
   </section>
 </template>
@@ -206,7 +262,7 @@ function onToolFire(payload: {
 
 .editor__workspace {
   display: grid;
-  grid-template-columns: auto 1fr 260px;
+  grid-template-columns: auto 1fr 280px;
   gap: 0.75rem;
   align-items: stretch;
   min-height: 580px;
@@ -269,36 +325,42 @@ function onToolFire(payload: {
 }
 
 .editor__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.meta {
   border: 1px solid #d0d7de;
   border-radius: 8px;
   background: #ffffff;
-  padding: 0.75rem 1rem;
-  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
 }
-.editor__sidebar h3 {
-  margin: 0.25rem 0 0.5rem;
-  font-size: 0.95rem;
+.meta summary {
+  cursor: pointer;
+  font-weight: 600;
 }
-.editor__sidebar dl {
+.meta dl {
   display: grid;
   grid-template-columns: 6.5em 1fr;
-  gap: 0.25rem 0.5rem;
-  margin: 0 0 0.75rem;
+  gap: 0.2rem 0.5rem;
+  margin: 0.5rem 0 0.5rem;
 }
-.editor__sidebar dt {
+.meta dt {
   color: #57606a;
 }
-.editor__sidebar dd {
+.meta dd {
   margin: 0;
   word-break: break-all;
 }
 .hotkeys {
   list-style: none;
   padding: 0;
-  margin: 0;
+  margin: 0.25rem 0 0;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.25rem;
 }
 kbd {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

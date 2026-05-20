@@ -1,67 +1,43 @@
 // SPDX-FileCopyrightText: The openTCS Authors
 // SPDX-License-Identifier: MIT
 //
-// Cross-view shared state for the currently-imported scan triple
-// (PNG + PGM + YAML) and its derived AffineMapping.
+// Background-map shared state.
 //
-// S4 scope only: this is a deliberately tiny module-level singleton built
-// on `ref` + `shallowRef`, NOT a Pinia store. The roadmap puts Pinia at S5
-// ("S5 起手"), where this composable will be replaced by a proper
-// `useProjectStore()`. Keeping the API surface small here (set/clear +
-// individual readonly refs) keeps that migration mechanical.
-//
-// Why share across views?
-//   - ImportView (S3) owns the upload UX + yaml parsing.
-//   - EditorView (S4+) needs the AffineMapping and a decoded HTMLImageElement
-//     to draw the Konva BackgroundLayer.
-//   - Re-uploading inside the editor would create two parallel input flows;
-//     a singleton ref keeps "import once, edit anywhere" intuitive.
+// S5 migration note: this used to be a hand-rolled `shallowRef` singleton
+// (see S4 完工备忘). Starting in S5 the source of truth is
+// `useProjectStore()`. We keep this composable as a thin compatibility
+// layer with the *exact same* surface (`background` / `hasBackground` /
+// `version` / `setBackgroundMap` / `clearBackgroundMap`) so the S4-era
+// callers in ImportView do not need to change their shape — the only
+// effect is that ImportView ↔ EditorView now share a single Pinia store
+// (which also persists Point / Path drafts to localStorage).
 
-import { computed, shallowReadonly, shallowRef, readonly, ref } from 'vue';
+import { computed, ref, shallowReadonly } from 'vue';
+import { storeToRefs } from 'pinia';
 
-import type { AffineMapping } from '@/domain/geometry/affine';
-import type { RosMapMetadata } from '@/domain/yaml/parseRosMapYaml';
+import { useProjectStore, type BackgroundMapState } from '@/stores/project';
 
-export interface BackgroundMapState {
-  /** Decoded PNG, ready to hand to a Konva.Image / vue-konva <v-image>. */
-  image: HTMLImageElement;
-  /** Original PNG file name (display only). */
-  pngName: string;
-  /** Original PGM file name (display only). Optional — PGM is archival, not rendered. */
-  pgmName: string | null;
-  /** Original YAML file name (display only). */
-  yamlName: string;
-  /** Natural pixel size of the PNG; matches `affine.image{Width,Height}`. */
-  width: number;
-  height: number;
-  /** Parsed ROS map.yaml metadata. */
-  yaml: RosMapMetadata;
-  /** Pixel↔meter mapping derived from `yaml` + image size. */
-  affine: AffineMapping;
-}
+export type { BackgroundMapState };
 
-const state = shallowRef<BackgroundMapState | null>(null);
-// Monotonically increases each time `setBackgroundMap` is called; lets
-// consumers (e.g. MapStage) react to "a new map was imported" even when the
-// AffineMapping happens to compare equal.
+// Monotonic counter so consumers (MapStage) can react to "a new map was
+// imported" even when two backgrounds happen to compare equal.
 const version = ref(0);
 
 export function useBackgroundMap() {
+  const store = useProjectStore();
+  const { background } = storeToRefs(store);
   return {
-    /** Current background map or `null` if nothing has been imported yet. */
-    background: shallowReadonly(state),
-    /** True iff a background map is currently available. */
-    hasBackground: computed(() => state.value !== null),
-    /** Bumps on every successful import. */
-    version: readonly(version),
+    background: shallowReadonly(background),
+    hasBackground: computed(() => background.value !== null),
+    version: shallowReadonly(version),
 
     setBackgroundMap(next: BackgroundMapState): void {
-      state.value = next;
+      store.setBackground(next);
       version.value += 1;
     },
 
     clearBackgroundMap(): void {
-      state.value = null;
+      store.clearBackground();
       version.value += 1;
     },
   };
