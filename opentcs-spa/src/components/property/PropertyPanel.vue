@@ -209,7 +209,30 @@ function onAddLocationType(): void {
 }
 
 function onAddBlock(): void {
-  store.addBlock();
+  const created = store.addBlock();
+  store.select({ kind: 'block', name: created.name });
+}
+function onSelectLocationType(name: string): void {
+  store.select({ kind: 'locationType', name });
+}
+function onSelectBlock(name: string): void {
+  store.select({ kind: 'block', name });
+}
+function onDeleteLocationType(name: string): void {
+  const refs = store.locations.filter((l) => l.typeName === name);
+  if (refs.length > 0) {
+    toastError(
+      `LocationType "${name}" 仍被 ${refs.length} 个 Location 引用，请先在 Location 上改 type 后再删`,
+      'LocationType',
+    );
+    return;
+  }
+  store.select({ kind: 'locationType', name });
+  store.deleteSelected();
+}
+function onDeleteBlock(name: string): void {
+  store.select({ kind: 'block', name });
+  store.deleteSelected();
 }
 </script>
 
@@ -228,6 +251,62 @@ function onAddBlock(): void {
       <div class="quick-actions">
         <button type="button" @click="onAddLocationType">+ LocationType</button>
         <button type="button" @click="onAddBlock">+ Block</button>
+      </div>
+<!-- Click-to-select lists for entities with no canvas position
+           (LocationType / Block). Without these the user can only reach
+           a freshly-created item via auto-select; existing ones become
+           orphaned. The active row is highlighted to mirror the canvas
+           selection state. -->
+      <div v-if="store.locationTypes.length > 0" class="entity-list">
+        <p class="entity-list__title">LocationType ({{ store.locationTypes.length }})</p>
+        <ul>
+          <li
+            v-for="t in store.locationTypes"
+            :key="t.name"
+            :class="{
+              active: store.selection?.kind === 'locationType' && store.selection.name === t.name,
+            }"
+          >
+            <button type="button" class="entity-list__row" @click="onSelectLocationType(t.name)">
+              {{ t.name }}
+            </button>
+            <button
+              type="button"
+              class="entity-list__del"
+              :title="`删除 ${t.name}`"
+              :aria-label="`删除 ${t.name}`"
+              @click.stop="onDeleteLocationType(t.name)"
+            >
+              ×
+            </button>
+          </li>
+        </ul>
+      </div>
+      <div v-if="store.blocks.length > 0" class="entity-list">
+        <p class="entity-list__title">Block ({{ store.blocks.length }})</p>
+        <ul>
+          <li
+            v-for="b in store.blocks"
+            :key="b.name"
+            :class="{
+              active: store.selection?.kind === 'block' && store.selection.name === b.name,
+            }"
+          >
+            <button type="button" class="entity-list__row" @click="onSelectBlock(b.name)">
+              {{ b.name }}
+              <span class="entity-list__meta">· {{ b.memberNames.length }} 成员</span>
+            </button>
+            <button
+              type="button"
+              class="entity-list__del"
+              :title="`删除 ${b.name}`"
+              :aria-label="`删除 ${b.name}`"
+              @click.stop="onDeleteBlock(b.name)"
+            >
+              ×
+            </button>
+          </li>
+        </ul>
       </div>
     </header>
 
@@ -393,6 +472,78 @@ function onAddBlock(): void {
 }
 .quick-actions button:hover {
   background: #eaeef2;
+}
+.entity-list {
+  margin-top: 0.5rem;
+  border: 1px solid #eaeef2;
+  border-radius: 4px;
+  padding: 0.3rem 0.4rem 0.4rem;
+  background: #fbfcfd;
+}
+.entity-list__title {
+  margin: 0 0 0.2rem;
+  font-size: 0.72rem;
+  color: #57606a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.entity-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-height: 8.5rem;
+  overflow-y: auto;
+}
+.entity-list li {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  border-radius: 3px;
+}
+.entity-list li.active {
+  background: #ddf4ff;
+  outline: 1px solid #0969da;
+}
+.entity-list__row {
+  flex: 1;
+  text-align: left;
+  padding: 0.2rem 0.4rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  color: #1f2328;
+  border-radius: 3px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.entity-list__row:hover {
+  background: #eaeef2;
+}
+.entity-list__meta {
+  color: #57606a;
+  font-size: 0.72rem;
+}
+.entity-list__del {
+  border: none;
+  background: transparent;
+  color: #57606a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 0 0.4rem;
+  border-radius: 3px;
+}
+.entity-list__del:hover {
+  background: #ffebe9;
+  color: #cf222e;
 }
 .hint {
   color: #57606a;
