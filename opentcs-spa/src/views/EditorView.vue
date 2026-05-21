@@ -280,13 +280,15 @@ function pointTypeBadge(): string {
   background: #0a5cb6;
 }
 
-.editor__workspace {
-  display: grid;
-  grid-template-columns: auto 1fr 280px;
+ .editor__workspace {
+   display: grid;
+   grid-template-columns: auto 1fr 280px;
+  /* Bound the row height to the viewport so the canvas area cannot
+     grow with its own content (which would re-trigger ResizeObserver). */
+  grid-template-rows: minmax(560px, calc(100vh - 220px));
   gap: 0.75rem;
   align-items: stretch;
-  min-height: 580px;
-}
+ }
 
 .editor__stage {
   position: relative;
@@ -297,10 +299,6 @@ function pointTypeBadge(): string {
   display: flex;
   flex-direction: column;
   min-height: 560px;
-}
-.editor__stage :deep(.map-stage) {
-  flex: 1;
-  min-height: 0;
 }
 
 .statusbar {

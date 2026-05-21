@@ -54,8 +54,8 @@ const emit = defineEmits<{
 
 const hostRef = useTemplateRef<HTMLDivElement>('hostRef');
 const stageRef = useTemplateRef<{ getStage: () => Konva.Stage }>('stageRef');
-const stageWidth = ref(640);
-const stageHeight = ref(480);
+const stageWidth = ref(1);
+const stageHeight = ref(1);
 
 let resizeObserver: ResizeObserver | null = null;
 
@@ -220,15 +220,20 @@ function onKeyUp(e: KeyboardEvent): void {
 
 onMounted(() => {
   if (hostRef.value) {
+    // 1) Sync-measure the canvas area before Konva's first paint —
+    //    eliminates the "640×480 → real-size" flash.
+    const rect = hostRef.value.getBoundingClientRect();
+    stageWidth.value = Math.max(1, Math.round(rect.width));
+    stageHeight.value = Math.max(1, Math.round(rect.height));
+    fitToContainer();
+
+    // 2) Track resize, but never auto re-fit — the user owns the viewport
+    //    after the initial fit, with the "重置视口" button as escape hatch.
     resizeObserver = new ResizeObserver(([entry]) => {
       if (!entry) return;
       const { width, height } = entry.contentRect;
       stageWidth.value = Math.max(1, Math.round(width));
       stageHeight.value = Math.max(1, Math.round(height));
-      // Re-fit once the very first measurement comes in.
-      if (scale.value === 1 && stageX.value === 0 && stageY.value === 0) {
-        fitToContainer();
-      }
     });
     resizeObserver.observe(hostRef.value);
   }
@@ -273,21 +278,25 @@ defineSlots<{
 </script>
 
 <template>
-  <div ref="hostRef" class="map-stage" :style="{ cursor: cursorCss }">
-    <v-stage
-      ref="stageRef"
-      :config="stageConfig"
-      @wheel="onWheel"
-      @pointermove="onPointerMove"
-      @pointerleave="onPointerLeave"
-      @click="onStageClick"
-      @tap="onStageClick"
-      @dragend="onStageDragEnd"
-    >
-      <BackgroundLayer :image="image" :width="imageWidth" :height="imageHeight" />
-      <AnnotationLayer :tool="tool" :scale="scale" @entity-click="onEntityClick" />
-      <HoverLayer :cursor="cursorStage" :tool="tool" :scale="scale" />
-    </v-stage>
+  <div class="map-stage" :style="{ cursor: cursorCss }">
+    <!-- Konva canvas 用绝对定位脱离文档流，避免其像素高度反向撑大父级
+         而触发 ResizeObserver 反馈环（白闪 / 页面无限增高的根因）。 -->
+    <div ref="hostRef" class="map-stage__canvas">
+      <v-stage
+        ref="stageRef"
+        :config="stageConfig"
+        @wheel="onWheel"
+        @pointermove="onPointerMove"
+        @pointerleave="onPointerLeave"
+        @click="onStageClick"
+        @tap="onStageClick"
+        @dragend="onStageDragEnd"
+      >
+        <BackgroundLayer :image="image" :width="imageWidth" :height="imageHeight" />
+        <AnnotationLayer :tool="tool" :scale="scale" @entity-click="onEntityClick" />
+        <HoverLayer :cursor="cursorStage" :tool="tool" :scale="scale" />
+      </v-stage>
+    </div>
     <slot
       name="status"
       :scale="scale"
@@ -298,16 +307,28 @@ defineSlots<{
   </div>
 </template>
 
-<style scoped>
-.map-stage {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background:
-    repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 0 0 / 16px 16px,
-    #ffffff;
-  /* Konva creates an absolutely-positioned <canvas> inside; the host stays
-     responsive via ResizeObserver. */
+ <style scoped>
+ .map-stage {
+   position: relative;
+   width: 100%;
+   height: 100%;
+   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+   background:
+     repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 0 0 / 16px 16px,
+     #ffffff;
 }
-</style>
+.map-stage__canvas {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+/* v-stage renders a child <div> sized to stageWidth/Height in CSS pixels.
+   Absolutize it so it cannot contribute to parent intrinsic height. */
+.map-stage__canvas :deep(> div) {
+  position: absolute;
+  inset: 0;
+ }
+ </style>
