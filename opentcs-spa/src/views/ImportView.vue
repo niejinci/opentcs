@@ -46,6 +46,9 @@ const pngObjectUrl = ref<string | null>(null);
 // Most-recently decoded PNG, kept around so we can publish to the shared
 // background-map composable once yaml + image are both present.
 const decodedImage = shallowRef<HTMLImageElement | null>(null);
+// Base64 data URL of the most-recently uploaded PNG, captured so the store
+// can stash it in localStorage and rehydrate the background after F5.
+const pngDataUrl = ref<string | null>(null);
 
 const yamlMeta = shallowRef<RosMapMetadata | null>(null);
 const affine = shallowRef<AffineMapping | null>(null);
@@ -74,6 +77,19 @@ function stripExt(name: string): string {
   return dot > 0 ? name.slice(0, dot) : name;
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === 'string') resolve(result);
+      else reject(new Error('FileReader returned non-string result'));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('FileReader failed'));
+    reader.readAsDataURL(file);
+  });
+}
+
 function revokePngObjectUrl(): void {
   if (pngObjectUrl.value) {
     URL.revokeObjectURL(pngObjectUrl.value);
@@ -85,6 +101,7 @@ function resetMappingState(): void {
   affine.value = null;
   imageNaturalSize.value = null;
   decodedImage.value = null;
+  pngDataUrl.value = null;
   hoverPixel.value = null;
   clearBackgroundMap();
 }
@@ -112,6 +129,7 @@ function publishBackgroundIfReady(): void {
   if (!img || !meta || !aff || !pngFile.value || !yamlFile.value) return;
   setBackgroundMap({
     image: img,
+    pngDataUrl: pngDataUrl.value ?? undefined,
     pngName: pngFile.value.name,
     pgmName: pgmFile.value?.name ?? null,
     yamlName: yamlFile.value.name,
@@ -163,6 +181,16 @@ async function onPngChange(e: Event): Promise<void> {
   pngFile.value = { name: file.name, sizeBytes: file.size };
   resetMappingState();
   recomputeFileNameWarnings();
+
+  // Read PNG bytes as a base64 data URL in parallel with image decoding;
+  // the store stashes this in localStorage so the background survives F5.
+  try {
+    pngDataUrl.value = await readFileAsDataUrl(file);
+  } catch {
+    // Non-fatal — F5 persistence will degrade gracefully (the user simply
+    // has to re-upload after refresh).
+    pngDataUrl.value = null;
+  }
 
   // Decode image to obtain natural pixel dimensions, then paint to canvas.
   const img = new Image();

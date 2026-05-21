@@ -47,6 +47,13 @@ import type { RosMapMetadata } from '@/domain/yaml/parseRosMapYaml';
 
 export interface BackgroundMapState {
   image: HTMLImageElement;
+  /**
+   * Base64 `data:image/png;base64,...` URL of the original PNG bytes,
+   * used purely so the background can survive an F5 refresh by being
+   * stashed in localStorage. Optional: callers that don't supply it
+   * (e.g. tests) simply lose the F5-persistence guarantee.
+   */
+  pngDataUrl?: string;
   pngName: string;
   pgmName: string | null;
   yamlName: string;
@@ -59,8 +66,24 @@ export interface BackgroundMapState {
 /* ------------------------------ Persistence ----------------------------- */
 
 const STORAGE_KEY = 'opentcs-spa.draftV1';
+const STORAGE_KEY_BG = 'opentcs-spa.bgV1';
 const STORAGE_VERSION = 2;
+const STORAGE_VERSION_BG = 1;
 const PERSIST_DEBOUNCE_MS = 200;
+
+/* The background travels in its own localStorage key so the (potentially
+   multi-MB) PNG data URL doesn't get rewritten on every Point/Path edit. */
+interface PersistedBackground {
+  v: number;
+  pngDataUrl: string;
+  pngName: string;
+  pgmName: string | null;
+  yamlName: string;
+  width: number;
+  height: number;
+  yaml: RosMapMetadata;
+  affine: AffineMapping;
+}
 
 interface PersistedDraft {
   v: number;
@@ -112,6 +135,69 @@ function savePersisted(payload: PersistedDraft): void {
     // Quota exceeded or storage disabled — silently skip; the in-memory
     // draft remains usable for the rest of the session.
   }
+}
+
+function loadPersistedBackground(): PersistedBackground | null {
+  if (typeof localStorage === 'undefined') return null;
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY_BG);
+  } catch {
+    return null;
+  }
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<PersistedBackground>;
+    if (parsed?.v !== STORAGE_VERSION_BG) return null;
+    if (
+      typeof parsed.pngDataUrl !== 'string' ||
+      typeof parsed.pngName !== 'string' ||
+      typeof parsed.yamlName !== 'string' ||
+      typeof parsed.width !== 'number' ||
+      typeof parsed.height !== 'number' ||
+      !parsed.yaml ||
+      !parsed.affine
+    ) {
+      return null;
+    }
+    return {
+      v: STORAGE_VERSION_BG,
+      pngDataUrl: parsed.pngDataUrl,
+      pngName: parsed.pngName,
+      pgmName: parsed.pgmName ?? null,
+      yamlName: parsed.yamlName,
+      width: parsed.width,
+      height: parsed.height,
+      yaml: parsed.yaml,
+      affine: parsed.affine,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function savePersistedBackground(payload: PersistedBackground | null): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    if (payload === null) {
+      localStorage.removeItem(STORAGE_KEY_BG);
+    } else {
+      localStorage.setItem(STORAGE_KEY_BG, JSON.stringify(payload));
+    }
+  } catch {
+    // Quota exceeded (e.g. very large PNG). Silently skip; the in-memory
+    // background remains usable for the current session, only F5-persistence
+    // is forfeited.
+  }
+}
+
+function decodeImageFromDataUrl(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Failed to decode persisted background PNG'));
+    img.src = dataUrl;
+  });
 }
 
 /* ------------------------------ Color palettes -------------------------- */
@@ -181,9 +267,51 @@ export const useProjectStore = defineStore('project', () => {
 
   function setBackground(next: BackgroundMapState): void {
     background.value = next;
+    if (next.pngDataUrl) {
+      savePersistedBackground({
+        v: STORAGE_VERSION_BG,
+        pngDataUrl: next.pngDataUrl,
+        pngName: next.pngName,
+        pgmName: next.pgmName,
+        yamlName: next.yamlName,
+        width: next.width,
+        height: next.height,
+        yaml: next.yaml,
+        affine: next.affine,
+      });
+    }
   }
   function clearBackground(): void {
     background.value = null;
+    savePersistedBackground(null);
+  }
+
+  // Asynchronously rehydrate the background from a previous session so an
+  // F5 refresh keeps the editor showing the imported map (TC-3.6 expects
+  // Point / Path drafts to remain visible without re-importing).
+  const persistedBg = loadPersistedBackground();
+  if (persistedBg) {
+    decodeImageFromDataUrl(persistedBg.pngDataUrl).then(
+      (img) => {
+        // Only adopt if the user hasn't imported a fresh map in the meantime.
+        if (background.value !== null) return;
+        background.value = {
+          image: img,
+          pngDataUrl: persistedBg.pngDataUrl,
+          pngName: persistedBg.pngName,
+          pgmName: persistedBg.pgmName,
+          yamlName: persistedBg.yamlName,
+          width: persistedBg.width,
+          height: persistedBg.height,
+          yaml: persistedBg.yaml,
+          affine: persistedBg.affine,
+        };
+      },
+      () => {
+        // Corrupt persisted PNG — drop it so we don't keep retrying.
+        savePersistedBackground(null);
+      },
+    );
   }
 
   /* ------------------------------ Lookups ------------------------------ */
@@ -871,4 +999,4 @@ export const useProjectStore = defineStore('project', () => {
   };
 });
 
-export { STORAGE_KEY };
+export { STORAGE_KEY, STORAGE_KEY_BG };
