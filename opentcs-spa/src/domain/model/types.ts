@@ -50,6 +50,12 @@ export interface DraftPoint {
     /** Pixel y on the background image (top-left origin, y down). */
     pixelY: number;
   };
+  /**
+   * Mirror of `CreationTO.properties` — free-form `<String, String>` map for
+   * adapter / order metadata (e.g. VDA5050 manufacturer, serial, topic
+   * prefix). Empty by default. Order is preserved at the SPA boundary.
+   */
+  properties: Record<string, string>;
 }
 
 /** Mirror of PathCreationTO (subset; locked / envelopes / peripheralOps land later). */
@@ -65,6 +71,8 @@ export interface DraftPath {
   maxReverseVelocity: number;
   /** Mirrors PathCreationTO.locked. */
   locked: boolean;
+  /** Mirror of `CreationTO.properties`. See DraftPoint for details. */
+  properties: Record<string, string>;
 }
 
 /** Discriminator for selection / property-panel routing. */
@@ -134,6 +142,8 @@ export interface DraftLocationType {
   layout: {
     locationRepresentation: LocationRepresentation;
   };
+  /** Mirror of `CreationTO.properties`. See DraftPoint for details. */
+  properties: Record<string, string>;
 }
 
 /**
@@ -162,6 +172,8 @@ export interface DraftLocation {
     /** Optional override of the LocationType's representation. */
     locationRepresentation: LocationRepresentation;
   };
+  /** Mirror of `CreationTO.properties`. See DraftPoint for details. */
+  properties: Record<string, string>;
 }
 
 /** Mirror of `BlockCreationTO.Type`. */
@@ -187,6 +199,8 @@ export interface DraftBlock {
   layout: {
     colorRgb: string;
   };
+  /** Mirror of `CreationTO.properties`. See DraftPoint for details. */
+  properties: Record<string, string>;
 }
 
 /**
@@ -229,4 +243,6 @@ export interface DraftVehicle {
     /** routeColor mirrored as hex `#RRGGBB`. */
     routeColorRgb: string;
   };
+  /** Mirror of `CreationTO.properties`. See DraftPoint for details. */
+  properties: Record<string, string>;
 }

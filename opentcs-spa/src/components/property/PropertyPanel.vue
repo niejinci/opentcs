@@ -24,6 +24,7 @@ import { computed, ref, watch } from 'vue';
 import BlockForm from '@/components/property/BlockForm.vue';
 import LocationForm from '@/components/property/LocationForm.vue';
 import LocationTypeForm from '@/components/property/LocationTypeForm.vue';
+import MiscPropertiesEditor from '@/components/property/MiscPropertiesEditor.vue';
 import VehicleForm from '@/components/property/VehicleForm.vue';
 import { useProjectStore } from '@/stores/project';
 import { toastError } from '@/ui/toast/toastBus';
@@ -212,12 +213,15 @@ function onAddBlock(): void {
   const created = store.addBlock();
   store.select({ kind: 'block', name: created.name });
 }
+
 function onSelectLocationType(name: string): void {
   store.select({ kind: 'locationType', name });
 }
+
 function onSelectBlock(name: string): void {
   store.select({ kind: 'block', name });
 }
+
 function onDeleteLocationType(name: string): void {
   const refs = store.locations.filter((l) => l.typeName === name);
   if (refs.length > 0) {
@@ -252,7 +256,7 @@ function onDeleteBlock(name: string): void {
         <button type="button" @click="onAddLocationType">+ LocationType</button>
         <button type="button" @click="onAddBlock">+ Block</button>
       </div>
-<!-- Click-to-select lists for entities with no canvas position
+      <!-- Click-to-select lists for entities with no canvas position
            (LocationType / Block). Without these the user can only reach
            a freshly-created item via auto-select; existing ones become
            orphaned. The active row is highlighted to mirror the canvas
@@ -364,6 +368,7 @@ function onDeleteBlock(name: string): void {
         position mm: ({{ selectedPoint.pose.position.x }}, {{ selectedPoint.pose.position.y }},
         {{ selectedPoint.pose.position.z }})
       </p>
+      <MiscPropertiesEditor kind="point" :name="selectedPoint.name" />
       <button class="danger" type="button" @click="onDelete">
         删除此 Point（级联删除其相关 Path / Location.links / Block.members）
       </button>
@@ -416,6 +421,7 @@ function onDeleteBlock(name: string): void {
         <input v-model="pathForm.locked" type="checkbox" @change="commitPathLocked" />
         <span>locked（虚线显示，订单不会经过）</span>
       </label>
+      <MiscPropertiesEditor kind="path" :name="selectedPath.name" />
       <button class="danger" type="button" @click="onDelete">删除此 Path</button>
     </section>
 

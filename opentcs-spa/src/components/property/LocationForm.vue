@@ -12,6 +12,7 @@
 
 import { computed, ref, watch } from 'vue';
 
+import MiscPropertiesEditor from '@/components/property/MiscPropertiesEditor.vue';
 import { LOCATION_REPRESENTATIONS, type LocationRepresentation } from '@/domain/model/types';
 import { useProjectStore } from '@/stores/project';
 import { toastError } from '@/ui/toast/toastBus';
@@ -220,6 +221,7 @@ function onDelete(): void {
     <p class="hint">
       position mm: ({{ selected.position.x }}, {{ selected.position.y }}, {{ selected.position.z }})
     </p>
+    <MiscPropertiesEditor kind="location" :name="selected.name" />
     <button class="danger" type="button" @click="onDelete">删除此 Location</button>
   </section>
 </template>

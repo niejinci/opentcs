@@ -37,6 +37,7 @@ import type {
   DraftPath,
   DraftPoint,
   DraftVehicle,
+  EntityKind,
   LocationRepresentation,
   PointType,
   SelectionRef,
@@ -110,21 +111,40 @@ function loadPersisted(): PersistedDraft | null {
     if (parsed?.v !== STORAGE_VERSION && parsed?.v !== 1) return null;
     if (!Array.isArray(parsed.points) || !Array.isArray(parsed.paths)) return null;
     // v1 → v2: only Point/Path existed. Initialise the S6 arrays empty.
+    // Also backfill `properties: {}` on any entity persisted before the
+    // Miscellaneous-properties feature shipped, so downstream code (forms,
+    // S8 publish converter) can assume the field is always present.
     return {
       v: STORAGE_VERSION,
-      points: parsed.points as DraftPoint[],
-      paths: parsed.paths as DraftPath[],
+      points: (parsed.points as DraftPoint[]).map(withProperties),
+      paths: (parsed.paths as DraftPath[]).map(withProperties),
       locationTypes: Array.isArray(parsed.locationTypes)
-        ? (parsed.locationTypes as DraftLocationType[])
+        ? (parsed.locationTypes as DraftLocationType[]).map(withProperties)
         : [],
-      locations: Array.isArray(parsed.locations) ? (parsed.locations as DraftLocation[]) : [],
-      blocks: Array.isArray(parsed.blocks) ? (parsed.blocks as DraftBlock[]) : [],
-      vehicles: Array.isArray(parsed.vehicles) ? (parsed.vehicles as DraftVehicle[]) : [],
+      locations: Array.isArray(parsed.locations)
+        ? (parsed.locations as DraftLocation[]).map(withProperties)
+        : [],
+      blocks: Array.isArray(parsed.blocks)
+        ? (parsed.blocks as DraftBlock[]).map(withProperties)
+        : [],
+      vehicles: Array.isArray(parsed.vehicles)
+        ? (parsed.vehicles as DraftVehicle[]).map(withProperties)
+        : [],
       selection: parsed.selection ?? null,
     };
   } catch {
     return null; // corrupt JSON
   }
+}
+
+/**
+ * Returns the entity with a guaranteed `properties` object. Used both for
+ * upgrading pre-S6.1 persisted drafts and for defensively normalising any
+ * payload that may reach the store (e.g. tests, future imports).
+ */
+function withProperties<T extends { properties?: Record<string, string> }>(entity: T): T {
+  if (entity.properties && typeof entity.properties === 'object') return entity;
+  return { ...entity, properties: {} };
 }
 
 function savePersisted(payload: PersistedDraft): void {
@@ -411,6 +431,7 @@ export const useProjectStore = defineStore('project', () => {
         orientationAngle: Number.NaN,
       },
       layout: { pixelX: pixel.x, pixelY: pixel.y },
+      properties: {},
     };
     points.value.push(created);
     selection.value = { kind: 'point', name };
@@ -513,6 +534,7 @@ export const useProjectStore = defineStore('project', () => {
       maxVelocity: 1000, // 1 m/s default
       maxReverseVelocity: 0,
       locked: false,
+      properties: {},
     };
     paths.value.push(created);
     selection.value = { kind: 'path', name };
@@ -564,6 +586,7 @@ export const useProjectStore = defineStore('project', () => {
       allowedOperations: ['Load', 'Unload'],
       allowedPeripheralOperations: [],
       layout: { locationRepresentation: 'LOAD_TRANSFER_GENERIC' },
+      properties: {},
     };
     locationTypes.value.push(created);
     return created;
@@ -633,6 +656,7 @@ export const useProjectStore = defineStore('project', () => {
         pixelY: pixel.y,
         locationRepresentation: 'DEFAULT',
       },
+      properties: {},
     };
     locations.value.push(created);
     selection.value = { kind: 'location', name };
@@ -730,6 +754,7 @@ export const useProjectStore = defineStore('project', () => {
       type: 'SINGLE_VEHICLE_ONLY',
       memberNames: [],
       layout: { colorRgb: pickBlockColor(blocks.value.length) },
+      properties: {},
     };
     blocks.value.push(created);
     selection.value = { kind: 'block', name };
@@ -799,6 +824,7 @@ export const useProjectStore = defineStore('project', () => {
         orientationDeg: 0,
         routeColorRgb: pickVehicleColor(vehicles.value.length),
       },
+      properties: {},
     };
     vehicles.value.push(created);
     selection.value = { kind: 'vehicle', name };
@@ -870,6 +896,97 @@ export const useProjectStore = defineStore('project', () => {
       e.energyLevelSufficientlyRecharged = clampPercent(patch.energyLevelSufficientlyRecharged);
     if (patch.energyLevelFullyRecharged !== undefined)
       e.energyLevelFullyRecharged = clampPercent(patch.energyLevelFullyRecharged);
+  }
+
+  /* ----------------------- Miscellaneous properties -------------------- */
+
+  /**
+   * Resolve the entity bag holding `properties` for a given selection
+   * descriptor, so the property-editor actions below can operate on any
+   * of the six entity kinds without duplicating lookup branches.
+   */
+  function findEntityWithProperties(
+    kind: EntityKind,
+    name: string,
+  ): { properties: Record<string, string> } | undefined {
+    switch (kind) {
+      case 'point':
+        return findPoint(name);
+      case 'path':
+        return findPath(name);
+      case 'locationType':
+        return findLocationType(name);
+      case 'location':
+        return findLocation(name);
+      case 'block':
+        return findBlock(name);
+      case 'vehicle':
+        return findVehicle(name);
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Set / overwrite a single property entry on the addressed entity.
+   * `key` must be a non-empty string. Returns `{ ok: false, error }` on
+   * validation failure so the caller can surface a toast and revert the
+   * input — never throws.
+   */
+  function setEntityProperty(
+    kind: EntityKind,
+    name: string,
+    key: string,
+    value: string,
+  ): { ok: boolean; error?: string } {
+    const k = key.trim();
+    if (!k) return { ok: false, error: '键不能为空' };
+    const target = findEntityWithProperties(kind, name);
+    if (!target) return { ok: false, error: `未找到 ${kind} '${name}'` };
+    // Reassign the bag (not just mutate) so Pinia's deep watcher fires and
+    // the persistence layer schedules a save.
+    target.properties = { ...target.properties, [k]: value };
+    return { ok: true };
+  }
+
+  /**
+   * Rename an existing property key (preserving its value and approximate
+   * insertion order). Refuses no-ops, empty new keys, and collisions with
+   * an existing key.
+   */
+  function renameEntityPropertyKey(
+    kind: EntityKind,
+    name: string,
+    oldKey: string,
+    newKey: string,
+  ): { ok: boolean; error?: string } {
+    if (oldKey === newKey) return { ok: true };
+    const nk = newKey.trim();
+    if (!nk) return { ok: false, error: '键不能为空' };
+    const target = findEntityWithProperties(kind, name);
+    if (!target) return { ok: false, error: `未找到 ${kind} '${name}'` };
+    if (!(oldKey in target.properties)) {
+      return { ok: false, error: `属性键 '${oldKey}' 不存在` };
+    }
+    if (nk in target.properties) {
+      return { ok: false, error: `属性键 '${nk}' 已存在` };
+    }
+    // Rebuild the bag preserving order: substitute the renamed entry in place.
+    const next: Record<string, string> = {};
+    for (const [k, v] of Object.entries(target.properties)) {
+      if (k === oldKey) next[nk] = v;
+      else next[k] = v;
+    }
+    target.properties = next;
+    return { ok: true };
+  }
+
+  function deleteEntityProperty(kind: EntityKind, name: string, key: string): void {
+    const target = findEntityWithProperties(kind, name);
+    if (!target || !(key in target.properties)) return;
+    const next = { ...target.properties };
+    delete next[key];
+    target.properties = next;
   }
 
   /* ------------------------ Selection + deletion ----------------------- */
@@ -992,6 +1109,10 @@ export const useProjectStore = defineStore('project', () => {
     moveVehicle,
     renameVehicle,
     updateVehicleFields,
+    // miscellaneous properties (all entity kinds)
+    setEntityProperty,
+    renameEntityPropertyKey,
+    deleteEntityProperty,
     // selection + delete
     select,
     deleteSelected,

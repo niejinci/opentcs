@@ -182,7 +182,7 @@ async function onPngChange(e: Event): Promise<void> {
   resetMappingState();
   recomputeFileNameWarnings();
 
-    // Read PNG bytes as a base64 data URL in parallel with image decoding;
+  // Read PNG bytes as a base64 data URL in parallel with image decoding;
   // the store stashes this in localStorage so the background survives F5.
   try {
     pngDataUrl.value = await readFileAsDataUrl(file);
