@@ -7,6 +7,7 @@ import com.google.inject.Injector;
 import java.nio.file.Paths;
 import org.opentcs.bff.kernel.BffKernelConfiguration;
 import org.opentcs.bff.kernel.KernelClient;
+import org.opentcs.bff.project.BffWorkspaceConfiguration;
 import org.opentcs.bff.security.BffSecurityConfiguration;
 import org.opentcs.configuration.ConfigurationBindingProvider;
 import org.opentcs.configuration.gestalt.GestaltConfigurationBindingProvider;
@@ -42,9 +43,15 @@ public final class RunBff {
         = bindingProvider.get(BffKernelConfiguration.PREFIX, BffKernelConfiguration.class);
     BffSecurityConfiguration securityConfig
         = bindingProvider.get(BffSecurityConfiguration.PREFIX, BffSecurityConfiguration.class);
+    BffWorkspaceConfiguration workspaceConfig
+        = bindingProvider.get(
+            BffWorkspaceConfiguration.PREFIX, BffWorkspaceConfiguration.class
+        );
 
     Injector injector
-        = Guice.createInjector(new BffModule(bffConfig, kernelConfig, securityConfig));
+        = Guice.createInjector(
+            new BffModule(bffConfig, kernelConfig, securityConfig, workspaceConfig)
+        );
     BffApplication app = injector.getInstance(BffApplication.class);
     KernelClient kernelClient = injector.getInstance(KernelClient.class);
 

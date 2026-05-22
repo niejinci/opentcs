@@ -14,6 +14,9 @@ import org.opentcs.bff.events.SseEventBridge;
 import org.opentcs.bff.health.HealthHandler;
 import org.opentcs.bff.kernel.KernelClient;
 import org.opentcs.bff.plantmodel.PlantModelSummaryHandler;
+import org.opentcs.bff.project.ProjectAssetsHandler;
+import org.opentcs.bff.project.ProjectStore;
+import org.opentcs.bff.project.ProjectsHandler;
 import org.opentcs.bff.security.AccessKeyAuthenticator;
 import org.opentcs.bff.security.BffSecurityConfiguration;
 import org.opentcs.bff.swagger.OpenApiSpecHandler;
@@ -167,6 +170,13 @@ class BffApplicationTest {
     when(kernelClient.listVehicles()).thenReturn(java.util.Set.of());
     BffSecurityConfiguration securityConfig = TestConfigurations.security(accessKey);
     SseEventBridge sseEventBridge = new SseEventBridge();
+    ProjectStore projectStore = new ProjectStore(
+        java.nio.file.Paths.get(
+            System.getProperty("java.io.tmpdir"),
+            "opentcs-bff-test-" + java.util.UUID.randomUUID()
+        ),
+        1024L * 1024L
+    );
     return new BffApplication(
         bff("127.0.0.1", 0),
         new AccessKeyAuthenticator(securityConfig),
@@ -175,6 +185,8 @@ class BffApplicationTest {
         new ListVehiclesHandler(kernelClient),
         new GetVehicleHandler(kernelClient),
         new CreateTransportOrderHandler(kernelClient),
+        new ProjectsHandler(projectStore),
+        new ProjectAssetsHandler(projectStore),
         new OpenApiSpecHandler(),
         sseEventBridge,
         new KernelEventPoller(kernelClient, sseEventBridge)

@@ -8,6 +8,7 @@ import com.google.inject.AbstractModule;
 import org.opentcs.bff.kernel.BffKernelConfiguration;
 import org.opentcs.bff.kernel.DefaultKernelServicePortalFactory;
 import org.opentcs.bff.kernel.KernelServicePortalFactory;
+import org.opentcs.bff.project.BffWorkspaceConfiguration;
 import org.opentcs.bff.security.BffSecurityConfiguration;
 
 /**
@@ -25,6 +26,7 @@ public class BffModule
   private final BffConfiguration configuration;
   private final BffKernelConfiguration kernelConfiguration;
   private final BffSecurityConfiguration securityConfiguration;
+  private final BffWorkspaceConfiguration workspaceConfiguration;
 
   /**
    * Creates a new instance.
@@ -32,15 +34,18 @@ public class BffModule
    * @param configuration The runtime configuration to expose to injected components.
    * @param kernelConfiguration The Kernel connection configuration.
    * @param securityConfiguration The HTTP security configuration.
+   * @param workspaceConfiguration The on-disk project workspace configuration (S7).
    */
   public BffModule(
       BffConfiguration configuration,
       BffKernelConfiguration kernelConfiguration,
-      BffSecurityConfiguration securityConfiguration
+      BffSecurityConfiguration securityConfiguration,
+      BffWorkspaceConfiguration workspaceConfiguration
   ) {
     this.configuration = requireNonNull(configuration, "configuration");
     this.kernelConfiguration = requireNonNull(kernelConfiguration, "kernelConfiguration");
     this.securityConfiguration = requireNonNull(securityConfiguration, "securityConfiguration");
+    this.workspaceConfiguration = requireNonNull(workspaceConfiguration, "workspaceConfiguration");
   }
 
   @Override
@@ -48,6 +53,7 @@ public class BffModule
     bind(BffConfiguration.class).toInstance(configuration);
     bind(BffKernelConfiguration.class).toInstance(kernelConfiguration);
     bind(BffSecurityConfiguration.class).toInstance(securityConfiguration);
+    bind(BffWorkspaceConfiguration.class).toInstance(workspaceConfiguration);
     bind(KernelServicePortalFactory.class).to(DefaultKernelServicePortalFactory.class);
   }
 }
