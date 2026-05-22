@@ -213,7 +213,7 @@ public class PlantModelManager
   public void createPlantModelObjects(PlantModelCreationTO to)
       throws ObjectExistsException,
         ObjectUnknownException {
-    LOG.info("Plant model is being created: {}", to.getName());
+    LOG.info("Plant model is being created: {}", to);
 
     clear();
     setName(to.getName());
