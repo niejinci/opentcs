@@ -18,6 +18,7 @@ const milestone = 'S4 · 画布编辑器框架：Konva 多图层 + 缩放/平移
         <p class="milestone">{{ milestone }}</p>
       </div>
       <nav class="app-nav">
+        <RouterLink to="/projects">工程</RouterLink>
         <RouterLink to="/import">地图导入</RouterLink>
         <RouterLink to="/editor">画布编辑器</RouterLink>
         <RouterLink to="/debug">BFF 调试</RouterLink>

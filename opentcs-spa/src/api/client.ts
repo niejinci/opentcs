@@ -44,6 +44,8 @@ interface RequestInternal extends RequestOptions {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   path: string;
   body?: unknown;
+  /** Raw body (e.g. FormData). Mutually exclusive with `body`. */
+  rawBody?: BodyInit;
 }
 
 function buildHeaders(extra?: Record<string, string>): Headers {
@@ -106,6 +108,8 @@ async function doRequest<T>(req: RequestInternal): Promise<T> {
   if (req.body !== undefined) {
     headers.set('Content-Type', JSON_CONTENT_TYPE);
     init.body = JSON.stringify(req.body);
+  } else if (req.rawBody !== undefined) {
+    init.body = req.rawBody;
   }
 
   let response: Response;
@@ -167,8 +171,19 @@ export const apiClient = {
   put<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
     return doRequest<T>({ method: 'PUT', path, body, ...options });
   },
+  patch<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
+    return doRequest<T>({ method: 'PATCH', path, body, ...options });
+  },
   delete<T>(path: string, options?: RequestOptions): Promise<T> {
     return doRequest<T>({ method: 'DELETE', path, ...options });
+  },
+  /**
+   * POST with a raw {@link BodyInit} (e.g. {@link FormData} for multipart uploads).
+   * The `Content-Type` header is intentionally left unset so the browser supplies
+   * the correct multipart boundary.
+   */
+  postRaw<T>(path: string, rawBody: BodyInit, options?: RequestOptions): Promise<T> {
+    return doRequest<T>({ method: 'POST', path, rawBody, ...options });
   },
 } as const;
 
