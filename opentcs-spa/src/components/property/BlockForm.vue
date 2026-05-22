@@ -11,6 +11,7 @@
 
 import { computed, ref, watch } from 'vue';
 
+import MiscPropertiesEditor from '@/components/property/MiscPropertiesEditor.vue';
 import type { BlockType } from '@/domain/model/types';
 import { useProjectStore } from '@/stores/project';
 import { toastError } from '@/ui/toast/toastBus';
@@ -124,6 +125,7 @@ function onDelete(): void {
     </fieldset>
 
     <p class="hint">画布上以虚线框标出成员包络（仅在选中本 Block 时显示）。</p>
+    <MiscPropertiesEditor kind="block" :name="selected.name" />
     <button class="danger" type="button" @click="onDelete">删除此 Block</button>
   </section>
 </template>

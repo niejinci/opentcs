@@ -24,6 +24,7 @@ import { computed, ref, watch } from 'vue';
 import BlockForm from '@/components/property/BlockForm.vue';
 import LocationForm from '@/components/property/LocationForm.vue';
 import LocationTypeForm from '@/components/property/LocationTypeForm.vue';
+import MiscPropertiesEditor from '@/components/property/MiscPropertiesEditor.vue';
 import VehicleForm from '@/components/property/VehicleForm.vue';
 import { useProjectStore } from '@/stores/project';
 import { toastError } from '@/ui/toast/toastBus';
@@ -368,6 +369,7 @@ function onDeleteBlock(name: string): void {
         position mm: ({{ selectedPoint.pose.position.x }}, {{ selectedPoint.pose.position.y }},
         {{ selectedPoint.pose.position.z }})
       </p>
+      <MiscPropertiesEditor kind="point" :name="selectedPoint.name" />
       <button class="danger" type="button" @click="onDelete">
         删除此 Point（级联删除其相关 Path / Location.links / Block.members）
       </button>
@@ -420,6 +422,7 @@ function onDeleteBlock(name: string): void {
         <input v-model="pathForm.locked" type="checkbox" @change="commitPathLocked" />
         <span>locked（虚线显示，订单不会经过）</span>
       </label>
+      <MiscPropertiesEditor kind="path" :name="selectedPath.name" />
       <button class="danger" type="button" @click="onDelete">删除此 Path</button>
     </section>
 

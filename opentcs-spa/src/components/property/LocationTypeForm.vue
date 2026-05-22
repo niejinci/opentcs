@@ -12,6 +12,7 @@
 
 import { computed, ref, watch } from 'vue';
 
+import MiscPropertiesEditor from '@/components/property/MiscPropertiesEditor.vue';
 import { LOCATION_REPRESENTATIONS, type LocationRepresentation } from '@/domain/model/types';
 import { useProjectStore } from '@/stores/project';
 import { toastError } from '@/ui/toast/toastBus';
@@ -138,6 +139,7 @@ function onDelete(): void {
       被 <strong>{{ referencingLocationCount }}</strong> 个 Location 引用
       {{ referencingLocationCount > 0 ? '；删除将被拦截' : '' }}
     </p>
+    <MiscPropertiesEditor kind="locationType" :name="selected.name" />
     <button class="danger" type="button" @click="onDelete">删除此 LocationType</button>
   </section>
 </template>

@@ -11,6 +11,7 @@
 
 import { computed, ref, watch } from 'vue';
 
+import MiscPropertiesEditor from '@/components/property/MiscPropertiesEditor.vue';
 import { useProjectStore } from '@/stores/project';
 import { toastError } from '@/ui/toast/toastBus';
 
@@ -272,6 +273,7 @@ function onDelete(): void {
       pixel: ({{ selected.layout.pixelX.toFixed(1) }}, {{ selected.layout.pixelY.toFixed(1) }}) —
       拖动画布上车体或在选择工具下拖拽可调位置
     </p>
+    <MiscPropertiesEditor kind="vehicle" :name="selected.name" />
     <button class="danger" type="button" @click="onDelete">删除此 Vehicle</button>
   </section>
 </template>
