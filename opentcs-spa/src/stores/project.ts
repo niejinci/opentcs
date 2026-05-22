@@ -97,6 +97,33 @@ interface PersistedDraft {
   selection: SelectionRef | null;
 }
 
+/* --------------------- NaN ↔ "NaN" wire-form helpers -------------------- */
+//
+// `JSON.stringify` collapses any non-finite number (`NaN`, `±Infinity`) to
+// `null`, which would silently destroy `pose.orientationAngle = NaN`
+// ("unset") on every persist→hydrate cycle and, more importantly, would
+// produce a payload that fails Java deserialisation into
+// `PoseCreationTO.orientationAngle` (`double`, non-nullable).
+//
+// Spec convention (`chat-with-ai/20-agv地图适配到opentcs.md` § 3, line ~1019)
+// pins the wire form to the string `"NaN"`; the round-trip below preserves
+// that across `localStorage` and BFF persistence alike.
+function nanReplacer(_key: string, value: unknown): unknown {
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    if (Number.isNaN(value)) return 'NaN';
+    if (value === Number.POSITIVE_INFINITY) return 'Infinity';
+    if (value === Number.NEGATIVE_INFINITY) return '-Infinity';
+  }
+  return value;
+}
+
+function nanReviver(_key: string, value: unknown): unknown {
+  if (value === 'NaN') return Number.NaN;
+  if (value === 'Infinity') return Number.POSITIVE_INFINITY;
+  if (value === '-Infinity') return Number.NEGATIVE_INFINITY;
+  return value;
+}
+
 function loadPersisted(): PersistedDraft | null {
   if (typeof localStorage === 'undefined') return null;
   let raw: string | null;
@@ -107,7 +134,7 @@ function loadPersisted(): PersistedDraft | null {
   }
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as Partial<PersistedDraft>;
+    const parsed = JSON.parse(raw, nanReviver) as Partial<PersistedDraft>;
     if (parsed?.v !== STORAGE_VERSION && parsed?.v !== 1) return null;
     if (!Array.isArray(parsed.points) || !Array.isArray(parsed.paths)) return null;
     // v1 → v2: only Point/Path existed. Initialise the S6 arrays empty.
@@ -150,7 +177,7 @@ function withProperties<T extends { properties?: Record<string, string> }>(entit
 function savePersisted(payload: PersistedDraft): void {
   if (typeof localStorage === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload, nanReplacer));
   } catch {
     // Quota exceeded or storage disabled — silently skip; the in-memory
     // draft remains usable for the rest of the session.
