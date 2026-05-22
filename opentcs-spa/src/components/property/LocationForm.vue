@@ -149,6 +149,37 @@ function isLinked(pointName: string): boolean {
   return l.links.some((lk) => lk.pointName === pointName);
 }
 
+/**
+ * Soft-warning: detect `vda5050:destinationAction.<op>.*` property keys
+ * whose `<op>` is not in the linked LocationType's `allowedOperations`.
+ *
+ * MVP rationale (matches opentcs-modeleditor's "Miscellaneous" tab UX):
+ * we don't *block* saving — Kernel/PlantModel persistence stays
+ * permissive, and `S7 BFF validate` + `S8 publish converter` are the
+ * authoritative gates. This banner only nudges the editor to notice the
+ * mismatch (e.g. typeName=LocType-1 but properties carry `drop.*`).
+ */
+const DESTINATION_ACTION_KEY_RE = /^vda5050:destinationAction\.([^.]+)\./;
+
+const orphanActionWarnings = computed<string[]>(() => {
+  const l = selected.value;
+  if (!l) return [];
+  const type = store.findLocationType(l.typeName);
+  // Unknown typeName is its own error surfaced elsewhere (commitType toast);
+  // don't double-warn here.
+  if (!type) return [];
+  const allowed = new Set(type.allowedOperations);
+  const seen = new Set<string>();
+  for (const key of Object.keys(l.properties)) {
+    const m = DESTINATION_ACTION_KEY_RE.exec(key);
+    if (!m) continue;
+    const op = m[1];
+    if (allowed.has(op)) continue;
+    seen.add(op);
+  }
+  return Array.from(seen).sort();
+});
+
 function onDelete(): void {
   store.deleteSelected();
 }
@@ -220,6 +251,20 @@ function onDelete(): void {
 
     <p class="hint">
       position mm: ({{ selected.position.x }}, {{ selected.position.y }}, {{ selected.position.z }})
+    </p>
+    <p
+      v-if="orphanActionWarnings.length > 0"
+      class="warn-banner"
+      role="status"
+      data-test="location-action-warning"
+    >
+      ⚠ 该 Location 的 properties 中含 <code>vda5050:destinationAction.{{
+        orphanActionWarnings.join(' / ')
+      }}.*</code>，但其 LocationType <code>{{ selected.typeName }}</code> 的
+      <code>allowedOperations</code> 不包含
+      <code>{{ orphanActionWarnings.join(' / ') }}</code>。下订单时该动作将被
+      Kernel 拒绝（422）。MVP 阶段不阻塞保存——发布前请到 LocationType
+      上补齐 allowedOperations，或修正 typeName。
     </p>
     <MiscPropertiesEditor kind="location" :name="selected.name" />
     <button class="danger" type="button" @click="onDelete">删除此 Location</button>
@@ -299,6 +344,24 @@ function onDelete(): void {
   color: #57606a;
   font-size: 0.8rem;
   margin: 0.25rem 0;
+}
+.warn-banner {
+  margin: 0;
+  padding: 0.4rem 0.6rem;
+  background: #fff8c5;
+  border: 1px solid #d4a72c;
+  border-radius: 4px;
+  color: #57606a;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.warn-banner code {
+  background: #fffbe0;
+  border: 1px solid #eac54f;
+  padding: 0 0.25rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .danger {
   margin-top: 0.5rem;
