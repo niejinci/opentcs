@@ -19,8 +19,8 @@
             "vda5050:orientation.forward": "-90"
         ```
 3. 画2个站点: Location-1, Location-2
-    - Location-1 连接到 Point-2
-    - Location-2 连接到 Point-3
+    - Location-1 连接到 Point-2, typeName 为 LocType-1
+    - Location-2 连接到 Point-3, typeName 为 LocType-2
     - 给站点 Location-1设置属性
         ```
         "vda5050:destinationAction.pick.blockingType": "NONE",
@@ -211,7 +211,7 @@ opentcs-spa.draftV1
         },
         {
             "name": "Location-2",
-            "typeName": "LocType-1",
+            "typeName": "LocType-2",
             "position": {
                 "x": -125190,
                 "y": 25427,
