@@ -146,7 +146,7 @@ function addRow(): void {
     </p>
 
     <ul v-if="rows.length > 0" class="rows">
-      <li v-for="(row, idx) in rows" :key="`${row.originalKey}-${idx}`" class="row">
+      <li v-for="row in rows" :key="row.originalKey" class="row">
         <input
           v-model="row.key"
           type="text"
