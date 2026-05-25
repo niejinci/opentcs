@@ -15,13 +15,14 @@
 //       * `select` tool → empty-canvas click = clear selection
 //   - Right-hand PropertyPanel for the currently selected entity
 
-import { onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue';
-import { RouterLink } from 'vue-router';
+import { onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 
 import EditorToolbar from '@/components/canvas/EditorToolbar.vue';
 import MapStage from '@/components/canvas/MapStage.vue';
 import PropertyPanel from '@/components/property/PropertyPanel.vue';
 import { useBackgroundMap } from '@/composables/useBackgroundMap';
+import { useCloudDraftSync } from '@/composables/useCloudDraftSync';
 import {
   EDITOR_TOOLS,
   editorToolForHotkey,
@@ -29,10 +30,40 @@ import {
   type EditorToolId,
 } from '@/domain/editor/tools';
 import { useProjectStore } from '@/stores/project';
-import { toastInfo } from '@/ui/toast/toastBus';
+import { useProjectsStore } from '@/stores/projects';
+import { toastError, toastInfo } from '@/ui/toast/toastBus';
 
 const { background, hasBackground } = useBackgroundMap();
 const store = useProjectStore();
+const projects = useProjectsStore();
+const route = useRoute();
+const router = useRouter();
+
+// S7: push every debounced state change to the BFF for the active project.
+// No-op when no project is selected (cloud sync simply skips the request).
+useCloudDraftSync();
+
+// Hydrate the editor with the persisted draft for the URL-bound project.
+// If the route has no `projectId` and there's no remembered current one,
+// kick the user back to /projects so the catalogue is the single entry
+// point into the editor.
+async function activateProjectFromRoute(): Promise<void> {
+  const id = (route.params.projectId as string | undefined) ?? projects.currentId ?? null;
+  if (!id) {
+    void router.replace({ name: 'projects' });
+    return;
+  }
+  try {
+    await projects.setCurrent(id);
+    const env = await projects.loadCurrentDraft();
+    store.hydrateDraftPayload(env?.payload ?? null);
+  } catch {
+    toastError('加载工程失败', 'BFF');
+    void router.replace({ name: 'projects' });
+  }
+}
+
+watch(() => route.params.projectId, () => void activateProjectFromRoute(), { immediate: true });
 
 const activeTool = ref<EditorToolId>('select');
 const mapStageRef = useTemplateRef<{ resetView: () => void } | null>('mapStageRef');

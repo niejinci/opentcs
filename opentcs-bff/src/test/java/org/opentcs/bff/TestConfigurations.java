@@ -5,7 +5,7 @@ package org.opentcs.bff;
 /**
  * Test fixtures for BFF unit tests.
  */
-final class TestConfigurations {
+public final class TestConfigurations {
 
   private TestConfigurations() {
   }
@@ -17,7 +17,7 @@ final class TestConfigurations {
    * @param bindPort The bind port.
    * @return A {@link BffConfiguration} bound to the given address and port.
    */
-  static BffConfiguration bff(String bindAddress, int bindPort) {
+  public static BffConfiguration bff(String bindAddress, int bindPort) {
     return new BffConfiguration() {
       @Override
       public String bindAddress() {
@@ -38,7 +38,7 @@ final class TestConfigurations {
    * @param accessKey The configured access key.
    * @return The configuration.
    */
-  static org.opentcs.bff.security.BffSecurityConfiguration security(String accessKey) {
+  public static org.opentcs.bff.security.BffSecurityConfiguration security(String accessKey) {
     return () -> accessKey == null ? "" : accessKey;
   }
 }

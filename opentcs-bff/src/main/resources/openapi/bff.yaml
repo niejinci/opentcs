@@ -18,6 +18,8 @@ tags:
     description: Working with transport orders
   - name: Events
     description: Server-Sent Events (SSE) for real-time object state updates
+  - name: Projects
+    description: SPA project (draft + assets) CRUD persisted to the BFF workspace
 security:
   - ApiKeyAuth: []
 paths:
@@ -143,6 +145,235 @@ paths:
                 description: A stream of SSE messages (see endpoint description for the payload format).
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /api/v1/projects:
+    get:
+      tags: [Projects]
+      summary: List all projects in the BFF workspace.
+      operationId: listProjects
+      responses:
+        '200':
+          description: The list of projects.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Projects]
+      summary: Create a new project.
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: Project created.
+          headers:
+            Location:
+              schema: { type: string }
+              description: Path to the newly created project.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/projects/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Projects]
+      summary: Fetch project metadata.
+      operationId: getProject
+      responses:
+        '200':
+          description: Project metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMeta'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Projects]
+      summary: Rename a project.
+      operationId: renameProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenameProjectRequest'
+      responses:
+        '200':
+          description: Updated project metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Projects]
+      summary: Delete a project (recursive).
+      operationId: deleteProject
+      responses:
+        '204':
+          description: Project deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/projects/{id}/copy:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      tags: [Projects]
+      summary: Copy ("save as") a project. Copies meta, draft and assets; excludes publish history.
+      operationId: copyProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CopyProjectRequest'
+      responses:
+        '201':
+          description: New project metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMeta'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/projects/{id}/draft:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Projects]
+      summary: Get the current draft (DraftEnvelope).
+      operationId: getProjectDraft
+      responses:
+        '200':
+          description: Draft envelope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Projects]
+      summary: |
+        Replace the current draft. The payload is stored verbatim; only the envelope
+        is validated (the integer `version` field must be present).
+      operationId: putProjectDraft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftEnvelope'
+      responses:
+        '204':
+          description: Draft written.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/projects/{id}/assets:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Projects]
+      summary: List uploaded assets.
+      operationId: listProjectAssets
+      responses:
+        '200':
+          description: Asset listing.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectAsset'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Projects]
+      summary: |
+        Upload one or more assets (multipart/form-data, field name `file`).
+        Allowed extensions: png, pgm, yaml, yml.
+      operationId: uploadProjectAssets
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '201':
+          description: Created asset descriptors.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectAsset'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          description: Asset exceeds the configured size limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/projects/{id}/assets/{name}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: name
+        in: path
+        required: true
+        schema: { type: string }
+        description: Asset file name (must match `[A-Za-z0-9][A-Za-z0-9_-]{0,127}\.(png|pgm|yaml|yml)`).
+    get:
+      tags: [Projects]
+      summary: Download an asset.
+      operationId: getProjectAsset
+      responses:
+        '200':
+          description: The asset bytes.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Projects]
+      summary: Delete an asset.
+      operationId: deleteProjectAsset
+      responses:
+        '204':
+          description: Asset deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
 components:
   schemas:
     Vehicle:
@@ -341,6 +572,63 @@ components:
             - $ref: '#/components/schemas/Vehicle'
             - $ref: '#/components/schemas/TransportOrder'
           nullable: true
+    ProjectSummary:
+      type: object
+      required: [id, name, updatedAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        updatedAt: { type: string, format: date-time }
+        hasDraft: { type: boolean }
+    ProjectMeta:
+      type: object
+      required: [id, name, createdAt, updatedAt, hasDraft, assets]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        hasDraft: { type: boolean }
+        assets:
+          type: array
+          items: { type: string }
+    CreateProjectRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        id:
+          type: string
+          description: Optional project id (must match `^[a-z0-9][a-z0-9_-]{0,63}$`).
+    RenameProjectRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+    CopyProjectRequest:
+      type: object
+      required: [newName]
+      properties:
+        newName: { type: string }
+        newId: { type: string }
+    DraftEnvelope:
+      type: object
+      required: [version, payload]
+      description: Opaque draft envelope. The `payload` field is stored verbatim.
+      properties:
+        version: { type: integer }
+        savedAt: { type: string, format: date-time }
+        payload:
+          type: object
+          additionalProperties: true
+    ProjectAsset:
+      type: object
+      required: [name, size, contentType, updatedAt]
+      properties:
+        name: { type: string }
+        size: { type: integer, format: int64 }
+        contentType: { type: string }
+        updatedAt: { type: string, format: date-time }
   responses:
     BadRequest:
       description: The request body is malformed or fails validation.
@@ -360,6 +648,25 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: The requested resource does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: The request conflicts with the current state.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  parameters:
+    ProjectId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: Project id (must match `^[a-z0-9][a-z0-9_-]{0,63}$`).
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

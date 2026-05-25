@@ -1,5 +1,12 @@
 :root {
-  color-scheme: light dark;
+  /*
+   * The app currently ships a single light theme; views hard-code light
+   * surfaces (#ffffff / #f6f8fa). Letting the UA pick "dark" makes the
+   * default `button` / `input` text white, producing the white-on-white
+   * buttons reported during S7 acceptance. Lock to light until a real
+   * dark theme exists.
+   */
+  color-scheme: light;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -11,6 +18,18 @@ body {
   margin: 0;
   padding: 0;
   background: #ffffff;
+  /* Defensive: force readable text on the light surfaces above even
+     when the OS / browser is in dark mode. */
+  color: #1f2328;
+}
+
+/* Form controls don't inherit `color` from <body> by default — pin them
+   to the same readable dark grey to avoid white-on-white. */
+button,
+input,
+select,
+textarea {
+  color: #1f2328;
 }
 
 #app {

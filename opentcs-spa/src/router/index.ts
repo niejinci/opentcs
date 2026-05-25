@@ -9,7 +9,13 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 
 const routes: RouteRecordRaw[] = [
-  { path: '/', redirect: '/import' },
+  { path: '/', redirect: '/projects' },
+  {
+    path: '/projects',
+    name: 'projects',
+    component: () => import('@/views/ProjectsView.vue'),
+    meta: { title: '工程列表' },
+  },
   {
     path: '/import',
     name: 'import',
@@ -17,10 +23,11 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '地图导入' },
   },
   {
-    path: '/editor',
+    path: '/editor/:projectId?',
     name: 'editor',
     component: () => import('@/views/EditorView.vue'),
     meta: { title: '画布编辑器' },
+    props: true,
   },
   {
     path: '/debug',
@@ -28,8 +35,8 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/DebugView.vue'),
     meta: { title: 'BFF 调试' },
   },
-  // Catch-all → import. Orders view lands in S9.
-  { path: '/:pathMatch(.*)*', redirect: '/import' },
+  // Catch-all → projects list.
+  { path: '/:pathMatch(.*)*', redirect: '/projects' },
 ];
 
 export const router = createRouter({
