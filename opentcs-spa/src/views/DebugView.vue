@@ -238,6 +238,7 @@ button {
   border-radius: 6px;
   border: 1px solid #d0d7de;
   background: #f6f8fa;
+  color: #1f2328;
   cursor: pointer;
 }
 button:disabled {

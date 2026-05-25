@@ -217,6 +217,8 @@ function fmt(ts: string): string {
   padding: 0.4rem 0.6rem;
   border: 1px solid #d0d7de;
   border-radius: 6px;
+  background: #ffffff;
+  color: #1f2328;
   font: inherit;
 }
 .btn {
@@ -224,8 +226,12 @@ function fmt(ts: string): string {
   border: 1px solid #d0d7de;
   border-radius: 6px;
   background: #ffffff;
+  color: #1f2328;
   cursor: pointer;
   font: inherit;
+}
+.btn:hover {
+  background: #f3f4f6;
 }
 .btn.primary {
   background: #0969da;

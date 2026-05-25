@@ -471,6 +471,7 @@ function onDeleteBlock(name: string): void {
   padding: 0.25rem 0.55rem;
   border: 1px solid #d0d7de;
   background: #f6f8fa;
+  color: #1f2328;
   border-radius: 4px;
   cursor: pointer;
   font: inherit;
