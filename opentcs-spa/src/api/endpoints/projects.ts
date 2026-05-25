@@ -74,8 +74,14 @@ export function copyProject(
   );
 }
 
-export function getDraft(id: string): Promise<DraftEnvelope> {
-  return apiClient.get<DraftEnvelope>(`${BASE}/${encodeURIComponent(id)}/draft`);
+export function getDraft(
+  id: string,
+  options?: { toastOnError?: boolean; signal?: AbortSignal },
+): Promise<DraftEnvelope> {
+  return apiClient.get<DraftEnvelope>(
+    `${BASE}/${encodeURIComponent(id)}/draft`,
+    options,
+  );
 }
 
 export function putDraft(

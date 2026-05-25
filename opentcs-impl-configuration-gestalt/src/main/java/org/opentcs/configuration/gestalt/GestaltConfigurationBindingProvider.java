@@ -19,6 +19,7 @@ import org.github.gestalt.config.reload.TimedConfigReloadStrategy;
 import org.github.gestalt.config.source.ConfigSource;
 import org.github.gestalt.config.source.ConfigSourcePackage;
 import org.github.gestalt.config.source.FileConfigSourceBuilder;
+import org.github.gestalt.config.source.SystemPropertiesConfigSourceBuilder;
 import org.github.gestalt.config.tag.Tags;
 import org.opentcs.configuration.ConfigurationBindingProvider;
 import org.opentcs.configuration.ConfigurationException;
@@ -167,6 +168,12 @@ public class GestaltConfigurationBindingProvider
           )
       );
     }
+
+    // JVM system properties (-Dkey=value) take precedence over file-based sources, so users
+    // can override individual settings without editing configuration files.
+    LOG.info("Using overrides from JVM system properties (-D...)...");
+    sources.add(SystemPropertiesConfigSourceBuilder.builder().build());
+
     return sources;
   }
 

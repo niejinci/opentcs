@@ -96,8 +96,15 @@ export const useProjectsStore = defineStore('projects', () => {
 
   async function loadCurrentDraft(): Promise<DraftEnvelope | null> {
     if (!currentId.value) return null;
+    // Freshly-created projects have no draft yet; the BFF returns 404 in that
+    // case. Short-circuit using the already-loaded meta to avoid both the
+    // round-trip and a misleading user-facing error toast.
+    if (currentMeta.value && currentMeta.value.id === currentId.value
+        && currentMeta.value.hasDraft === false) {
+      return null;
+    }
     try {
-      return await getDraft(currentId.value);
+      return await getDraft(currentId.value, { toastOnError: false });
     } catch (err) {
       if (err instanceof HttpError && err.status === 404) return null;
       throw err;
