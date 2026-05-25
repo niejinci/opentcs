@@ -49,6 +49,13 @@ export function useCloudDraftSync(): void {
 
   function schedule(): void {
     if (!projects.currentId) return;
+    // Skip while hydrating: the deep watcher fires when `hydrateDraftPayload`
+    // reassigns the refs, but that reassignment is loading server state into
+    // the client, not a user edit. Echoing it back as a PUT would (a) write
+    // an empty payload for projects with no server-side draft, flipping
+    // `hasDraft` to true, and (b) race a stale debounced PUT against the
+    // next navigation, potentially clobbering another project's draft.
+    if (project.isHydrating) return;
     if (timer) clearTimeout(timer);
     timer = setTimeout(flush, CLOUD_PUSH_DEBOUNCE_MS);
   }

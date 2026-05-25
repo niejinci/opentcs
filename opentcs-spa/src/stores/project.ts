@@ -274,6 +274,15 @@ export const useProjectStore = defineStore('project', () => {
   // shallowRef: HTMLImageElement must not be deeply reactive.
   const background = shallowRef<BackgroundMapState | null>(null);
 
+  // Set to `true` while `hydrateDraftPayload` is reassigning the draft refs,
+  // so the cloud-sync watcher (and any other state-change observer) can skip
+  // echoing the just-loaded payload back to the BFF as a fresh write.
+  // Without this guard, hydrating a freshly-opened project that has no
+  // server-side draft (`payload == null`) emits an empty PUT that clobbers
+  // the project's `hasDraft` flag — and more dangerously, a stale debounced
+  // PUT can race the next navigation and overwrite another project's draft.
+  const isHydrating = ref(false);
+
   const hydrated = loadPersisted();
   const points = ref<DraftPoint[]>(hydrated?.points ?? []);
   const paths = ref<DraftPath[]>(hydrated?.paths ?? []);
@@ -337,24 +346,34 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   function hydrateDraftPayload(payload: Record<string, unknown> | null): void {
-    if (!payload) {
-      points.value = [];
-      paths.value = [];
-      locationTypes.value = [];
-      locations.value = [];
-      blocks.value = [];
-      vehicles.value = [];
-      selection.value = null;
-      return;
+    isHydrating.value = true;
+    try {
+      if (!payload) {
+        points.value = [];
+        paths.value = [];
+        locationTypes.value = [];
+        locations.value = [];
+        blocks.value = [];
+        vehicles.value = [];
+        selection.value = null;
+        return;
+      }
+      const revived = JSON.parse(JSON.stringify(payload), nanReviver) as Partial<PersistedDraft>;
+      points.value = (revived.points ?? []).map(withProperties) as DraftPoint[];
+      paths.value = (revived.paths ?? []).map(withProperties) as DraftPath[];
+      locationTypes.value = (revived.locationTypes ?? []).map(withProperties) as DraftLocationType[];
+      locations.value = (revived.locations ?? []).map(withProperties) as DraftLocation[];
+      blocks.value = (revived.blocks ?? []).map(withProperties) as DraftBlock[];
+      vehicles.value = (revived.vehicles ?? []).map(withProperties) as DraftVehicle[];
+      selection.value = revived.selection ?? null;
+    } finally {
+      // Defer clearing the flag until after the deep watcher (flush: 'pre')
+      // has run for this reassignment batch, so the watcher's callback sees
+      // `isHydrating === true` and skips scheduling a cloud PUT.
+      setTimeout(() => {
+        isHydrating.value = false;
+      }, 0);
     }
-    const revived = JSON.parse(JSON.stringify(payload), nanReviver) as Partial<PersistedDraft>;
-    points.value = (revived.points ?? []).map(withProperties) as DraftPoint[];
-    paths.value = (revived.paths ?? []).map(withProperties) as DraftPath[];
-    locationTypes.value = (revived.locationTypes ?? []).map(withProperties) as DraftLocationType[];
-    locations.value = (revived.locations ?? []).map(withProperties) as DraftLocation[];
-    blocks.value = (revived.blocks ?? []).map(withProperties) as DraftBlock[];
-    vehicles.value = (revived.vehicles ?? []).map(withProperties) as DraftVehicle[];
-    selection.value = revived.selection ?? null;
   }
 
 
@@ -1195,6 +1214,7 @@ export const useProjectStore = defineStore('project', () => {
     // S7: draft payload bridge for cloud persistence.
     serializeDraftPayload,
     hydrateDraftPayload,
+    isHydrating,
   };
 });
 
