@@ -122,7 +122,7 @@ export interface TransportOrderRequest {
  * intentionally NOT offered in MVP to keep the failure mode of "typo →
  * 404" off the table for the happy path.
  */
-export const TRANSPORT_ORDER_OPERATIONS = ['NOP', 'MOVE', 'LIFT', 'DROP'] as const;
+export const TRANSPORT_ORDER_OPERATIONS = ['NOP', 'MOVE', 'PARK', 'LIFT', 'DROP'] as const;
 export type TransportOrderOperation = (typeof TRANSPORT_ORDER_OPERATIONS)[number];
 
 /* ------------------------------------------------------------------ */

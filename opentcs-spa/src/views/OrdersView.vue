@@ -61,12 +61,60 @@ const submitting = ref(false);
  *  authoritative validator. */
 const targetSuggestions = ref<string[]>([]);
 
+/**
+ * Per-target metadata derived from the project's BFF draft, used to
+ * constrain the operation dropdown so the user can't submit a
+ * combination the kernel will reject (e.g. `Point-1 + LIFT` →
+ * `BAD_REQUEST: LIFT is not a valid operation for point destination
+ * Point-1`). The kernel rules (see
+ * `TransportOrderPoolManager#isValidOperationOnPoint` /
+ * `#isValidOperationOnLocationType`) are:
+ *   - Point destination → only `MOVE` or `PARK` are valid.
+ *   - Location destination → `NOP`, or anything in the LocationType's
+ *     `allowedOperations` (intersected with the attached Link's
+ *     `allowedOperations` if non-empty).
+ * For unknown targets (user typed a name not in the draft) we keep the
+ * full op list and let the BFF/Kernel produce the authoritative 4xx,
+ * matching scenario #3 of the S9 acceptance script.
+ */
+type TargetInfo =
+  | { kind: 'point' }
+  | { kind: 'location'; allowedOps: ReadonlySet<string> };
+const targetInfoByName = ref<Map<string, TargetInfo>>(new Map());
+
+const POINT_OPS: readonly TransportOrderOperation[] = ['MOVE', 'PARK'];
+
+function resolveAllowedOps(targetName: string): readonly TransportOrderOperation[] {
+  const info = targetInfoByName.value.get(targetName.trim());
+  if (!info) return TRANSPORT_ORDER_OPERATIONS;
+  if (info.kind === 'point') return POINT_OPS;
+  // Location: NOP + MOVE are always accepted by the kernel; union with
+  // whatever the LocationType explicitly allows (filtered to the four
+  // well-known ops the SPA exposes).
+  const out: TransportOrderOperation[] = [];
+  for (const op of TRANSPORT_ORDER_OPERATIONS) {
+    if (op === 'NOP' || op === 'MOVE' || info.allowedOps.has(op)) {
+      out.push(op);
+    }
+  }
+  return out;
+}
+
+function rowAllowedOps(row: DestinationRow): readonly TransportOrderOperation[] {
+  return resolveAllowedOps(row.targetName);
+}
+
+function rowIsValid(row: DestinationRow): boolean {
+  if (row.targetName.trim().length === 0) return false;
+  return rowAllowedOps(row).includes(row.operation);
+}
+
 const vehicleOptions = computed<Vehicle[]>(() => live.vehicleList);
 
 const canSubmit = computed(() => {
   if (submitting.value) return false;
   if (destRows.value.length === 0) return false;
-  return destRows.value.every((r) => r.targetName.trim().length > 0);
+  return destRows.value.every((r) => rowIsValid(r));
 });
 
 onMounted(async () => {
@@ -91,23 +139,65 @@ async function loadDraftTargets(): Promise<void> {
     const arr = (k: string): unknown[] =>
       Array.isArray(payload[k]) ? (payload[k] as unknown[]) : [];
     const names = new Set<string>();
+    const info = new Map<string, TargetInfo>();
+
+    // Build a lookup of LocationType name → allowed ops first so we can
+    // copy it onto each Location.
+    const typeAllowedOps = new Map<string, ReadonlySet<string>>();
+    for (const t of arr('locationTypes')) {
+      const obj = t as { name?: unknown; allowedOperations?: unknown };
+      if (typeof obj.name !== 'string' || obj.name.length === 0) continue;
+      const ops = Array.isArray(obj.allowedOperations)
+        ? (obj.allowedOperations as unknown[]).filter(
+            (x): x is string => typeof x === 'string',
+          )
+        : [];
+      typeAllowedOps.set(obj.name, new Set(ops));
+    }
+
     for (const p of arr('points')) {
       const n = (p as { name?: unknown }).name;
-      if (typeof n === 'string' && n.length > 0) names.add(n);
+      if (typeof n === 'string' && n.length > 0) {
+        names.add(n);
+        info.set(n, { kind: 'point' });
+      }
     }
     for (const l of arr('locations')) {
-      const n = (l as { name?: unknown }).name;
-      if (typeof n === 'string' && n.length > 0) names.add(n);
+      const obj = l as { name?: unknown; typeName?: unknown };
+      const n = obj.name;
+      if (typeof n !== 'string' || n.length === 0) continue;
+      names.add(n);
+      const tn = typeof obj.typeName === 'string' ? obj.typeName : '';
+      info.set(n, {
+        kind: 'location',
+        allowedOps: typeAllowedOps.get(tn) ?? new Set<string>(),
+      });
     }
     targetSuggestions.value = [...names].sort();
+    targetInfoByName.value = info;
   } catch {
     // Non-fatal — user can still type names manually.
     targetSuggestions.value = [];
+    targetInfoByName.value = new Map();
   }
 }
 
 function addDestination(): void {
   destRows.value.push({ id: nextRowId++, targetName: '', operation: 'MOVE' });
+}
+
+/**
+ * Called whenever a row's target name changes. If the currently chosen
+ * operation is invalid for the new target's kind, snap to the first
+ * allowed op so the form stays in a submittable state by default and
+ * the user isn't surprised by the kernel's 400 (which is the exact
+ * failure mode reported in the S9 acceptance Happy-path).
+ */
+function onTargetChanged(row: DestinationRow): void {
+  const allowed = rowAllowedOps(row);
+  if (allowed.length > 0 && !allowed.includes(row.operation)) {
+    row.operation = allowed[0];
+  }
 }
 
 function removeDestination(id: number): void {
@@ -207,41 +297,50 @@ watch(
         </div>
 
         <ol class="dest-list">
-          <li v-for="(row, idx) in destRows" :key="row.id" class="dest-row">
-            <span class="idx">{{ idx + 1 }}.</span>
-            <input
-              v-model="row.targetName"
-              :list="`dest-targets-${row.id}`"
-              placeholder="Point / Location 名"
-              spellcheck="false"
-              autocomplete="off"
-              class="target"
-            />
-            <datalist :id="`dest-targets-${row.id}`">
-              <option v-for="n in targetSuggestions" :key="n" :value="n" />
-            </datalist>
-            <select v-model="row.operation" class="op">
-              <option v-for="op in TRANSPORT_ORDER_OPERATIONS" :key="op" :value="op">
-                {{ op }}
-              </option>
-            </select>
-            <div class="row-tools">
-              <button type="button" :disabled="idx === 0" @click="moveRow(row.id, -1)">↑</button>
-              <button
-                type="button"
-                :disabled="idx === destRows.length - 1"
-                @click="moveRow(row.id, 1)"
-              >
-                ↓
-              </button>
-              <button
-                type="button"
-                :disabled="destRows.length <= 1"
-                @click="removeDestination(row.id)"
-              >
-                ×
-              </button>
+          <li v-for="(row, idx) in destRows" :key="row.id" class="dest-row-wrap">
+            <div class="dest-row">
+              <span class="idx">{{ idx + 1 }}.</span>
+              <input
+                v-model="row.targetName"
+                :list="`dest-targets-${row.id}`"
+                placeholder="Point / Location 名"
+                spellcheck="false"
+                autocomplete="off"
+                class="target"
+                @change="onTargetChanged(row)"
+              />
+              <datalist :id="`dest-targets-${row.id}`">
+                <option v-for="n in targetSuggestions" :key="n" :value="n" />
+              </datalist>
+              <select v-model="row.operation" class="op">
+                <option v-for="op in rowAllowedOps(row)" :key="op" :value="op">
+                  {{ op }}
+                </option>
+              </select>
+              <div class="row-tools">
+                <button type="button" :disabled="idx === 0" @click="moveRow(row.id, -1)">↑</button>
+                <button
+                  type="button"
+                  :disabled="idx === destRows.length - 1"
+                  @click="moveRow(row.id, 1)"
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  :disabled="destRows.length <= 1"
+                  @click="removeDestination(row.id)"
+                >
+                  ×
+                </button>
+              </div>
             </div>
+            <p
+              v-if="row.targetName.trim().length > 0 && !rowIsValid(row)"
+              class="row-warn"
+            >
+              「{{ row.operation }}」对该目标不可用，请选择上方下拉中的有效操作。
+            </p>
           </li>
         </ol>
       </div>
@@ -345,6 +444,11 @@ watch(
   flex-direction: column;
   gap: 0.4rem;
 }
+.dest-row-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
 .dest-row {
   display: flex;
   align-items: center;
@@ -401,5 +505,10 @@ watch(
   background: #94d3a2;
   border-color: #94d3a2;
   cursor: not-allowed;
+}
+.row-warn {
+  margin: 0 0 0 1.9rem;
+  font-size: 0.78rem;
+  color: #9a6700;
 }
 </style>
