@@ -47,6 +47,14 @@ const live = useLiveStatusStore();
 
 const projectId = computed(() => String(route.params.projectId ?? '').trim());
 const projectName = ref<string>('');
+/**
+ * `ProjectMeta.lastPublishedAt` from the BFF — absent ⇒ the user has
+ * never published this project's draft to the kernel, in which case
+ * none of the draft's points/locations exist on the kernel side and any
+ * order will fail with `NOT_FOUND: <name>`. Used to render the
+ * "未发布" pre-submit hint banner.
+ */
+const lastPublishedAt = ref<string | null>(null);
 
 const intendedVehicle = ref<string>('');
 const destRows = ref<DestinationRow[]>([
@@ -126,6 +134,7 @@ onMounted(async () => {
   try {
     const meta = await getProject(projectId.value);
     projectName.value = meta.name;
+    lastPublishedAt.value = meta.lastPublishedAt ?? null;
   } catch {
     /* toast handled by client */
   }
@@ -240,13 +249,47 @@ async function submit(): Promise<void> {
       const code = err.payload?.code ?? `HTTP_${err.status}`;
       const msg = err.payload?.message ?? err.statusText;
       const field = err.payload?.fieldPath ? `\n字段：${err.payload.fieldPath}` : '';
-      toastError(`${code}: ${msg}${field}`, '订单创建失败');
+      const hint = orderErrorHint(code, msg, destinations);
+      toastError(`${code}: ${msg}${field}${hint}`, '订单创建失败');
     } else {
       toastError('订单创建失败，请检查网络');
     }
   } finally {
     submitting.value = false;
   }
+}
+
+/**
+ * Produce a user-facing hint for the most common failure modes the
+ * kernel returns when the SPA draft drifts from the published plant
+ * model. Most importantly: when the kernel replies `NOT_FOUND: <name>`
+ * for a destination we just sent, the error is usually that the
+ * referenced Point/Location only exists in the local draft and was
+ * never published — the raw 404 message gives the user no clue. We
+ * detect that case and append a Chinese suggestion to re-publish, plus
+ * (when applicable) the exact offending name and "去画布发布" reminder.
+ *
+ * Returns either the empty string (no hint) or a leading-newline
+ * suffix that callers can append straight onto the toast body.
+ */
+function orderErrorHint(
+  code: string,
+  message: string,
+  sentDestinations: readonly Destination[],
+): string {
+  if (code !== 'NOT_FOUND') return '';
+  // The kernel formats the message as "NOT_FOUND: <name>" or
+  // "<some-prefix> <name>"; try to recover the missing name either by
+  // intersecting the message text with our own destinations or by
+  // stripping the leading code.
+  const sentNames = sentDestinations.map((d) => d.locationName);
+  const offending = sentNames.find((n) => n.length > 0 && message.includes(n));
+  const subject = offending ?? message.replace(/^NOT_FOUND:\s*/, '').trim();
+  const subjectStr = subject.length > 0 ? `「${subject}」` : '该目的地';
+  const publishedHint = lastPublishedAt.value
+    ? '该名称最近一次发布之后被新增或重命名'
+    : '当前工程从未发布过模型';
+  return `\n提示：${subjectStr} 在内核中不存在 —— 可能${publishedHint}。请回到画布编辑器，使用「发布到内核」按钮重新发布模型后再下单。`;
 }
 
 // If the user navigates here before SSE has primed the vehicle list,
@@ -277,6 +320,15 @@ watch(
     </header>
 
     <div class="orders-body">
+      <div v-if="!lastPublishedAt" class="publish-banner warn" role="status">
+        ⚠ 当前工程尚未发布过模型到内核，提交订单会失败（kernel 会返回
+        <code>NOT_FOUND</code>）。请先回到画布编辑器使用「发布到内核」按钮。
+      </div>
+      <div v-else class="publish-banner info" role="status">
+        上次发布：{{ lastPublishedAt }} ——
+        若画布中新增或重命名了 Point / Location，请重新发布后再下单。
+      </div>
+
       <div class="vehicle-pick">
         <label for="veh-select">执行车辆 (可选)</label>
         <select id="veh-select" v-model="intendedVehicle">
@@ -510,5 +562,27 @@ watch(
   margin: 0 0 0 1.9rem;
   font-size: 0.78rem;
   color: #9a6700;
+}
+.publish-banner {
+  border-radius: 6px;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.publish-banner code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0 0.25rem;
+  border-radius: 3px;
+}
+.publish-banner.warn {
+  background: #fff8c5;
+  border: 1px solid #d4a72c;
+  color: #633c01;
+}
+.publish-banner.info {
+  background: #ddf4ff;
+  border: 1px solid #54aeff;
+  color: #0550ae;
 }
 </style>
