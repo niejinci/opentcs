@@ -73,13 +73,57 @@ export interface Destination {
   properties?: Record<string, string> | null;
 }
 
+/**
+ * Mirrors `components.schemas.TransportOrderState` — verbatim copy of the
+ * Kernel's `org.opentcs.data.order.TransportOrder.State` enum. Mid-life
+ * states `DISPATCHABLE` / `WITHDRAWN` are forwarded as-is even though the
+ * acceptance criteria only mention four happy-path states.
+ */
+export type TransportOrderState =
+  | 'RAW'
+  | 'ACTIVE'
+  | 'DISPATCHABLE'
+  | 'BEING_PROCESSED'
+  | 'WITHDRAWN'
+  | 'FINISHED'
+  | 'FAILED'
+  | 'UNROUTABLE';
+
 /** Mirrors `components.schemas.TransportOrder`. */
 export interface TransportOrder {
   name: string;
   type: string;
+  state: TransportOrderState;
   intendedVehicle?: string | null;
+  processingVehicle?: string | null;
   destinations: Destination[];
 }
+
+/** Mirrors `components.schemas.TransportOrderRequest`. */
+export interface TransportOrderRequest {
+  name: string;
+  incompleteName?: boolean;
+  dispensable?: boolean;
+  intendedVehicle?: string | null;
+  type?: string | null;
+  deadline?: string | null;
+  destinations: Destination[];
+  dependencies?: string[] | null;
+  wrappingSequence?: string | null;
+  peripheralReservationToken?: string | null;
+  properties?: Record<string, string> | null;
+}
+
+/**
+ * Standard openTCS destination operations exposed in the SPA's order
+ * builder. The Kernel accepts arbitrary strings (driver-specific ops),
+ * but the verification suite calls out at least `NOP / MOVE / LIFT /
+ * DROP` and we surface those four as a dropdown. Free-form text input is
+ * intentionally NOT offered in MVP to keep the failure mode of "typo →
+ * 404" off the table for the happy path.
+ */
+export const TRANSPORT_ORDER_OPERATIONS = ['NOP', 'MOVE', 'LIFT', 'DROP'] as const;
+export type TransportOrderOperation = (typeof TRANSPORT_ORDER_OPERATIONS)[number];
 
 /* ------------------------------------------------------------------ */
 /* SSE                                                                 */

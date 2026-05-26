@@ -20,6 +20,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router';
 
 import EditorToolbar from '@/components/canvas/EditorToolbar.vue';
 import MapStage from '@/components/canvas/MapStage.vue';
+import OrderStatusSidebar from '@/components/OrderStatusSidebar.vue';
 import PropertyPanel from '@/components/property/PropertyPanel.vue';
 import { useBackgroundMap } from '@/composables/useBackgroundMap';
 import { useCloudDraftSync } from '@/composables/useCloudDraftSync';
@@ -243,6 +244,14 @@ function pointTypeBadge(): string {
 
       <div class="editor__sidebar">
         <PropertyPanel />
+        <OrderStatusSidebar />
+        <RouterLink
+          v-if="projects.currentId"
+          :to="{ name: 'project-orders', params: { projectId: projects.currentId } }"
+          class="orders-cta"
+        >
+          下达运输订单 →
+        </RouterLink>
         <details class="meta">
           <summary>底图 / 快捷键</summary>
           <dl v-if="background">
@@ -378,6 +387,21 @@ function pointTypeBadge(): string {
   flex-direction: column;
   gap: 0.5rem;
   min-width: 0;
+  overflow-y: auto;
+}
+.orders-cta {
+  display: block;
+  text-align: center;
+  padding: 0.4rem 0.6rem;
+  background: #0969da;
+  color: #ffffff;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.orders-cta:hover {
+  background: #0a5cb6;
 }
 .meta {
   border: 1px solid #d0d7de;

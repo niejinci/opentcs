@@ -42,6 +42,13 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '发布到 Kernel' },
     props: true,
   },
+  {
+    path: '/projects/:projectId/orders',
+    name: 'project-orders',
+    component: () => import('@/views/OrdersView.vue'),
+    meta: { title: '运输订单' },
+    props: true,
+  },
   // Catch-all → projects list.
   { path: '/:pathMatch(.*)*', redirect: '/projects' },
 ];

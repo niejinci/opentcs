@@ -26,6 +26,7 @@ import { computed } from 'vue';
 
 import type { EditorToolId } from '@/domain/editor/tools';
 import type { DraftLocation, DraftPath, DraftPoint, DraftVehicle } from '@/domain/model/types';
+import { useLiveVehicleOverlay } from '@/composables/useLiveVehicleOverlay';
 import { useProjectStore } from '@/stores/project';
 
 const props = defineProps<{
@@ -41,6 +42,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useProjectStore();
+const { overlay: vehicleOverlay } = useLiveVehicleOverlay();
 
 /* --------------------------- Visual constants -------------------------- */
 
@@ -200,7 +202,25 @@ function locationFill(l: DraftLocation): string {
 }
 
 function vehicleFill(v: DraftVehicle): string {
-  return v.layout.routeColorRgb;
+  // S9: when a kernel SSE tick has reported a state for this vehicle,
+  // use the state-derived colour from `useLiveVehicleOverlay`; otherwise
+  // fall back to the draft route colour so empty / disconnected sessions
+  // still render the icons.
+  const entry = vehicleOverlay.value.find((o) => o.name === v.name);
+  return entry?.fillRgb ?? v.layout.routeColorRgb;
+}
+
+function vehiclePixel(v: DraftVehicle): { x: number; y: number } {
+  // S9: kernel `currentPosition` (if any) wins over draft layout.
+  const entry = vehicleOverlay.value.find((o) => o.name === v.name);
+  if (entry && entry.isLive) {
+    return { x: entry.pixelX, y: entry.pixelY };
+  }
+  return { x: v.layout.pixelX, y: v.layout.pixelY };
+}
+
+function vehicleIsLive(v: DraftVehicle): boolean {
+  return vehicleOverlay.value.find((o) => o.name === v.name)?.isLive === true;
 }
 
 function vehicleStrokeWidth(v: DraftVehicle): number {
@@ -449,8 +469,8 @@ function isEntityDraggable(): boolean {
     <template v-for="v in store.vehicles" :key="`veh-${v.name}`">
       <v-rect
         :config="{
-          x: v.layout.pixelX,
-          y: v.layout.pixelY,
+          x: vehiclePixel(v).x,
+          y: vehiclePixel(v).y,
           width: vehicleLength,
           height: vehicleWidth,
           offsetX: vehicleLength / 2,
@@ -460,7 +480,7 @@ function isEntityDraggable(): boolean {
           stroke: VEHICLE_STROKE,
           strokeWidth: vehicleStrokeWidth(v),
           opacity: 0.85,
-          draggable: isEntityDraggable(),
+          draggable: isEntityDraggable() && !vehicleIsLive(v),
           name: 'draft-vehicle',
         }"
         @click="(e: KonvaEventObject<MouseEvent>) => onVehicleClick(v, e)"
@@ -470,8 +490,8 @@ function isEntityDraggable(): boolean {
       />
       <v-text
         :config="{
-          x: v.layout.pixelX + vehicleLength * 0.6,
-          y: v.layout.pixelY - vehicleWidth * 0.6,
+          x: vehiclePixel(v).x + vehicleLength * 0.6,
+          y: vehiclePixel(v).y - vehicleWidth * 0.6,
           text: v.name,
           fontSize: labelFontSize,
           fill: '#1f2328',

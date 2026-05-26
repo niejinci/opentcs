@@ -2,12 +2,23 @@
 // Root shell. S3 introduces vue-router and a top nav switching between
 // the new ImportView and the S2 DebugView. Each view stays a leaf
 // component reachable only through its route.
+//
+// S9 adds the single SSE-subscribed `liveStatus` Pinia store and starts
+// it once for the lifetime of the SPA shell (above <RouterView/>), so
+// views can read live vehicle / transport-order state without each one
+// owning its own EventSource.
 
+import { onBeforeUnmount, onMounted } from 'vue';
 import { RouterLink, RouterView } from 'vue-router';
 
 import ToastContainer from '@/ui/toast/ToastContainer.vue';
+import { useLiveStatusStore } from '@/stores/liveStatus';
 
-const milestone = 'S4 · 画布编辑器框架：Konva 多图层 + 缩放/平移 + 工具栏';
+const milestone = 'S9 · 运输订单创建 + SSE 实时状态可视化';
+
+const live = useLiveStatusStore();
+onMounted(() => live.start());
+onBeforeUnmount(() => live.stop());
 </script>
 
 <template>

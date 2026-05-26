@@ -575,6 +575,7 @@ components:
       required:
         - name
         - type
+        - state
         - destinations
       properties:
         name:
@@ -583,15 +584,37 @@ components:
         type:
           type: string
           description: The type of the transport order.
+        state:
+          $ref: '#/components/schemas/TransportOrderState'
         intendedVehicle:
           type: string
           nullable: true
           description: The name of the vehicle intended to execute the order.
+        processingVehicle:
+          type: string
+          nullable: true
+          description: >-
+            The name of the vehicle that is currently processing this order, or `null` if no
+            vehicle has been assigned yet.
         destinations:
           type: array
           description: The destinations of the transport order.
           items:
             $ref: '#/components/schemas/Destination'
+    TransportOrderState:
+      type: string
+      description: >-
+        Lifecycle state of a transport order. Mirrors the openTCS Kernel's
+        `org.opentcs.data.order.TransportOrder.State` enum.
+      enum:
+        - RAW
+        - ACTIVE
+        - DISPATCHABLE
+        - BEING_PROCESSED
+        - WITHDRAWN
+        - FINISHED
+        - FAILED
+        - UNROUTABLE
     SseEventEnvelope:
       type: object
       description: >-

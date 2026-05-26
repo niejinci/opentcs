@@ -107,8 +107,14 @@ public final class TransportOrderConverter {
     TransportOrder dto = new TransportOrder();
     dto.setName(order.getName());
     dto.setType(order.getType());
+    dto.setState(
+        org.opentcs.bff.api.v1.model.TransportOrderState.valueOf(order.getState().name())
+    );
     if (order.getIntendedVehicle() != null) {
       dto.setIntendedVehicle(order.getIntendedVehicle().getName());
+    }
+    if (order.getProcessingVehicle() != null) {
+      dto.setProcessingVehicle(order.getProcessingVehicle().getName());
     }
     List<Destination> dests = new ArrayList<>();
     order.getAllDriveOrders().forEach(driveOrder -> {
