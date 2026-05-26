@@ -119,18 +119,21 @@ function collectLocalIssues(payload: Record<string, unknown>): ValidationIssue[]
     }
   }
   for (const p of arr('paths')) {
-    const src = String(p.sourcePoint ?? '');
-    const dst = String(p.destinationPoint ?? '');
+    // Draft schema names mirror PathCreationTO: srcPointName / destPointName.
+    // The BFF publish converter emits the same names in `fieldPath`
+    // (e.g. `paths[3].srcPointName`), so we keep them aligned end-to-end.
+    const src = String(p.srcPointName ?? '');
+    const dst = String(p.destPointName ?? '');
     if (src && !pointNames.has(src)) {
       issues.push({
-        message: `Path '${String(p.name)}' 的 sourcePoint '${src}' 不存在`,
-        fieldPath: `paths[name=${String(p.name)}].sourcePoint`,
+        message: `Path '${String(p.name)}' 的 srcPointName '${src}' 不存在`,
+        fieldPath: `paths[name=${String(p.name)}].srcPointName`,
       });
     }
     if (dst && !pointNames.has(dst)) {
       issues.push({
-        message: `Path '${String(p.name)}' 的 destinationPoint '${dst}' 不存在`,
-        fieldPath: `paths[name=${String(p.name)}].destinationPoint`,
+        message: `Path '${String(p.name)}' 的 destPointName '${dst}' 不存在`,
+        fieldPath: `paths[name=${String(p.name)}].destPointName`,
       });
     }
   }
