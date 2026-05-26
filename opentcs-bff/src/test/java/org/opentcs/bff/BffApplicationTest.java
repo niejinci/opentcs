@@ -187,6 +187,7 @@ class BffApplicationTest {
         new CreateTransportOrderHandler(kernelClient),
         new ProjectsHandler(projectStore),
         new ProjectAssetsHandler(projectStore),
+        org.mockito.Mockito.mock(org.opentcs.bff.publish.PublishHandler.class),
         new OpenApiSpecHandler(),
         sseEventBridge,
         new KernelEventPoller(kernelClient, sseEventBridge)

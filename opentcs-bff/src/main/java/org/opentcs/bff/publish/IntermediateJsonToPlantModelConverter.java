@@ -34,10 +34,10 @@ import org.opentcs.access.to.model.VehicleCreationTO;
  * 1:1 mirrors of the openTCS {@code *CreationTO} classes (see ADR-0003 in
  * {@code spa-frontend-architecture.md}), so all this layer does is:
  * <ol>
- *   <li>walk the JSON arrays,</li>
- *   <li>validate required fields + referential integrity (path src/dest, location.type, …),</li>
- *   <li>drop editor-only fields ({@code layout.pixelX/Y}, {@code layout.orientationDeg}),</li>
- *   <li>build the corresponding {@code *CreationTO} via its {@code withX} builders.</li>
+ * <li>walk the JSON arrays,</li>
+ * <li>validate required fields + referential integrity (path src/dest, location.type, …),</li>
+ * <li>drop editor-only fields ({@code layout.pixelX/Y}, {@code layout.orientationDeg}),</li>
+ * <li>build the corresponding {@code *CreationTO} via its {@code withX} builders.</li>
  * </ol>
  *
  * <p>On any malformed / missing / dangling reference, throws {@link PublishValidationException}
@@ -53,11 +53,11 @@ public final class IntermediateJsonToPlantModelConverter {
    * Converts the SPA's intermediate-JSON payload into a {@link PlantModelCreationTO}.
    *
    * @param payload The {@code payload} sub-tree of the SPA draft envelope v2 (the part containing
-   *     {@code points/paths/locationTypes/locations/blocks/vehicles}).
+   * {@code points/paths/locationTypes/locations/blocks/vehicles}).
    * @param modelName The plant-model name to embed in the TO.
    * @return A fully-built {@link PlantModelCreationTO}.
    * @throws PublishValidationException If the payload is missing required fields, has dangling
-   *     references, or otherwise can't be packed.
+   * references, or otherwise can't be packed.
    */
   public static PlantModelCreationTO toCreationTO(JsonNode payload, String modelName) {
     requireNonNull(payload, "payload");
@@ -278,7 +278,9 @@ public final class IntermediateJsonToPlantModelConverter {
     if (!layout.isMissingNode() && !layout.isNull()) {
       String hex = layout.path("colorRgb").asText("");
       if (!hex.isEmpty()) {
-        out = out.withLayout(new BlockCreationTO.Layout(parseHexColor(hex, fp + ".layout.colorRgb")));
+        out = out.withLayout(
+            new BlockCreationTO.Layout(parseHexColor(hex, fp + ".layout.colorRgb"))
+        );
       }
     }
     return out;

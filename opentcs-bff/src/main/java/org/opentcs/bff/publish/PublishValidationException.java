@@ -21,7 +21,7 @@ public class PublishValidationException
    * Creates a new instance.
    *
    * @param fieldPath The JSON path of the offending field (e.g. {@code paths[2].srcPointName}).
-   *     May be {@code null} for top-level errors.
+   * May be {@code null} for top-level errors.
    * @param message A human-readable explanation.
    */
   public PublishValidationException(String fieldPath, String message) {

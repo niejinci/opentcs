@@ -30,7 +30,7 @@ import org.opentcs.bff.vehicle.ListVehiclesHandler;
 class ProjectAssetsHandlerTest {
 
   @TempDir
-  Path workspace;
+  private Path workspace;
 
   private BffApplication newApp() {
     KernelClient kernelClient = mock(KernelClient.class);
@@ -46,6 +46,7 @@ class ProjectAssetsHandlerTest {
         new CreateTransportOrderHandler(kernelClient),
         new ProjectsHandler(store),
         new ProjectAssetsHandler(store),
+        org.mockito.Mockito.mock(org.opentcs.bff.publish.PublishHandler.class),
         new OpenApiSpecHandler(),
         sse,
         new KernelEventPoller(kernelClient, sse)
@@ -55,9 +56,11 @@ class ProjectAssetsHandlerTest {
   @Test
   void illegalAssetName400() {
     JavalinTest.test(newApp().javalin(), (server, client) -> {
-      client.request("/api/v1/projects", b -> b
-          .header("Content-Type", "application/json")
-          .post(BodyPublishers.ofString("{\"name\":\"X\",\"id\":\"a1\"}")));
+      client.request(
+          "/api/v1/projects", b -> b
+              .header("Content-Type", "application/json")
+              .post(BodyPublishers.ofString("{\"name\":\"X\",\"id\":\"a1\"}"))
+      );
       var r = client.get("/api/v1/projects/a1/assets/..%2Fpasswd");
       assertThat(r.code()).isEqualTo(400);
     });
@@ -66,9 +69,11 @@ class ProjectAssetsHandlerTest {
   @Test
   void missingAsset404() {
     JavalinTest.test(newApp().javalin(), (server, client) -> {
-      client.request("/api/v1/projects", b -> b
-          .header("Content-Type", "application/json")
-          .post(BodyPublishers.ofString("{\"name\":\"X\",\"id\":\"a2\"}")));
+      client.request(
+          "/api/v1/projects", b -> b
+              .header("Content-Type", "application/json")
+              .post(BodyPublishers.ofString("{\"name\":\"X\",\"id\":\"a2\"}"))
+      );
       var r = client.get("/api/v1/projects/a2/assets/map.yaml");
       assertThat(r.code()).isEqualTo(404);
     });
@@ -77,9 +82,11 @@ class ProjectAssetsHandlerTest {
   @Test
   void listEmpty() {
     JavalinTest.test(newApp().javalin(), (server, client) -> {
-      client.request("/api/v1/projects", b -> b
-          .header("Content-Type", "application/json")
-          .post(BodyPublishers.ofString("{\"name\":\"X\",\"id\":\"a3\"}")));
+      client.request(
+          "/api/v1/projects", b -> b
+              .header("Content-Type", "application/json")
+              .post(BodyPublishers.ofString("{\"name\":\"X\",\"id\":\"a3\"}"))
+      );
       var r = client.get("/api/v1/projects/a3/assets");
       assertThat(r.code()).isEqualTo(200);
       assertThat(r.body().string()).isEqualTo("[]");

@@ -50,6 +50,7 @@ public record ProjectMetaDto(
   ) {
     this(id, name, createdAt, updatedAt, hasDraft, assets, null);
   }
+
   /**
    * Returns a copy with a different display name.
    *

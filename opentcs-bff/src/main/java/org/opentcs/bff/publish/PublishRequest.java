@@ -12,8 +12,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @param dryRun If true, only run BFF-side validation; do not contact the kernel.
  */
 public record PublishRequest(
-    @JsonProperty("projectId") String projectId,
-    @JsonProperty("modelName") String modelName,
-    @JsonProperty("dryRun") Boolean dryRun
+    @JsonProperty("projectId")
+    String projectId,
+    @JsonProperty("modelName")
+    String modelName,
+    @JsonProperty("dryRun")
+    Boolean dryRun
 ) {
 }

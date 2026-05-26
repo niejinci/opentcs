@@ -26,6 +26,8 @@ export interface ProjectMeta {
   updatedAt: string;
   hasDraft: boolean;
   assets: string[];
+  /** S8 — set when a successful publish has been recorded. Absent on legacy meta. */
+  lastPublishedAt?: string;
 }
 
 export interface DraftEnvelope {

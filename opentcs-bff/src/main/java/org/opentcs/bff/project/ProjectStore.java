@@ -15,7 +15,6 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.DirectoryStream;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -41,13 +40,13 @@ import org.slf4j.LoggerFactory;
  * <pre>
  * ${bff.workspace.dir}/
  * └── projects/
- *     └── {projectId}/
- *         ├── meta.json
- *         ├── draft.json        (DraftEnvelope JSON, optional)
- *         └── assets/
- *             ├── {name}.png
- *             ├── {name}.pgm
- *             └── {name}.yaml
+ * └── {projectId}/
+ * ├── meta.json
+ * ├── draft.json (DraftEnvelope JSON, optional)
+ * └── assets/
+ * ├── {name}.png
+ * ├── {name}.pgm
+ * └── {name}.yaml
  * </pre>
  *
  * <p>All writes that mutate {@code meta.json} / {@code draft.json} go through a temp-file +
@@ -58,8 +57,6 @@ import org.slf4j.LoggerFactory;
  */
 @Singleton
 public class ProjectStore {
-
-  private static final Logger LOG = LoggerFactory.getLogger(ProjectStore.class);
 
   /**
    * Allowed characters in an asset filename (incl. exactly one dot before the extension).
@@ -73,6 +70,8 @@ public class ProjectStore {
   static final String DRAFT_FILENAME = "draft.json";
   static final String ASSETS_DIRNAME = "assets";
   static final String PROJECTS_DIRNAME = "projects";
+
+  private static final Logger LOG = LoggerFactory.getLogger(ProjectStore.class);
 
   private final ObjectMapper objectMapper;
   private final Path workspaceRoot;
@@ -99,7 +98,8 @@ public class ProjectStore {
    * @param assetMaxBytes Maximum bytes accepted for a single asset upload.
    */
   public ProjectStore(Path workspaceRoot, long assetMaxBytes) {
-    this.workspaceRoot = requireNonNull(workspaceRoot, "workspaceRoot").toAbsolutePath().normalize();
+    this.workspaceRoot = requireNonNull(workspaceRoot, "workspaceRoot").toAbsolutePath()
+        .normalize();
     this.projectsRoot = this.workspaceRoot.resolve(PROJECTS_DIRNAME);
     this.assetMaxBytes = assetMaxBytes;
     this.objectMapper = new ObjectMapper()
@@ -489,7 +489,9 @@ public class ProjectStore {
     try {
       long bytes = copyWithLimit(input, tmp, assetMaxBytes);
       try {
-        Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        Files.move(
+            tmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING
+        );
       }
       catch (AtomicMoveNotSupportedException ame) {
         Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
@@ -593,7 +595,8 @@ public class ProjectStore {
     return dir;
   }
 
-  private ProjectMetaDto loadMeta(ProjectId id) throws IOException {
+  private ProjectMetaDto loadMeta(ProjectId id)
+      throws IOException {
     Path projectDir = resolveProjectDir(id);
     Path metaPath = projectDir.resolve(META_FILENAME);
     Instant fallback = Files.exists(projectDir)
@@ -625,12 +628,14 @@ public class ProjectStore {
     );
   }
 
-  private void writeMeta(Path projectDir, ProjectMetaDto meta) throws IOException {
+  private void writeMeta(Path projectDir, ProjectMetaDto meta)
+      throws IOException {
     Path metaPath = projectDir.resolve(META_FILENAME);
     writeAtomically(metaPath, objectMapper.writeValueAsBytes(meta));
   }
 
-  private void writeAtomically(Path target, byte[] bytes) throws IOException {
+  private void writeAtomically(Path target, byte[] bytes)
+      throws IOException {
     Path dir = target.getParent();
     requireNonNull(dir, "target.getParent()");
     Files.createDirectories(dir);
@@ -638,7 +643,9 @@ public class ProjectStore {
     try {
       Files.write(tmp, bytes);
       try {
-        Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        Files.move(
+            tmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING
+        );
       }
       catch (AtomicMoveNotSupportedException ignored) {
         Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
@@ -650,7 +657,8 @@ public class ProjectStore {
     }
   }
 
-  private List<String> listAssetNames(ProjectId id) throws IOException {
+  private List<String> listAssetNames(ProjectId id)
+      throws IOException {
     Path assetsDir = resolveProjectDir(id).resolve(ASSETS_DIRNAME);
     if (!Files.isDirectory(assetsDir)) {
       return List.of();
@@ -671,7 +679,8 @@ public class ProjectStore {
     return names;
   }
 
-  private long copyWithLimit(InputStream input, Path target, long limit) throws IOException {
+  private long copyWithLimit(InputStream input, Path target, long limit)
+      throws IOException {
     byte[] buf = new byte[8192];
     long total = 0;
     try (var out = Files.newOutputStream(target)) {

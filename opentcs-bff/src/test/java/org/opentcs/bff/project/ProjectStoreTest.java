@@ -24,7 +24,7 @@ class ProjectStoreTest {
   private static final ObjectMapper JSON = new ObjectMapper();
 
   @TempDir
-  Path workspace;
+  private Path workspace;
   private ProjectStore store;
 
   @BeforeEach
@@ -87,7 +87,8 @@ class ProjectStoreTest {
   }
 
   @Test
-  void draftRoundTripPreservesPayload() throws Exception {
+  void draftRoundTripPreservesPayload()
+      throws Exception {
     store.create("X", "p1");
     ObjectNode envelope = JSON.createObjectNode();
     envelope.put("version", 1);
@@ -114,10 +115,14 @@ class ProjectStoreTest {
   void writeAssetEnforcesWhitelistAndSize() {
     store.create("X", "p1");
     assertThatThrownBy(
-        () -> store.writeAsset(ProjectId.of("p1"), "evil.exe", new ByteArrayInputStream(new byte[1]))
+        () -> store.writeAsset(
+            ProjectId.of("p1"), "evil.exe", new ByteArrayInputStream(new byte[1])
+        )
     ).isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(
-        () -> store.writeAsset(ProjectId.of("p1"), "../escape.png", new ByteArrayInputStream(new byte[1]))
+        () -> store.writeAsset(
+            ProjectId.of("p1"), "../escape.png", new ByteArrayInputStream(new byte[1])
+        )
     ).isInstanceOf(IllegalArgumentException.class);
     // Over the configured 16 KiB limit.
     byte[] big = new byte[17 * 1024];
@@ -127,7 +132,8 @@ class ProjectStoreTest {
   }
 
   @Test
-  void uploadDownloadDeleteAsset() throws Exception {
+  void uploadDownloadDeleteAsset()
+      throws Exception {
     store.create("X", "p1");
     byte[] bytes = "hello".getBytes(StandardCharsets.UTF_8);
     ProjectAssetDto asset = store.writeAsset(
@@ -145,7 +151,8 @@ class ProjectStoreTest {
   }
 
   @Test
-  void copyClonesDraftAndAssets() throws Exception {
+  void copyClonesDraftAndAssets()
+      throws Exception {
     store.create("Src", "src1");
     ObjectNode env = JSON.createObjectNode();
     env.put("version", 1);
@@ -177,7 +184,8 @@ class ProjectStoreTest {
   }
 
   @Test
-  void writeDraftAtomicSurvivesRestart() throws Exception {
+  void writeDraftAtomicSurvivesRestart()
+      throws Exception {
     store.create("X", "p1");
     ObjectNode env = JSON.createObjectNode();
     env.put("version", 7);

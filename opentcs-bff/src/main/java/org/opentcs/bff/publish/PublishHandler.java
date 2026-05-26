@@ -28,19 +28,19 @@ import org.slf4j.LoggerFactory;
  * <p>Reads {@code projects/&lt;id&gt;/draft.json}, packs its {@code payload} into a
  * {@link PlantModelCreationTO} via {@link IntermediateJsonToPlantModelConverter}, and either:
  * <ul>
- *   <li>{@code dryRun=true} → returns the validation result without touching the kernel,</li>
- *   <li>{@code dryRun=false} → opens a fresh {@link KernelServicePortal}
- *       ({@code login → createPlantModel → logout}), then records {@code lastPublishedAt} on
- *       the project meta. The portal is <em>never</em> cached between requests.</li>
+ * <li>{@code dryRun=true} → returns the validation result without touching the kernel,</li>
+ * <li>{@code dryRun=false} → opens a fresh {@link KernelServicePortal}
+ * ({@code login → createPlantModel → logout}), then records {@code lastPublishedAt} on
+ * the project meta. The portal is <em>never</em> cached between requests.</li>
  * </ul>
  *
  * <p>Failure modes:
  * <ul>
- *   <li>missing/invalid request → 400</li>
- *   <li>project doesn't exist → 404</li>
- *   <li>draft missing → 400 ({@code DRAFT_MISSING})</li>
- *   <li>validation error → 400 with {@code fieldPath}</li>
- *   <li>kernel unreachable / RMI failure → 502 ({@code KERNEL_UNREACHABLE})</li>
+ * <li>missing/invalid request → 400</li>
+ * <li>project doesn't exist → 404</li>
+ * <li>draft missing → 400 ({@code DRAFT_MISSING})</li>
+ * <li>validation error → 400 with {@code fieldPath}</li>
+ * <li>kernel unreachable / RMI failure → 502 ({@code KERNEL_UNREACHABLE})</li>
  * </ul>
  * No matter what fails, the on-disk draft is never modified.
  */
@@ -110,7 +110,9 @@ public class PublishHandler
     String modelName = (req.modelName() != null && !req.modelName().isBlank())
         ? req.modelName()
         : meta.name();
-    PlantModelCreationTO to = IntermediateJsonToPlantModelConverter.toCreationTO(payload, modelName);
+    PlantModelCreationTO to = IntermediateJsonToPlantModelConverter.toCreationTO(
+        payload, modelName
+    );
     PublishResponse.PublishDiff diff = new PublishResponse.PublishDiff(
         to.getPoints().size(),
         to.getPaths().size(),
@@ -166,10 +168,4 @@ public class PublishHandler
       }
     }
   }
-
-  /**
-   * Marker so the surrounding {@code BffApplication} can wire {@link ProjectNotFoundException}
-   * mapping consistently; resolved via the existing project handler exception path.
-   */
-  static final Class<ProjectNotFoundException> PROJECT_NOT_FOUND = ProjectNotFoundException.class;
 }

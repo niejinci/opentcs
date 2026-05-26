@@ -24,6 +24,8 @@ export interface BffErrorResponse {
   message: string;
   /** Correlation id, also echoed in the `X-Trace-Id` response header. */
   traceId?: string | null;
+  /** Optional pointer to the offending field (e.g. `paths[name=p1].sourcePoint`). */
+  fieldPath?: string | null;
 }
 
 /* ------------------------------------------------------------------ */

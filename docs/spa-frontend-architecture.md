@@ -416,3 +416,20 @@ S7 BFF 接口实现要点：① 全部走流式 IO；② `meta.json` 写入用 "
   - Block / Vehicle 的颜色用 `#RRGGBB`（小写），不带 alpha；S8 转换器直接 `Integer.parseInt(rgb.substring(1), 16)` 即可喂给 `java.awt.Color`
   - 拖动 Vehicle 当前只改 `layout.pixelXY`，不改 orientation；orientation 仍靠 VehicleForm 数字输入框编辑，无旋转控柄（v2）
 - 下一阶段入口文件：`opentcs-bff/src/main/java/org/opentcs/bff/projects/`（S7 起手 —— 在 BFF 新建工程目录服务，落 `data/projects/<id>/draft.json` + `assets/`，并新增 `GET/PUT /api/v1/projects/{id}/draft` 与 OpenAPI；SPA 同步在 `src/api/endpoints/projects.ts` 引契约，把 `useProjectStore()` 的 `localStorage` 持久化改为远程读写，envelope schema 保持 v2 不变以便机械迁移）
+
+### S8（2026-05-26）发布到 Kernel
+
+- 已完成：
+  - BFF 新增 `org.opentcs.bff.publish` 包：`PublishHandler`（fresh portal per call，dryRun 不 login）+ `IntermediateJsonToPlantModelConverter`（中间态 JSON → `PlantModelCreationTO` 镜像，覆盖 Point/Path/Location/LocationType/Block/Vehicle 六类 + 引用完整性校验）+ `PublishRequest/Response/Diff` DTO + `PublishValidationException(fieldPath)` / `KernelUnreachableException`
+  - 新路径 `POST /api/v1/plant-models/publish`，写入 `openapi/bff.yaml` 并扩展 `ProjectMeta.lastPublishedAt` + `ErrorResponse.fieldPath`
+  - `BffApplication` 新增 2 个异常映射：`PublishValidationException → 400 + fieldPath`、`KernelUnreachableException → 502 KERNEL_UNREACHABLE`；OpenAPI/Swagger UI 自动收录
+  - `ProjectStore.markPublished(id, ts)` 原子更新 `meta.json#lastPublishedAt`；publish 失败不写盘（draft 保持只读）
+  - 配置：`bff.kernel.host / port / userName / password` 走现有 Gestalt 链，默认 `127.0.0.1 / 1099 / Alice / xyz`（同 openTCS 默认 RMI 凭据，落到 `opentcs-bff-defaults-baseline.properties`）
+  - SPA 新增 `src/api/endpoints/publish.ts` 与 `src/views/PublishView.vue`，路由 `/projects/:projectId/publish`；`ProjectsView` 每行追加「发布」按钮；`ProjectMeta` 接口加可选 `lastPublishedAt`；`BffErrorResponse` 加可选 `fieldPath`
+  - 测试：`IntermediateJsonToPlantModelConverterTest`（happy + 3 校验失败）+ `PublishHandlerTest`（dryRun 不登 / 真发布 / 校验 400+fieldPath / 项目 404 / 端口不可达 502）
+- 已知坑：
+  - 配置 key 沿用 S2 的 camelCase `bff.kernel.userName`（不是 task 文案的 `user`），保持 `@ConfigurationPrefix` 习惯；若需重命名，应在独立 commit 内 batch 处理
+  - 转换器只做"打包/校验"，不做单位换算：mm/Triple/枚举大小写必须由 SPA 端先对齐
+  - `KernelServicePortal` 每次发布即用即关，**不缓存**——若后续需要短间隔多次发布可在 PublishHandler 上层再做节流
+  - `fieldPath` 路径表达式自由形式（如 `paths[name=p1].sourcePoint`），SPA 仅做透传 + 跳回 editor `?focus=` 提示，editor 端的实际选中跳转留待 S9 再补
+- 下一阶段入口文件：`opentcs-spa/src/views/OrdersView.vue`（S9 起手：订单 + SSE 实时可视化；将首次正式消费 BFF SSE bridge，路由 `/orders`；订单创建/取消复用 `useProjectsStore` 的当前模型上下文）

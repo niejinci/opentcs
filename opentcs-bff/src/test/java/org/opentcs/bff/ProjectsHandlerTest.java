@@ -1,9 +1,6 @@
 // SPDX-FileCopyrightText: The openTCS Authors
 // SPDX-License-Identifier: MIT
 package org.opentcs.bff;
-import org.opentcs.bff.project.ProjectStore;
-import org.opentcs.bff.project.ProjectsHandler;
-import org.opentcs.bff.project.ProjectAssetsHandler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -18,13 +15,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-
 import org.opentcs.bff.events.KernelEventPoller;
 import org.opentcs.bff.events.SseEventBridge;
 import org.opentcs.bff.health.HealthHandler;
 import org.opentcs.bff.kernel.KernelClient;
 import org.opentcs.bff.plantmodel.PlantModelSummaryHandler;
+import org.opentcs.bff.project.ProjectAssetsHandler;
+import org.opentcs.bff.project.ProjectStore;
+import org.opentcs.bff.project.ProjectsHandler;
 import org.opentcs.bff.security.AccessKeyAuthenticator;
 import org.opentcs.bff.swagger.OpenApiSpecHandler;
 import org.opentcs.bff.transportorder.CreateTransportOrderHandler;
@@ -39,7 +37,7 @@ class ProjectsHandlerTest {
   private static final ObjectMapper JSON = new ObjectMapper();
 
   @TempDir
-  Path workspace;
+  private Path workspace;
 
   private BffApplication newApp() {
     KernelClient kernelClient = mock(KernelClient.class);
@@ -55,6 +53,7 @@ class ProjectsHandlerTest {
         new CreateTransportOrderHandler(kernelClient),
         new ProjectsHandler(store),
         new ProjectAssetsHandler(store),
+        org.mockito.Mockito.mock(org.opentcs.bff.publish.PublishHandler.class),
         new OpenApiSpecHandler(),
         sse,
         new KernelEventPoller(kernelClient, sse)
@@ -68,29 +67,33 @@ class ProjectsHandlerTest {
       assertThat(r0.code()).isEqualTo(200);
       assertThat(r0.body().string()).isEqualTo("[]");
 
-      var rc = client.request("/api/v1/projects", b -> b
-          .header("Content-Type", "application/json")
-          .post(BodyPublishers.ofString("{\"name\":\"Demo\",\"id\":\"demo\"}"))
+      var rc = client.request(
+          "/api/v1/projects", b -> b
+              .header("Content-Type", "application/json")
+              .post(BodyPublishers.ofString("{\"name\":\"Demo\",\"id\":\"demo\"}"))
       );
       assertThat(rc.code()).isEqualTo(201);
       assertThat(rc.headers().get("Location")).containsExactly("/api/v1/projects/demo");
 
       assertThat(client.get("/api/v1/projects/demo").code()).isEqualTo(200);
 
-      var rr = client.request("/api/v1/projects/demo", b -> b
-          .header("Content-Type", "application/json")
-          .patch(BodyPublishers.ofString("{\"name\":\"Renamed\"}"))
+      var rr = client.request(
+          "/api/v1/projects/demo", b -> b
+              .header("Content-Type", "application/json")
+              .patch(BodyPublishers.ofString("{\"name\":\"Renamed\"}"))
       );
       assertThat(rr.code()).isEqualTo(200);
 
-      var rcopy = client.request("/api/v1/projects/demo/copy", b -> b
-          .header("Content-Type", "application/json")
-          .post(BodyPublishers.ofString("{\"newName\":\"Clone\",\"newId\":\"clone1\"}"))
+      var rcopy = client.request(
+          "/api/v1/projects/demo/copy", b -> b
+              .header("Content-Type", "application/json")
+              .post(BodyPublishers.ofString("{\"newName\":\"Clone\",\"newId\":\"clone1\"}"))
       );
       assertThat(rcopy.code()).isEqualTo(201);
 
-      var rd = client.request("/api/v1/projects/clone1", b -> b
-          .delete(BodyPublishers.noBody())
+      var rd = client.request(
+          "/api/v1/projects/clone1", b -> b
+              .delete(BodyPublishers.noBody())
       );
       assertThat(rd.code()).isEqualTo(204);
     });
@@ -107,18 +110,23 @@ class ProjectsHandlerTest {
   @Test
   void duplicateIdConflict() {
     JavalinTest.test(newApp().javalin(), (server, client) -> {
-      client.request("/api/v1/projects", b -> b
-          .header("Content-Type", "application/json")
-          .post(BodyPublishers.ofString("{\"name\":\"A\",\"id\":\"dup\"}")));
-      var r = client.request("/api/v1/projects", b -> b
-          .header("Content-Type", "application/json")
-          .post(BodyPublishers.ofString("{\"name\":\"B\",\"id\":\"dup\"}")));
+      client.request(
+          "/api/v1/projects", b -> b
+              .header("Content-Type", "application/json")
+              .post(BodyPublishers.ofString("{\"name\":\"A\",\"id\":\"dup\"}"))
+      );
+      var r = client.request(
+          "/api/v1/projects", b -> b
+              .header("Content-Type", "application/json")
+              .post(BodyPublishers.ofString("{\"name\":\"B\",\"id\":\"dup\"}"))
+      );
       assertThat(r.code()).isEqualTo(409);
     });
   }
 
   @Test
-  void draftRoundTripsGoldenFixture() throws Exception {
+  void draftRoundTripsGoldenFixture()
+      throws Exception {
     Path fixture = Paths.get("..", "docs", "fixtures", "opentcs-spa.draftV1.json").toAbsolutePath();
     assertThat(Files.exists(fixture))
         .as("Golden fixture %s must exist", fixture).isTrue();
@@ -130,12 +138,16 @@ class ProjectsHandlerTest {
     String envelopeJson = JSON.writeValueAsString(envelope);
 
     JavalinTest.test(newApp().javalin(), (server, client) -> {
-      client.request("/api/v1/projects", b -> b
-          .header("Content-Type", "application/json")
-          .post(BodyPublishers.ofString("{\"name\":\"Plant\",\"id\":\"p1\"}")));
-      var put = client.request("/api/v1/projects/p1/draft", b -> b
-          .header("Content-Type", "application/json")
-          .put(BodyPublishers.ofString(envelopeJson)));
+      client.request(
+          "/api/v1/projects", b -> b
+              .header("Content-Type", "application/json")
+              .post(BodyPublishers.ofString("{\"name\":\"Plant\",\"id\":\"p1\"}"))
+      );
+      var put = client.request(
+          "/api/v1/projects/p1/draft", b -> b
+              .header("Content-Type", "application/json")
+              .put(BodyPublishers.ofString(envelopeJson))
+      );
       assertThat(put.code()).isEqualTo(204);
       var get = client.get("/api/v1/projects/p1/draft");
       assertThat(get.code()).isEqualTo(200);
@@ -146,9 +158,11 @@ class ProjectsHandlerTest {
   @Test
   void missingDraftReturns404() {
     JavalinTest.test(newApp().javalin(), (server, client) -> {
-      client.request("/api/v1/projects", b -> b
-          .header("Content-Type", "application/json")
-          .post(BodyPublishers.ofString("{\"name\":\"X\",\"id\":\"q1\"}")));
+      client.request(
+          "/api/v1/projects", b -> b
+              .header("Content-Type", "application/json")
+              .post(BodyPublishers.ofString("{\"name\":\"X\",\"id\":\"q1\"}"))
+      );
       assertThat(client.get("/api/v1/projects/q1/draft").code()).isEqualTo(404);
     });
   }
@@ -156,12 +170,16 @@ class ProjectsHandlerTest {
   @Test
   void putDraftWithoutVersionField400() {
     JavalinTest.test(newApp().javalin(), (server, client) -> {
-      client.request("/api/v1/projects", b -> b
-          .header("Content-Type", "application/json")
-          .post(BodyPublishers.ofString("{\"name\":\"X\",\"id\":\"r1\"}")));
-      var r = client.request("/api/v1/projects/r1/draft", b -> b
-          .header("Content-Type", "application/json")
-          .put(BodyPublishers.ofString("{\"savedAt\":\"x\"}")));
+      client.request(
+          "/api/v1/projects", b -> b
+              .header("Content-Type", "application/json")
+              .post(BodyPublishers.ofString("{\"name\":\"X\",\"id\":\"r1\"}"))
+      );
+      var r = client.request(
+          "/api/v1/projects/r1/draft", b -> b
+              .header("Content-Type", "application/json")
+              .put(BodyPublishers.ofString("{\"savedAt\":\"x\"}"))
+      );
       assertThat(r.code()).isEqualTo(400);
     });
   }
