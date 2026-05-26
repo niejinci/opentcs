@@ -31,6 +31,9 @@ import org.opentcs.bff.project.ProjectAlreadyExistsException;
 import org.opentcs.bff.project.ProjectAssetsHandler;
 import org.opentcs.bff.project.ProjectNotFoundException;
 import org.opentcs.bff.project.ProjectsHandler;
+import org.opentcs.bff.publish.KernelUnreachableException;
+import org.opentcs.bff.publish.PublishHandler;
+import org.opentcs.bff.publish.PublishValidationException;
 import org.opentcs.bff.security.AccessKeyAuthenticator;
 import org.opentcs.bff.security.UnauthorizedException;
 import org.opentcs.bff.swagger.OpenApiSpecHandler;
@@ -115,6 +118,7 @@ public class BffApplication {
       CreateTransportOrderHandler createTransportOrderHandler,
       ProjectsHandler projectsHandler,
       ProjectAssetsHandler projectAssetsHandler,
+      PublishHandler publishHandler,
       OpenApiSpecHandler openApiSpecHandler,
       SseEventBridge sseEventBridge,
       KernelEventPoller kernelEventPoller
@@ -128,6 +132,7 @@ public class BffApplication {
     requireNonNull(createTransportOrderHandler, "createTransportOrderHandler");
     requireNonNull(projectsHandler, "projectsHandler");
     requireNonNull(projectAssetsHandler, "projectAssetsHandler");
+    requireNonNull(publishHandler, "publishHandler");
     requireNonNull(openApiSpecHandler, "openApiSpecHandler");
     this.sseEventBridge = requireNonNull(sseEventBridge, "sseEventBridge");
     this.kernelEventPoller = requireNonNull(kernelEventPoller, "kernelEventPoller");
@@ -168,6 +173,9 @@ public class BffApplication {
           });
           path("/transport-orders", () -> {
             post(createTransportOrderHandler);
+          });
+          path("/plant-models", () -> {
+            post("/publish", publishHandler);
           });
           path("/projects", () -> {
             get(projectsHandler.list());
@@ -234,6 +242,24 @@ public class BffApplication {
       cfg.routes.exception(AssetTooLargeException.class, (e, ctx) -> {
         ErrorResponses.write(
             ctx, HttpStatus.CONTENT_TOO_LARGE, "ASSET_TOO_LARGE", e.getMessage()
+        );
+      });
+      cfg.routes.exception(PublishValidationException.class, (e, ctx) -> {
+        ErrorResponses.write(
+            ctx,
+            HttpStatus.BAD_REQUEST,
+            "PUBLISH_VALIDATION",
+            e.getMessage(),
+            e.getFieldPath()
+        );
+      });
+      cfg.routes.exception(KernelUnreachableException.class, (e, ctx) -> {
+        LOG.warn("Kernel unreachable (trace {})", ErrorResponses.traceIdFor(ctx), e);
+        ErrorResponses.write(
+            ctx,
+            HttpStatus.BAD_GATEWAY,
+            "KERNEL_UNREACHABLE",
+            e.getMessage()
         );
       });
       cfg.routes.exception(KernelRuntimeException.class, (e, ctx) -> {

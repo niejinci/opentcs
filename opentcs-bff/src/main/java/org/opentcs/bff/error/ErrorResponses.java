@@ -39,6 +39,26 @@ public final class ErrorResponses {
    * @param message The human-readable error message.
    */
   public static void write(Context ctx, HttpStatus status, String code, String message) {
+    write(ctx, status, code, message, null);
+  }
+
+  /**
+   * Writes an {@link ErrorResponse} including an optional {@code fieldPath} (used by the
+   * S8 publish handler to point the SPA at a specific offending entity).
+   *
+   * @param ctx The request context.
+   * @param status The HTTP status to set.
+   * @param code The machine-readable error code.
+   * @param message The human-readable error message.
+   * @param fieldPath The JSON path of the offending field, or {@code null}.
+   */
+  public static void write(
+      Context ctx,
+      HttpStatus status,
+      String code,
+      String message,
+      String fieldPath
+  ) {
     requireNonNull(ctx, "ctx");
     requireNonNull(status, "status");
     requireNonNull(code, "code");
@@ -47,6 +67,7 @@ public final class ErrorResponses {
     body.setCode(code);
     body.setMessage(message);
     body.setTraceId(traceIdFor(ctx));
+    body.setFieldPath(fieldPath);
     ctx.status(status);
     ctx.json(body);
   }

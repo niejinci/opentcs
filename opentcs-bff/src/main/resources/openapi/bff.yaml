@@ -374,6 +374,39 @@ paths:
           description: Asset deleted.
         '404':
           $ref: '#/components/responses/NotFound'
+  /api/v1/plant-models/publish:
+    post:
+      tags: [PlantModels]
+      summary: |
+        Publishes a project's current draft to the openTCS kernel. The BFF reads the project's
+        on-disk `draft.json` (S7), packs its `payload` into a `PlantModelCreationTO` (no field
+        translation — units / enums / Triple shape are already aligned on the SPA side) and calls
+        `KernelServicePortal.getPlantModelService().createPlantModel(to)`. When `dryRun=true`,
+        only the BFF-side validation runs; the kernel is not contacted.
+      operationId: publishPlantModel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishRequest'
+      responses:
+        '200':
+          description: Publish (or dry-run) succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          description: The kernel could not be reached or the publish call failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     Vehicle:
@@ -453,6 +486,12 @@ components:
           description: >-
             A correlation ID identifying this request in server-side logs. Echoed back in the
             `X-Trace-Id` response header.
+        fieldPath:
+          type: string
+          nullable: true
+          description: >-
+            For validation errors, points at the offending JSON path inside the request body
+            (e.g. `paths[3].srcPointName`). Absent for non-validation errors.
     Destination:
       type: object
       description: A destination of a transport order's drive order.
@@ -592,6 +631,13 @@ components:
         assets:
           type: array
           items: { type: string }
+        lastPublishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            When the draft was last successfully published to the kernel. Absent for projects that
+            have never been published (back-compat: pre-S8 meta files don't carry the field).
     CreateProjectRequest:
       type: object
       required: [name]
@@ -629,6 +675,46 @@ components:
         size: { type: integer, format: int64 }
         contentType: { type: string }
         updatedAt: { type: string, format: date-time }
+    PublishRequest:
+      type: object
+      required: [projectId]
+      properties:
+        projectId:
+          type: string
+          description: Project id whose `draft.json` should be published.
+        modelName:
+          type: string
+          nullable: true
+          description: Optional model name. Defaults to the project's display name (`meta.name`).
+        dryRun:
+          type: boolean
+          default: false
+          description: If true, only run BFF-side validation; do not contact the kernel.
+    PublishDiff:
+      type: object
+      description: Summary of the draft contents, returned with every publish / dry-run response.
+      required: [points, paths, locationTypes, locations, blocks, vehicles]
+      properties:
+        points: { type: integer, format: int32 }
+        paths: { type: integer, format: int32 }
+        locationTypes: { type: integer, format: int32 }
+        locations: { type: integer, format: int32 }
+        blocks: { type: integer, format: int32 }
+        vehicles: { type: integer, format: int32 }
+    PublishResponse:
+      type: object
+      required: [ok, modelName, dryRun, diff]
+      properties:
+        ok: { type: boolean }
+        modelName: { type: string }
+        dryRun: { type: boolean }
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set only when `dryRun=false` and the publish succeeded.
+        diff:
+          $ref: '#/components/schemas/PublishDiff'
   responses:
     BadRequest:
       description: The request body is malformed or fails validation.

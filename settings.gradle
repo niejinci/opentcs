@@ -25,4 +25,4 @@ include 'opentcs-plantoverview-themes-default'
 include 'opentcs-documentation'
 
 // 告诉 openTCS 的构建系统：如果你需要 VDA5050，不要去网上下载 jar 包了，直接去旁边那个文件夹里现场编译源码！
-includeBuild('../opentcs-commadapter-vda5050')
+//includeBuild('../opentcs-commadapter-vda5050')

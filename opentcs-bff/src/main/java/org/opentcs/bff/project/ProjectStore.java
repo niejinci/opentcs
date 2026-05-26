@@ -384,6 +384,35 @@ public class ProjectStore {
     }
   }
 
+  /**
+   * Records a successful publish of the project's draft to the kernel.
+   *
+   * <p>Updates {@code meta.json#lastPublishedAt} (and {@code updatedAt}) atomically. The on-disk
+   * draft is intentionally not touched — publish is a strictly read-only operation as far as the
+   * draft is concerned.
+   *
+   * @param id The project id.
+   * @param publishedAt The publish timestamp to record.
+   * @return The updated metadata.
+   * @throws ProjectNotFoundException If the project doesn't exist.
+   */
+  public ProjectMetaDto markPublished(ProjectId id, Instant publishedAt) {
+    requireNonNull(id, "id");
+    requireNonNull(publishedAt, "publishedAt");
+    Path projectDir = requireProjectDir(id);
+    try {
+      ProjectMetaDto current = loadMeta(id);
+      ProjectMetaDto updated = current
+          .withUpdatedAt(publishedAt)
+          .withLastPublishedAt(publishedAt);
+      writeMeta(projectDir, updated);
+      return updated;
+    }
+    catch (IOException e) {
+      throw new UncheckedIOException("Failed to record publish for project " + id, e);
+    }
+  }
+
   /* -------------------------------- Assets ------------------------------------- */
 
   /**
@@ -586,7 +615,14 @@ public class ProjectStore {
     Instant createdAt = parseInstant(root.path("createdAt").asText(), fallback);
     Instant updatedAt = parseInstant(root.path("updatedAt").asText(), fallback);
     boolean hasDraft = Files.exists(projectDir.resolve(DRAFT_FILENAME));
-    return new ProjectMetaDto(id.value(), name, createdAt, updatedAt, hasDraft, listAssetNames(id));
+    // S8: lastPublishedAt is optional/back-compat — missing field => null.
+    JsonNode publishedNode = root.get("lastPublishedAt");
+    Instant lastPublishedAt = (publishedNode == null || publishedNode.isNull())
+        ? null
+        : parseInstant(publishedNode.asText(), null);
+    return new ProjectMetaDto(
+        id.value(), name, createdAt, updatedAt, hasDraft, listAssetNames(id), lastPublishedAt
+    );
   }
 
   private void writeMeta(Path projectDir, ProjectMetaDto meta) throws IOException {
