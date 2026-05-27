@@ -86,6 +86,37 @@ public class KernelClient {
   }
 
   /**
+   * Updates the named vehicle's integration level via
+   * {@link org.opentcs.components.kernel.services.VehicleService#updateVehicleIntegrationLevel}
+   * and returns the resulting vehicle state.
+   *
+   * @param name The name of the vehicle to update.
+   * @param integrationLevel The new integration level.
+   * @return The updated vehicle.
+   * @throws org.opentcs.data.ObjectUnknownException If no such vehicle exists.
+   * @throws IllegalArgumentException If the kernel rejects the transition (e.g. lowering the
+   * level while the vehicle is processing an order).
+   * @throws KernelRuntimeException If the Kernel cannot be reached or the request fails.
+   */
+  public Vehicle updateVehicleIntegrationLevel(
+      String name,
+      Vehicle.IntegrationLevel integrationLevel
+  ) {
+    requireNonNull(name, "name");
+    requireNonNull(integrationLevel, "integrationLevel");
+    var portal = ensureConnected();
+    var service = portal.getVehicleService();
+    Vehicle current = service.fetch(Vehicle.class, name)
+        .orElseThrow(
+            () -> new org.opentcs.data.ObjectUnknownException(
+                "No vehicle named '" + name + "' exists."
+            )
+        );
+    service.updateVehicleIntegrationLevel(current.getReference(), integrationLevel);
+    return service.fetch(Vehicle.class, name).orElse(current);
+  }
+
+  /**
    * Creates a new transport order in the Kernel from the given creation TO.
    *
    * @param to The transport order to create.

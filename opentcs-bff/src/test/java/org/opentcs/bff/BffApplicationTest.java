@@ -184,6 +184,7 @@ class BffApplicationTest {
         new PlantModelSummaryHandler(kernelClient),
         new ListVehiclesHandler(kernelClient),
         new GetVehicleHandler(kernelClient),
+        new org.opentcs.bff.vehicle.UpdateVehicleIntegrationLevelHandler(kernelClient),
         new CreateTransportOrderHandler(kernelClient),
         new ProjectsHandler(projectStore),
         new ProjectAssetsHandler(projectStore),

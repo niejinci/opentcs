@@ -22,6 +22,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { createTransportOrder } from '@/api/endpoints/transportOrders';
+import { updateVehicleIntegrationLevel } from '@/api/endpoints/vehicles';
 import { HttpError } from '@/api/errors';
 import { getDraft, getProject } from '@/api/endpoints/projects';
 import {
@@ -30,6 +31,7 @@ import {
   type TransportOrderOperation,
   type TransportOrderRequest,
   type Vehicle,
+  type VehicleIntegrationLevel,
 } from '@/api/types/bff';
 import { useLiveStatusStore } from '@/stores/liveStatus';
 import { toastError, toastSuccess } from '@/ui/toast/toastBus';
@@ -118,6 +120,54 @@ function rowIsValid(row: DestinationRow): boolean {
 }
 
 const vehicleOptions = computed<Vehicle[]>(() => live.vehicleList);
+
+const INTEGRATION_LEVELS: VehicleIntegrationLevel[] = [
+  'TO_BE_IGNORED',
+  'TO_BE_NOTICED',
+  'TO_BE_RESPECTED',
+  'TO_BE_UTILIZED',
+];
+/** Currently selected vehicle (from the order's intendedVehicle dropdown). */
+const selectedVehicle = computed<Vehicle | null>(() => {
+  const name = intendedVehicle.value;
+  if (!name) return null;
+  return live.vehicles[name] ?? null;
+});
+/** Pending UI selection for the "set integration level" picker. */
+const integrationLevelDraft = ref<VehicleIntegrationLevel | ''>('');
+const integrationLevelBusy = ref(false);
+
+watch(
+  selectedVehicle,
+  (veh) => {
+    integrationLevelDraft.value = veh ? veh.integrationLevel : '';
+  },
+  { immediate: true },
+);
+
+async function applyIntegrationLevel(): Promise<void> {
+  const veh = selectedVehicle.value;
+  const next = integrationLevelDraft.value;
+  if (!veh || !next || next === veh.integrationLevel) return;
+  integrationLevelBusy.value = true;
+  try {
+    const updated = await updateVehicleIntegrationLevel(veh.name, next);
+    // Optimistically update the live store so the picker reflects reality
+    // even before the SSE event round-trips. We replace the whole map (not a
+    // single key) to match the pattern used by `applyVehicleEnvelope` and
+    // guarantee Pinia reactivity.
+    live.vehicles = { ...live.vehicles, [updated.name]: updated };
+    toastSuccess(`${updated.name} → ${updated.integrationLevel}`);
+  } catch (err) {
+    if (err instanceof HttpError) {
+      // HttpError already triggered a toast via the api client.
+      return;
+    }
+    toastError(`更新失败：${(err as Error).message}`);
+  } finally {
+    integrationLevelBusy.value = false;
+  }
+}
 
 const canSubmit = computed(() => {
   if (submitting.value) return false;
@@ -342,6 +392,36 @@ watch(
         </span>
       </div>
 
+      <div v-if="selectedVehicle" class="vehicle-integration">
+        <label :for="`int-lvl-${selectedVehicle.name}`">
+          {{ selectedVehicle.name }} · 集成等级
+        </label>
+        <select
+          :id="`int-lvl-${selectedVehicle.name}`"
+          v-model="integrationLevelDraft"
+          :disabled="integrationLevelBusy"
+        >
+          <option v-for="lvl in INTEGRATION_LEVELS" :key="lvl" :value="lvl">
+            {{ lvl }}
+          </option>
+        </select>
+        <button
+          type="button"
+          :disabled="
+            integrationLevelBusy ||
+              !integrationLevelDraft ||
+              integrationLevelDraft === selectedVehicle.integrationLevel
+          "
+          @click="applyIntegrationLevel"
+        >
+          {{ integrationLevelBusy ? '应用中…' : '应用' }}
+        </button>
+        <span class="hint">
+          当前：<code>{{ selectedVehicle.integrationLevel }}</code> ——
+          调度执行需 <code>TO_BE_UTILIZED</code>。
+        </span>
+      </div>
+
       <div class="dest-block">
         <div class="dest-block-hdr">
           <h3>目的地序列</h3>
@@ -464,6 +544,33 @@ watch(
   flex: 1 1 auto;
   padding: 0.25rem 0.4rem;
   font-size: 0.9rem;
+}
+.vehicle-integration {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  padding: 0.6rem 0.85rem;
+  flex-wrap: wrap;
+}
+.vehicle-integration label {
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+.vehicle-integration select {
+  padding: 0.25rem 0.4rem;
+  font-size: 0.9rem;
+}
+.vehicle-integration button {
+  padding: 0.3rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.vehicle-integration button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 .hint {
   font-size: 0.8rem;

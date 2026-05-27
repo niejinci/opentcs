@@ -72,6 +72,49 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/KernelUnavailable'
+  /api/v1/vehicles/{name}/integrationLevel:
+    put:
+      tags:
+        - Vehicles
+      summary: Update a vehicle's integration level.
+      description: >-
+        Forwards the new integration level to the kernel via
+        `VehicleService#updateVehicleIntegrationLevel`. The kernel rejects illegal transitions
+        (e.g. lowering the integration level while the vehicle is processing an order) with
+        `400 BAD_REQUEST`. The response body is the updated vehicle DTO.
+      operationId: updateVehicleIntegrationLevel
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: The name of the vehicle.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleIntegrationLevelUpdate'
+      responses:
+        '200':
+          description: The updated vehicle.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No vehicle with the given name exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/KernelUnavailable'
   /api/v1/transport-orders:
     post:
       tags:
@@ -467,6 +510,14 @@ components:
         - TO_BE_NOTICED
         - TO_BE_RESPECTED
         - TO_BE_UTILIZED
+    VehicleIntegrationLevelUpdate:
+      type: object
+      description: Request body for `PUT /api/v1/vehicles/{name}/integrationLevel`.
+      required:
+        - integrationLevel
+      properties:
+        integrationLevel:
+          $ref: '#/components/schemas/VehicleIntegrationLevel'
     ErrorResponse:
       type: object
       description: An error returned by the BFF.

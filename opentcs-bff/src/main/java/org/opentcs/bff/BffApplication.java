@@ -40,6 +40,7 @@ import org.opentcs.bff.swagger.OpenApiSpecHandler;
 import org.opentcs.bff.transportorder.CreateTransportOrderHandler;
 import org.opentcs.bff.vehicle.GetVehicleHandler;
 import org.opentcs.bff.vehicle.ListVehiclesHandler;
+import org.opentcs.bff.vehicle.UpdateVehicleIntegrationLevelHandler;
 import org.opentcs.data.ObjectExistsException;
 import org.opentcs.data.ObjectUnknownException;
 import org.slf4j.Logger;
@@ -98,6 +99,8 @@ public class BffApplication {
    * {@code GET /api/v1/plant-model/summary}.
    * @param listVehiclesHandler The handler serving {@code GET /api/v1/vehicles}.
    * @param getVehicleHandler The handler serving {@code GET /api/v1/vehicles/{name}}.
+   * @param updateVehicleIntegrationLevelHandler The handler serving
+   * {@code PUT /api/v1/vehicles/{name}/integrationLevel}.
    * @param createTransportOrderHandler The handler serving
    * {@code POST /api/v1/transport-orders}.
    * @param projectsHandler The handler bundle serving {@code /api/v1/projects} CRUD endpoints.
@@ -115,6 +118,7 @@ public class BffApplication {
       PlantModelSummaryHandler plantModelSummaryHandler,
       ListVehiclesHandler listVehiclesHandler,
       GetVehicleHandler getVehicleHandler,
+      UpdateVehicleIntegrationLevelHandler updateVehicleIntegrationLevelHandler,
       CreateTransportOrderHandler createTransportOrderHandler,
       ProjectsHandler projectsHandler,
       ProjectAssetsHandler projectAssetsHandler,
@@ -129,6 +133,9 @@ public class BffApplication {
     requireNonNull(plantModelSummaryHandler, "plantModelSummaryHandler");
     requireNonNull(listVehiclesHandler, "listVehiclesHandler");
     requireNonNull(getVehicleHandler, "getVehicleHandler");
+    requireNonNull(
+        updateVehicleIntegrationLevelHandler, "updateVehicleIntegrationLevelHandler"
+    );
     requireNonNull(createTransportOrderHandler, "createTransportOrderHandler");
     requireNonNull(projectsHandler, "projectsHandler");
     requireNonNull(projectAssetsHandler, "projectAssetsHandler");
@@ -169,7 +176,10 @@ public class BffApplication {
           });
           path("/vehicles", () -> {
             get(listVehiclesHandler);
-            get("/{" + GetVehicleHandler.NAME_PARAM + "}", getVehicleHandler);
+            path("/{" + GetVehicleHandler.NAME_PARAM + "}", () -> {
+              get(getVehicleHandler);
+              put("/integrationLevel", updateVehicleIntegrationLevelHandler);
+            });
           });
           path("/transport-orders", () -> {
             post(createTransportOrderHandler);
