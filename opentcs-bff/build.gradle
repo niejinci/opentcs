@@ -110,6 +110,8 @@ dependencies {
   api libs.jackson.datatype.jsr310
 
   runtimeOnly libs.slf4j.jdk14
+  runtimeOnly 'org.opentcs.commadapter.vehicle.vda5050:openTCS-CommAdapter-VDA5050'
+  runtimeOnly project(':opentcs-commadapter-loopback') 
   runtimeOnly libs.swagger.ui
 
   testImplementation libs.javalin.testtools
