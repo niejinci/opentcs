@@ -44,6 +44,38 @@ class SseEventBridgeTest {
   }
 
   @Test
+  void registerSendsHandshakeComment() {
+    SseClient client = mockClient(Map.of("vehicles", List.of("true")));
+
+    bridge.register(client);
+
+    org.mockito.ArgumentCaptor<String> captor = org.mockito.ArgumentCaptor.forClass(String.class);
+    verify(client).sendComment(captor.capture());
+    assertThat(captor.getValue()).startsWith("connected ts=");
+  }
+
+  @Test
+  void broadcastHeartbeatSendsCommentToEverySubscriber() {
+    SseClient a = mockClient(Map.of("vehicles", List.of("true")));
+    SseClient b = mockClient(Map.of("transportOrders", List.of("true")));
+    bridge.register(a);
+    bridge.register(b);
+
+    bridge.broadcastHeartbeat();
+
+    verify(a).sendComment(org.mockito.ArgumentMatchers.startsWith("keepalive ts="));
+    verify(b).sendComment(org.mockito.ArgumentMatchers.startsWith("keepalive ts="));
+  }
+
+  @Test
+  void broadcastHeartbeatIsNoOpWhenNoSubscribers() {
+    // Must not throw and must not send anything.
+    bridge.broadcastHeartbeat();
+
+    assertThat(bridge.connectionCount()).isZero();
+  }
+
+  @Test
   void closeAllClosesEveryConnection() {
     SseClient a = mockClient(Map.of("vehicles", List.of("true")));
     SseClient b = mockClient(Map.of("transportOrders", List.of("true")));

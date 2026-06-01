@@ -160,6 +160,40 @@ class BffApplicationTest {
     );
   }
 
+  @Test
+  void exposesSsePingEndpoint() {
+    BffApplication app = newApp();
+
+    JavalinTest.test(
+        app.javalin(), (server, client) -> {
+          var response = client.get("/api/v1/sse/ping");
+
+          assertThat(response.code()).isEqualTo(200);
+          assertThat(response.headers().get("Content-Type"))
+              .anyMatch(v -> v.contains("application/json"));
+          String body = response.body().string();
+          assertThat(body).contains("\"ok\":true");
+          assertThat(body).contains("\"connections\":0");
+          assertThat(body).contains("/events/vehicles");
+          assertThat(body).contains("/events/transportOrders");
+          assertThat(body).contains("\"serverTime\":");
+        }
+    );
+  }
+
+  @Test
+  void ssePingRequiresAuthenticationWhenEnabled() {
+    BffApplication app = newAppWithSecurity("secret");
+
+    JavalinTest.test(
+        app.javalin(), (server, client) -> {
+          var response = client.get("/api/v1/sse/ping");
+
+          assertThat(response.code()).isEqualTo(401);
+        }
+    );
+  }
+
   private static BffApplication newApp() {
     return newAppWithSecurity("");
   }
@@ -170,6 +204,10 @@ class BffApplicationTest {
     when(kernelClient.listVehicles()).thenReturn(java.util.Set.of());
     BffSecurityConfiguration securityConfig = TestConfigurations.security(accessKey);
     SseEventBridge sseEventBridge = new SseEventBridge();
+    org.opentcs.bff.events.SsePingHandler ssePingHandler
+        = new org.opentcs.bff.events.SsePingHandler(sseEventBridge);
+    org.opentcs.bff.events.SseHeartbeatScheduler sseHeartbeatScheduler
+        = new org.opentcs.bff.events.SseHeartbeatScheduler(sseEventBridge);
     ProjectStore projectStore = new ProjectStore(
         java.nio.file.Paths.get(
             System.getProperty("java.io.tmpdir"),
@@ -191,7 +229,9 @@ class BffApplicationTest {
         org.mockito.Mockito.mock(org.opentcs.bff.publish.PublishHandler.class),
         new OpenApiSpecHandler(),
         sseEventBridge,
-        new KernelEventPoller(kernelClient, sseEventBridge)
+        ssePingHandler,
+        new KernelEventPoller(kernelClient, sseEventBridge),
+        sseHeartbeatScheduler
     );
   }
 }

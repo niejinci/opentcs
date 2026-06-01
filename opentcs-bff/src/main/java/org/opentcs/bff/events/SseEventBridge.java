@@ -61,11 +61,52 @@ public class SseEventBridge {
     );
     Subscription subscription = new Subscription(client, eventTypes);
     subscriptions.add(subscription);
+    // Send an immediate SSE comment so:
+    //   1. EventSource.onopen fires right away on the client side, and
+    //   2. any reverse-proxy (e.g. Nginx) write buffer is flushed even if it ignores
+    //      `X-Accel-Buffering: no` (already set by Javalin's SseHandler).
+    // Comments are lines starting with ':' per the SSE spec and are ignored by EventSource,
+    // so they cannot collide with regular event types.
+    try {
+      client.sendComment(
+          "connected ts=" + System.currentTimeMillis() + " subs=" + eventTypes
+      );
+    }
+    catch (RuntimeException e) {
+      LOG.debug("Failed to send initial SSE handshake comment.", e);
+    }
     client.keepAlive();
     client.onClose(() -> {
       LOG.info("SSE client disconnected (remote={})", client.ctx().ip());
       subscriptions.remove(subscription);
     });
+  }
+
+  /**
+   * Sends an SSE comment line ({@code :keepalive ts=N}) to every currently subscribed client.
+   *
+   * <p>This is intended to be called periodically by a background scheduler to keep the
+   * underlying TCP connection alive across reverse proxies and stateful firewalls that may
+   * otherwise drop idle connections. SSE comments are silently ignored by the
+   * {@code EventSource} client, so they have no observable effect on the application stream.
+   */
+  public void broadcastHeartbeat() {
+    if (subscriptions.isEmpty()) {
+      return;
+    }
+    String comment = "keepalive ts=" + System.currentTimeMillis();
+    for (Subscription subscription : subscriptions) {
+      try {
+        subscription.client().sendComment(comment);
+      }
+      catch (RuntimeException e) {
+        LOG.debug(
+            "Failed to send SSE heartbeat to client (remote={}): {}",
+            subscription.client().ctx().ip(),
+            e.getMessage()
+        );
+      }
+    }
   }
 
   /**

@@ -50,7 +50,9 @@ class ProjectAssetsHandlerTest {
         org.mockito.Mockito.mock(org.opentcs.bff.publish.PublishHandler.class),
         new OpenApiSpecHandler(),
         sse,
-        new KernelEventPoller(kernelClient, sse)
+        new org.opentcs.bff.events.SsePingHandler(sse),
+        new KernelEventPoller(kernelClient, sse),
+        new org.opentcs.bff.events.SseHeartbeatScheduler(sse)
     );
   }
 

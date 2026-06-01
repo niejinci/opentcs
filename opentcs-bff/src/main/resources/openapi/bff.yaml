@@ -188,6 +188,25 @@ paths:
                 description: A stream of SSE messages (see endpoint description for the payload format).
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /api/v1/sse/ping:
+    get:
+      tags:
+        - Events
+      summary: No-side-effect health probe for the SSE channel.
+      description: >-
+        Returns a small JSON payload describing the current state of the SSE channel without
+        opening a long-lived `text/event-stream` connection. Useful for monitoring and for
+        client-side pre-flight checks before opening an `EventSource`.
+      operationId: pingSse
+      responses:
+        '200':
+          description: SSE channel state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SsePingResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /api/v1/projects:
     get:
       tags: [Projects]
@@ -685,6 +704,30 @@ components:
             - $ref: '#/components/schemas/Vehicle'
             - $ref: '#/components/schemas/TransportOrder'
           nullable: true
+    SsePingResponse:
+      type: object
+      description: >-
+        Lightweight status payload returned by `GET /api/v1/sse/ping`. Reports the number of
+        currently subscribed SSE clients and the set of supported event types.
+      required: [ok, connections, supportedEvents, serverTime]
+      properties:
+        ok:
+          type: boolean
+          description: Always `true`; included for client-side schema validation symmetry.
+        connections:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Current number of subscribed SSE clients.
+        supportedEvents:
+          type: array
+          description: SSE event-type names this BFF instance can broadcast.
+          items:
+            type: string
+        serverTime:
+          type: integer
+          format: int64
+          description: Server clock at the time of the response, milliseconds since the Unix epoch.
     ProjectSummary:
       type: object
       required: [id, name, updatedAt]
