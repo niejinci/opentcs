@@ -22,6 +22,7 @@ import EditorToolbar from '@/components/canvas/EditorToolbar.vue';
 import MapStage from '@/components/canvas/MapStage.vue';
 import OrderStatusSidebar from '@/components/OrderStatusSidebar.vue';
 import PropertyPanel from '@/components/property/PropertyPanel.vue';
+import VehicleStatusPanel from '@/components/VehicleStatusPanel.vue';
 import { useBackgroundMap } from '@/composables/useBackgroundMap';
 import { useCloudDraftSync } from '@/composables/useCloudDraftSync';
 import {
@@ -244,6 +245,7 @@ function pointTypeBadge(): string {
 
       <div class="editor__sidebar">
         <PropertyPanel />
+        <VehicleStatusPanel />
         <OrderStatusSidebar />
         <RouterLink
           v-if="projects.currentId"

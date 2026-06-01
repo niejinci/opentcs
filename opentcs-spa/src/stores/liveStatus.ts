@@ -135,6 +135,32 @@ export const useLiveStatusStore = defineStore('liveStatus', () => {
   }
 
   function pushTimelineEntry(entry: OrderTimelineEntry): void {
+    // Dedupe: skip if the most recent timeline entry for this same order
+    // already represents the same `state` and the same "removed" status
+    // (`order === null`). This collapses three otherwise-redundant pairs:
+    //
+    //   1. (PR3 / 3.1) `recordCreatedOrder()` pushes RAW from the POST
+    //      response, then SSE delivers the same order with prev=null →
+    //      another RAW would otherwise be appended.
+    //   2. (PR3 / 3.2) Some kernels emit multiple TCSObjectEvents for the
+    //      same logical state transition (e.g. ACTIVE_CHANGED followed by
+    //      a property tick that flips state==state). The (!prev) guard
+    //      below isn't enough on its own when prev is missing entirely.
+    //   3. (PR3 / 3.3) On SSE reconnect the bridge re-delivers the
+    //      "current" state of every still-existing order; without this
+    //      guard the timeline would gain a phantom row for every active
+    //      order each reconnect.
+    //
+    // We compare against the most recent entry *for this order* rather
+    // than the global head, since orders interleave on the timeline.
+    const lastForOrder = orderTimeline.value.find((e) => e.name === entry.name);
+    if (
+      lastForOrder
+      && lastForOrder.state === entry.state
+      && (lastForOrder.order === null) === (entry.order === null)
+    ) {
+      return;
+    }
     const list = [entry, ...orderTimeline.value];
     if (list.length > ORDER_TIMELINE_CAP) {
       list.length = ORDER_TIMELINE_CAP;

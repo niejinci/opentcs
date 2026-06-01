@@ -23,6 +23,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 import { createTransportOrder } from '@/api/endpoints/transportOrders';
 import { updateVehicleIntegrationLevel } from '@/api/endpoints/vehicles';
+import VehicleStatusPanel from '@/components/VehicleStatusPanel.vue';
 import { HttpError } from '@/api/errors';
 import { getDraft, getProject } from '@/api/endpoints/projects';
 import {
@@ -370,6 +371,8 @@ watch(
     </header>
 
     <div class="orders-body">
+      <VehicleStatusPanel class="vehicle-status" />
+
       <div v-if="!lastPublishedAt" class="publish-banner warn" role="status">
         ⚠ 当前工程尚未发布过模型到内核，提交订单会失败（kernel 会返回
         <code>NOT_FOUND</code>）。请先回到画布编辑器使用「发布到内核」按钮。
