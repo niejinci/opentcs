@@ -7,14 +7,18 @@ import static java.util.Objects.requireNonNull;
 import com.google.inject.Singleton;
 import jakarta.inject.Inject;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.opentcs.access.KernelRuntimeException;
 import org.opentcs.access.KernelServicePortal;
 import org.opentcs.access.to.order.TransportOrderCreationTO;
+import org.opentcs.data.ObjectUnknownException;
 import org.opentcs.data.model.PlantModel;
+import org.opentcs.data.model.Point;
 import org.opentcs.data.model.Vehicle;
 import org.opentcs.data.order.TransportOrder;
+import org.opentcs.drivers.vehicle.VehicleCommAdapterMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,6 +117,52 @@ public class KernelClient {
             )
         );
     service.updateVehicleIntegrationLevel(current.getReference(), integrationLevel);
+    return service.fetch(Vehicle.class, name).orElse(current);
+  }
+
+  /**
+   * Sets the named vehicle's current position by sending the loopback / virtual-vehicle
+   * comm-adapter message of type {@code tcs:virtualVehicle:setPosition} via
+   * {@link org.opentcs.components.kernel.services.VehicleService#sendCommAdapterMessage}.
+   *
+   * <p>The point name is validated against the kernel's currently loaded plant model and
+   * an {@link IllegalArgumentException} is thrown for unknown points <em>before</em> the
+   * message is dispatched. Real (non-virtual) comm adapters that do not implement this
+   * message will silently ignore it; this endpoint is therefore primarily intended for
+   * commissioning a virtual vehicle on its starting point.
+   *
+   * @param name The name of the vehicle to position.
+   * @param pointName The name of the point at which to place the vehicle.
+   * @return The vehicle as known to the kernel after the message was dispatched. Note that
+   * the kernel's reported {@code currentPosition} is updated asynchronously by the
+   * vehicle controller; callers may need to await an SSE update for it to reflect the
+   * new position.
+   * @throws ObjectUnknownException If no vehicle with the given name exists.
+   * @throws IllegalArgumentException If no point with the given name exists in the plant
+   * model.
+   * @throws KernelRuntimeException If the Kernel cannot be reached or the request fails.
+   */
+  public Vehicle updateVehiclePosition(String name, String pointName) {
+    requireNonNull(name, "name");
+    requireNonNull(pointName, "pointName");
+    var portal = ensureConnected();
+    var service = portal.getVehicleService();
+    Vehicle current = service.fetch(Vehicle.class, name)
+        .orElseThrow(
+            () -> new ObjectUnknownException("No vehicle named '" + name + "' exists.")
+        );
+    if (service.fetch(Point.class, pointName).isEmpty()) {
+      throw new IllegalArgumentException(
+          "No point named '" + pointName + "' exists in the plant model."
+      );
+    }
+    service.sendCommAdapterMessage(
+        current.getReference(),
+        new VehicleCommAdapterMessage(
+            "tcs:virtualVehicle:setPosition",
+            Map.of("position", pointName)
+        )
+    );
     return service.fetch(Vehicle.class, name).orElse(current);
   }
 
