@@ -44,7 +44,6 @@ class ProjectAssetsHandlerTest {
         new ListVehiclesHandler(kernelClient),
         new GetVehicleHandler(kernelClient),
         new org.opentcs.bff.vehicle.UpdateVehicleIntegrationLevelHandler(kernelClient),
-        new org.opentcs.bff.vehicle.UpdateVehiclePositionHandler(kernelClient),
         new CreateTransportOrderHandler(kernelClient),
         new ProjectsHandler(store),
         new ProjectAssetsHandler(store),

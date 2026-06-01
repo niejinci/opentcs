@@ -42,8 +42,6 @@ class VehicleHandlersTest {
     GetVehicleHandler getHandler = new GetVehicleHandler(kernelClient);
     UpdateVehicleIntegrationLevelHandler updateLevelHandler
         = new UpdateVehicleIntegrationLevelHandler(kernelClient);
-    UpdateVehiclePositionHandler updatePositionHandler
-        = new UpdateVehiclePositionHandler(kernelClient);
     app = Javalin.create(cfg -> {
       cfg.startup.showJavalinBanner = false;
       cfg.routes.apiBuilder(() -> {
@@ -52,7 +50,6 @@ class VehicleHandlersTest {
           ApiBuilder.path("/{" + GetVehicleHandler.NAME_PARAM + "}", () -> {
             ApiBuilder.get(getHandler);
             ApiBuilder.put("/integrationLevel", updateLevelHandler);
-            ApiBuilder.put("/currentPosition", updatePositionHandler);
           });
         });
       });
@@ -219,132 +216,6 @@ class VehicleHandlersTest {
           JsonNode root = new ObjectMapper().readTree(response.body().string());
           assertThat(root.get("code").asText()).isEqualTo("NOT_FOUND");
           assertThat(root.get("message").asText()).contains("ghost");
-        }
-    );
-  }
-
-  @Test
-  void putCurrentPositionForwardsToKernelAndReturnsUpdatedDto() {
-    Vehicle updated = new Vehicle("alpha");
-    when(kernelClient.updateVehiclePosition(eq("alpha"), eq("Point-001"))).thenReturn(updated);
-
-    JavalinTest.test(
-        app, (server, client) -> {
-          var response = client.request(
-              "/api/v1/vehicles/alpha/currentPosition",
-              b -> b.put(
-                  BodyPublishers.ofString("{\"currentPosition\":\"Point-001\"}")
-              ).header("Content-Type", "application/json")
-          );
-
-          assertThat(response.code()).isEqualTo(200);
-          assertThat(response.body()).isNotNull();
-          JsonNode root = new ObjectMapper().readTree(response.body().string());
-          assertThat(root.get("name").asText()).isEqualTo("alpha");
-          verify(kernelClient).updateVehiclePosition(eq("alpha"), eq("Point-001"));
-        }
-    );
-  }
-
-  @Test
-  void putCurrentPositionRejectsMalformedBody() {
-    JavalinTest.test(
-        app, (server, client) -> {
-          var response = client.request(
-              "/api/v1/vehicles/alpha/currentPosition",
-              b -> b.put(BodyPublishers.ofString("not-json")).header(
-                  "Content-Type", "application/json"
-              )
-          );
-
-          assertThat(response.code()).isEqualTo(400);
-        }
-    );
-  }
-
-  @Test
-  void putCurrentPositionRejectsMissingField() {
-    JavalinTest.test(
-        app, (server, client) -> {
-          var response = client.request(
-              "/api/v1/vehicles/alpha/currentPosition",
-              b -> b.put(BodyPublishers.ofString("{}")).header(
-                  "Content-Type", "application/json"
-              )
-          );
-
-          assertThat(response.code()).isEqualTo(400);
-          assertThat(response.body()).isNotNull();
-          JsonNode root = new ObjectMapper().readTree(response.body().string());
-          assertThat(root.get("message").asText()).contains("currentPosition");
-        }
-    );
-  }
-
-  @Test
-  void putCurrentPositionRejectsBlankField() {
-    JavalinTest.test(
-        app, (server, client) -> {
-          var response = client.request(
-              "/api/v1/vehicles/alpha/currentPosition",
-              b -> b.put(BodyPublishers.ofString("{\"currentPosition\":\"   \"}")).header(
-                  "Content-Type", "application/json"
-              )
-          );
-
-          assertThat(response.code()).isEqualTo(400);
-          assertThat(response.body()).isNotNull();
-          JsonNode root = new ObjectMapper().readTree(response.body().string());
-          assertThat(root.get("message").asText()).contains("currentPosition");
-        }
-    );
-  }
-
-  @Test
-  void putCurrentPositionReturns404WhenVehicleAbsent() {
-    when(kernelClient.updateVehiclePosition(eq("ghost"), eq("Point-001")))
-        .thenThrow(new ObjectUnknownException("No vehicle named 'ghost' exists."));
-
-    JavalinTest.test(
-        app, (server, client) -> {
-          var response = client.request(
-              "/api/v1/vehicles/ghost/currentPosition",
-              b -> b.put(
-                  BodyPublishers.ofString("{\"currentPosition\":\"Point-001\"}")
-              ).header("Content-Type", "application/json")
-          );
-
-          assertThat(response.code()).isEqualTo(404);
-          assertThat(response.body()).isNotNull();
-          JsonNode root = new ObjectMapper().readTree(response.body().string());
-          assertThat(root.get("code").asText()).isEqualTo("NOT_FOUND");
-          assertThat(root.get("message").asText()).contains("ghost");
-        }
-    );
-  }
-
-  @Test
-  void putCurrentPositionReturns400WhenPointUnknown() {
-    when(kernelClient.updateVehiclePosition(eq("alpha"), eq("Phantom-Point")))
-        .thenThrow(
-            new IllegalArgumentException(
-                "No point named 'Phantom-Point' exists in the plant model."
-            )
-        );
-
-    JavalinTest.test(
-        app, (server, client) -> {
-          var response = client.request(
-              "/api/v1/vehicles/alpha/currentPosition",
-              b -> b.put(
-                  BodyPublishers.ofString("{\"currentPosition\":\"Phantom-Point\"}")
-              ).header("Content-Type", "application/json")
-          );
-
-          assertThat(response.code()).isEqualTo(400);
-          assertThat(response.body()).isNotNull();
-          JsonNode root = new ObjectMapper().readTree(response.body().string());
-          assertThat(root.get("message").asText()).contains("Phantom-Point");
         }
     );
   }

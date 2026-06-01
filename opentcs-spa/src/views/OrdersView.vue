@@ -22,10 +22,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { createTransportOrder } from '@/api/endpoints/transportOrders';
-import {
-  updateVehicleIntegrationLevel,
-  updateVehiclePosition,
-} from '@/api/endpoints/vehicles';
+import { updateVehicleIntegrationLevel } from '@/api/endpoints/vehicles';
 import { HttpError } from '@/api/errors';
 import { getDraft, getProject } from '@/api/endpoints/projects';
 import {
@@ -169,52 +166,6 @@ async function applyIntegrationLevel(): Promise<void> {
     toastError(`更新失败：${(err as Error).message}`);
   } finally {
     integrationLevelBusy.value = false;
-  }
-}
-
-/**
- * Names of Points only (no Locations), drawn from the project's BFF draft.
- * Used by the "set initial position" picker — only Points can be a vehicle's
- * `currentPosition`. We rebuild this on the fly from `targetInfoByName` so it
- * stays in sync after `loadDraftTargets`.
- */
-const pointSuggestions = computed<string[]>(() =>
-  [...targetInfoByName.value.entries()]
-    .filter(([, info]) => info.kind === 'point')
-    .map(([name]) => name)
-    .sort(),
-);
-/** Pending UI selection for the "set current position" picker. */
-const positionDraft = ref<string>('');
-const positionBusy = ref(false);
-
-watch(
-  selectedVehicle,
-  (veh) => {
-    positionDraft.value = veh?.currentPosition ?? '';
-  },
-  { immediate: true },
-);
-
-async function applyPosition(): Promise<void> {
-  const veh = selectedVehicle.value;
-  const next = positionDraft.value.trim();
-  if (!veh || !next || next === (veh.currentPosition ?? '')) return;
-  positionBusy.value = true;
-  try {
-    const updated = await updateVehiclePosition(veh.name, next);
-    // Mirror `applyIntegrationLevel`'s optimistic store update so the picker
-    // reflects the BFF's response immediately. The kernel's authoritative
-    // `currentPosition` arrives shortly after via SSE and supersedes this.
-    live.vehicles = { ...live.vehicles, [updated.name]: updated };
-    toastSuccess(`${updated.name} → 已请求定位至 ${next}`);
-  } catch (err) {
-    if (err instanceof HttpError) {
-      return;
-    }
-    toastError(`定位失败：${(err as Error).message}`);
-  } finally {
-    positionBusy.value = false;
   }
 }
 
@@ -471,40 +422,6 @@ watch(
         </span>
       </div>
 
-      <div v-if="selectedVehicle" class="vehicle-position">
-        <label :for="`pos-${selectedVehicle.name}`">
-          {{ selectedVehicle.name }} · 初始定位
-        </label>
-        <input
-          :id="`pos-${selectedVehicle.name}`"
-          v-model="positionDraft"
-          :list="`pos-points-${selectedVehicle.name}`"
-          :disabled="positionBusy"
-          placeholder="Point 名"
-          spellcheck="false"
-          autocomplete="off"
-          class="target"
-        />
-        <datalist :id="`pos-points-${selectedVehicle.name}`">
-          <option v-for="n in pointSuggestions" :key="n" :value="n" />
-        </datalist>
-        <button
-          type="button"
-          :disabled="
-            positionBusy ||
-              positionDraft.trim().length === 0 ||
-              positionDraft.trim() === (selectedVehicle.currentPosition ?? '')
-          "
-          @click="applyPosition"
-        >
-          {{ positionBusy ? '应用中…' : '应用' }}
-        </button>
-        <span class="hint">
-          当前：<code>{{ selectedVehicle.currentPosition ?? '—' }}</code> ——
-          仅虚拟车 (loopback) 适配器响应该消息。
-        </span>
-      </div>
-
       <div class="dest-block">
         <div class="dest-block-hdr">
           <h3>目的地序列</h3>
@@ -652,34 +569,6 @@ watch(
   cursor: pointer;
 }
 .vehicle-integration button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-.vehicle-position {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: #fff;
-  border: 1px solid #d0d7de;
-  border-radius: 6px;
-  padding: 0.6rem 0.85rem;
-  flex-wrap: wrap;
-}
-.vehicle-position label {
-  font-weight: 600;
-  flex: 0 0 auto;
-}
-.vehicle-position input.target {
-  padding: 0.25rem 0.4rem;
-  font-size: 0.9rem;
-  min-width: 10rem;
-}
-.vehicle-position button {
-  padding: 0.3rem 0.8rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-.vehicle-position button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }

@@ -31,26 +31,3 @@ export function updateVehicleIntegrationLevel(
     options,
   );
 }
-
-/**
- * `PUT /api/v1/vehicles/{name}/currentPosition` — set a vehicle's initial position.
- *
- * The BFF dispatches a `tcs:virtualVehicle:setPosition` comm-adapter message to the kernel
- * which the loopback / virtual-vehicle adapter understands. The named point must exist in
- * the kernel's currently loaded plant model — otherwise the BFF returns `400`.
- *
- * Note: the kernel's reported `currentPosition` is updated asynchronously by the vehicle
- * controller, so callers should also wait for the next SSE-driven vehicle update for the
- * canonical state rather than relying solely on the response body.
- */
-export function updateVehiclePosition(
-  name: string,
-  currentPosition: string,
-  options?: RequestOptions,
-): Promise<Vehicle> {
-  return apiClient.put<Vehicle>(
-    `/api/v1/vehicles/${encodeURIComponent(name)}/currentPosition`,
-    { currentPosition },
-    options,
-  );
-}

@@ -115,52 +115,6 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/KernelUnavailable'
-  /api/v1/vehicles/{name}/currentPosition:
-    put:
-      tags:
-        - Vehicles
-      summary: Set a vehicle's initial current position.
-      description: >-
-        Forwards the new position to the kernel as a comm-adapter message of type
-        `tcs:virtualVehicle:setPosition` (the well-known message type understood by the
-        loopback / virtual vehicle comm adapter shipped with openTCS). The named point must
-        exist in the kernel's currently loaded plant model — otherwise the BFF responds with
-        `400 BAD_REQUEST` *before* sending the message. Intended primarily for placing a
-        virtual vehicle on its starting point during commissioning; real comm adapters that
-        do not implement this message will silently ignore it.
-      operationId: updateVehiclePosition
-      parameters:
-        - name: name
-          in: path
-          required: true
-          description: The name of the vehicle.
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VehiclePositionUpdate'
-      responses:
-        '200':
-          description: The updated vehicle.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Vehicle'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          description: No vehicle with the given name exists.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '503':
-          $ref: '#/components/responses/KernelUnavailable'
   /api/v1/transport-orders:
     post:
       tags:
@@ -583,18 +537,6 @@ components:
       properties:
         integrationLevel:
           $ref: '#/components/schemas/VehicleIntegrationLevel'
-    VehiclePositionUpdate:
-      type: object
-      description: Request body for `PUT /api/v1/vehicles/{name}/currentPosition`.
-      required:
-        - currentPosition
-      properties:
-        currentPosition:
-          type: string
-          minLength: 1
-          description: >-
-            Name of the point at which to place the vehicle. Must reference a point that
-            exists in the kernel's currently loaded plant model.
     ErrorResponse:
       type: object
       description: An error returned by the BFF.
