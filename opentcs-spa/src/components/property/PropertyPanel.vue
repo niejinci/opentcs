@@ -26,10 +26,21 @@ import LocationForm from '@/components/property/LocationForm.vue';
 import LocationTypeForm from '@/components/property/LocationTypeForm.vue';
 import MiscPropertiesEditor from '@/components/property/MiscPropertiesEditor.vue';
 import VehicleForm from '@/components/property/VehicleForm.vue';
+import {
+  clampToleranceMm,
+  MAX_TOLERANCE_MM,
+  MIN_TOLERANCE_MM,
+  readToleranceOverrideMm,
+  TOLERANCE_PROPERTY_KEY,
+} from '@/domain/editor/tolerance';
+import { useEditorSettingsStore } from '@/stores/editorSettings';
+import { useLiveStatusStore } from '@/stores/liveStatus';
 import { useProjectStore } from '@/stores/project';
 import { toastError } from '@/ui/toast/toastBus';
 
 const store = useProjectStore();
+const editorSettings = useEditorSettingsStore();
+const live = useLiveStatusStore();
 
 /* --------------------------- Selected resolvers ------------------------ */
 
@@ -57,12 +68,14 @@ const pointForm = ref({
   worldY: 0, // meters
   z: 0, // mm
   orientationAngle: '' as string, // degrees, '' = NaN = unset
+  toleranceOverrideMm: '' as string, // mm, '' = use global default
 });
 
 watch(
   selectedPoint,
   (pt) => {
     if (!pt) return;
+    const override = readToleranceOverrideMm(pt);
     pointForm.value = {
       name: pt.name,
       type: pt.type,
@@ -72,6 +85,7 @@ watch(
       orientationAngle: Number.isFinite(pt.pose.orientationAngle)
         ? String(pt.pose.orientationAngle)
         : '',
+      toleranceOverrideMm: override === null ? '' : String(override),
     };
   },
   { immediate: true },
@@ -143,6 +157,102 @@ function commitPointOrientation(): void {
     return;
   }
   store.updatePointFields(pt.name, { orientationAngle: v });
+}
+
+function commitPointToleranceOverride(): void {
+  const pt = selectedPoint.value;
+  if (!pt) return;
+  const raw = pointForm.value.toleranceOverrideMm.trim();
+  if (raw === '') {
+    // Clear the per-point override so the global default takes over.
+    store.deleteEntityProperty('point', pt.name, TOLERANCE_PROPERTY_KEY);
+    pointForm.value.toleranceOverrideMm = '';
+    return;
+  }
+  const v = Number(raw);
+  if (!Number.isFinite(v) || v < MIN_TOLERANCE_MM) {
+    toastError(`容差半径必须是 ≥ ${MIN_TOLERANCE_MM} 的数字（mm），留空 = 用默认值`, 'Point');
+    const cur = readToleranceOverrideMm(pt);
+    pointForm.value.toleranceOverrideMm = cur === null ? '' : String(cur);
+    return;
+  }
+  const clamped = clampToleranceMm(v);
+  store.setEntityProperty('point', pt.name, TOLERANCE_PROPERTY_KEY, String(clamped));
+  pointForm.value.toleranceOverrideMm = String(clamped);
+}
+
+/* ------------------- Point: snap-to-vehicle helper -------------------- */
+//
+// "贴齐到车辆当前位置" — sets the selected Point's world coords to a
+// vehicle's measured (precisePosition) pose, so a Point that's a few cm
+// outside the AGV's actual stopping spot can be re-aligned in one click.
+//
+// Candidate selection rules (deterministic so a stale tick doesn't move
+// the Point unexpectedly):
+//   1. Prefer the vehicle whose `currentPosition === selectedPoint.name`
+//      AND has a `precisePosition` — that's "the AGV the kernel thinks is
+//      parked at this point".
+//   2. Otherwise pick the vehicle with a `precisePosition` whose mm
+//      distance to the current Point pose is smallest.
+//   3. If no kernel-side vehicle has a `precisePosition` yet → toast.
+
+interface SnapCandidate {
+  vehicleName: string;
+  preciseMm: { x: number; y: number; z: number };
+  isAtThisPoint: boolean;
+  distanceMm: number;
+}
+
+const snapCandidate = computed<SnapCandidate | null>(() => {
+  const pt = selectedPoint.value;
+  if (!pt) return null;
+  let best: SnapCandidate | null = null;
+  for (const v of Object.values(live.vehicles)) {
+    if (!v.precisePosition) continue;
+    const isAtThisPoint = v.currentPosition === pt.name;
+    const dx = v.precisePosition.x - pt.pose.position.x;
+    const dy = v.precisePosition.y - pt.pose.position.y;
+    const distanceMm = Math.sqrt(dx * dx + dy * dy);
+    const cand: SnapCandidate = {
+      vehicleName: v.name,
+      preciseMm: {
+        x: v.precisePosition.x,
+        y: v.precisePosition.y,
+        z: v.precisePosition.z,
+      },
+      isAtThisPoint,
+      distanceMm,
+    };
+    if (!best) {
+      best = cand;
+      continue;
+    }
+    // Vehicle parked at this Point always wins.
+    if (cand.isAtThisPoint && !best.isAtThisPoint) {
+      best = cand;
+      continue;
+    }
+    if (best.isAtThisPoint && !cand.isAtThisPoint) continue;
+    if (cand.distanceMm < best.distanceMm) best = cand;
+  }
+  return best;
+});
+
+function snapPointToVehicle(): void {
+  const pt = selectedPoint.value;
+  if (!pt) return;
+  const cand = snapCandidate.value;
+  if (!cand) {
+    toastError('暂无车辆上报实测位置（precisePosition），无法贴齐', 'Point');
+    return;
+  }
+  store.setPointWorldMeters(pt.name, {
+    x: cand.preciseMm.x / 1000,
+    y: cand.preciseMm.y / 1000,
+  });
+  // Refresh form mirrors so the UI shows the new world coords immediately.
+  pointForm.value.worldX = cand.preciseMm.x / 1000;
+  pointForm.value.worldY = cand.preciseMm.y / 1000;
 }
 
 /* -------------------------- Path form bindings ------------------------- */
@@ -364,6 +474,43 @@ function onDeleteBlock(name: string): void {
           @change="commitPointOrientation"
         />
       </label>
+      <label>
+        <span>到位容差半径 (mm, 留空 = 用默认 {{ editorSettings.toleranceDefaultMm }})</span>
+        <input
+          v-model="pointForm.toleranceOverrideMm"
+          type="number"
+          :min="MIN_TOLERANCE_MM"
+          :max="MAX_TOLERANCE_MM"
+          :step="10"
+          inputmode="numeric"
+          :placeholder="String(editorSettings.toleranceDefaultMm)"
+          data-testid="point-tolerance-override"
+          @change="commitPointToleranceOverride"
+        />
+      </label>
+      <div class="snap-row">
+        <button
+          type="button"
+          class="snap-btn"
+          :disabled="!snapCandidate"
+          :title="
+            snapCandidate
+              ? `将 Point 坐标设为车辆 ${snapCandidate.vehicleName} 的实测位置`
+                + ` (距离 ${Math.round(snapCandidate.distanceMm)} mm`
+                + `${snapCandidate.isAtThisPoint ? '，AGV 当前停在此点' : ''})`
+              : '当前没有车辆上报实测位置'
+          "
+          data-testid="point-snap-to-vehicle"
+          @click="snapPointToVehicle"
+        >
+          贴齐到车辆当前位置
+        </button>
+        <span v-if="snapCandidate" class="snap-hint">
+          → {{ snapCandidate.vehicleName }}
+          · Δ{{ Math.round(snapCandidate.distanceMm) }} mm
+          <span v-if="snapCandidate.isAtThisPoint">· 当前停靠</span>
+        </span>
+      </div>
       <p class="hint">
         position mm: ({{ selectedPoint.pose.position.x }}, {{ selectedPoint.pose.position.y }},
         {{ selectedPoint.pose.position.z }})
@@ -602,6 +749,35 @@ function onDeleteBlock(name: string): void {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
+}
+.snap-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.snap-btn {
+  padding: 0.35rem 0.55rem;
+  border: 1px solid #0969da;
+  background: #ffffff;
+  color: #0969da;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+}
+.snap-btn:hover:not(:disabled) {
+  background: #0969da;
+  color: #ffffff;
+}
+.snap-btn:disabled {
+  border-color: #d0d7de;
+  color: #8c959f;
+  cursor: not-allowed;
+}
+.snap-hint {
+  font-size: 0.78rem;
+  color: #57606a;
 }
 .danger {
   margin-top: 0.5rem;

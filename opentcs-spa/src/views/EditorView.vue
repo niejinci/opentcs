@@ -20,7 +20,10 @@ import { RouterLink, useRoute, useRouter } from 'vue-router';
 
 import EditorToolbar from '@/components/canvas/EditorToolbar.vue';
 import MapStage from '@/components/canvas/MapStage.vue';
+import OrderStatusSidebar from '@/components/OrderStatusSidebar.vue';
 import PropertyPanel from '@/components/property/PropertyPanel.vue';
+import ResourceTree from '@/components/tree/ResourceTree.vue';
+import VehicleStatusPanel from '@/components/VehicleStatusPanel.vue';
 import { useBackgroundMap } from '@/composables/useBackgroundMap';
 import { useCloudDraftSync } from '@/composables/useCloudDraftSync';
 import {
@@ -29,6 +32,7 @@ import {
   getEditorTool,
   type EditorToolId,
 } from '@/domain/editor/tools';
+import { useEditorSettingsStore } from '@/stores/editorSettings';
 import { useProjectStore } from '@/stores/project';
 import { useProjectsStore } from '@/stores/projects';
 import { toastError, toastInfo } from '@/ui/toast/toastBus';
@@ -36,6 +40,7 @@ import { toastError, toastInfo } from '@/ui/toast/toastBus';
 const { background, hasBackground } = useBackgroundMap();
 const store = useProjectStore();
 const projects = useProjectsStore();
+const settings = useEditorSettingsStore();
 const route = useRoute();
 const router = useRouter();
 
@@ -63,7 +68,11 @@ async function activateProjectFromRoute(): Promise<void> {
   }
 }
 
-watch(() => route.params.projectId, () => void activateProjectFromRoute(), { immediate: true });
+watch(
+  () => route.params.projectId,
+  () => void activateProjectFromRoute(),
+  { immediate: true },
+);
 
 const activeTool = ref<EditorToolId>('select');
 const mapStageRef = useTemplateRef<{ resetView: () => void } | null>('mapStageRef');
@@ -182,7 +191,9 @@ function pointTypeBadge(): string {
       <p class="hint">
         <kbd>V</kbd> 选择 · <kbd>P</kbd> Point · <kbd>L</kbd> Path · <kbd>O</kbd> Location ·
         <kbd>B</kbd> Block · <kbd>K</kbd> Vehicle；<kbd>Delete</kbd> 删除选中 ·
-        <kbd>Esc</kbd> 取消半态。草稿自动落本机 <code>localStorage</code>（刷新页面不丢）。
+        <kbd>Esc</kbd> 取消半态。左侧资源树支持单击选中、<kbd>↑↓</kbd> 切换、<kbd>←→</kbd>
+        折叠、<kbd>Enter</kbd> 选中。工具栏底部可开关「网格吸附」与「缩略图」（右下角点击/拖动可重定位视口）。草稿自动落本机
+        <code>localStorage</code>（刷新页面不丢）。
       </p>
     </header>
 
@@ -191,7 +202,8 @@ function pointTypeBadge(): string {
       <RouterLink to="/import" class="cta">前往「地图导入」上传三件套 →</RouterLink>
     </div>
 
-    <div v-else class="editor__workspace">
+    <div v-else class="editor__workspace" :data-tree-collapsed="settings.treeCollapsed">
+      <ResourceTree />
       <EditorToolbar :active-tool="activeTool" @switch-tool="setTool" />
 
       <div class="editor__stage">
@@ -243,6 +255,15 @@ function pointTypeBadge(): string {
 
       <div class="editor__sidebar">
         <PropertyPanel />
+        <VehicleStatusPanel />
+        <OrderStatusSidebar />
+        <RouterLink
+          v-if="projects.currentId"
+          :to="{ name: 'project-orders', params: { projectId: projects.currentId } }"
+          class="orders-cta"
+        >
+          下达运输订单 →
+        </RouterLink>
         <details class="meta">
           <summary>底图 / 快捷键</summary>
           <dl v-if="background">
@@ -311,15 +332,20 @@ function pointTypeBadge(): string {
   background: #0a5cb6;
 }
 
- .editor__workspace {
-   display: grid;
-   grid-template-columns: auto 1fr 280px;
+.editor__workspace {
+  display: grid;
+  grid-template-columns: 240px auto 1fr 280px;
   /* Bound the row height to the viewport so the canvas area cannot
      grow with its own content (which would re-trigger ResizeObserver). */
   grid-template-rows: minmax(560px, calc(100vh - 220px));
   gap: 0.75rem;
   align-items: stretch;
- }
+}
+.editor__workspace[data-tree-collapsed='true'] {
+  /* Shrink the resource-tree track to a thin strip so the canvas can
+     reclaim the freed horizontal space. */
+  grid-template-columns: 32px auto 1fr 280px;
+}
 
 .editor__stage {
   position: relative;
@@ -378,6 +404,21 @@ function pointTypeBadge(): string {
   flex-direction: column;
   gap: 0.5rem;
   min-width: 0;
+  overflow-y: auto;
+}
+.orders-cta {
+  display: block;
+  text-align: center;
+  padding: 0.4rem 0.6rem;
+  background: #0969da;
+  color: #ffffff;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.orders-cta:hover {
+  background: #0a5cb6;
 }
 .meta {
   border: 1px solid #d0d7de;

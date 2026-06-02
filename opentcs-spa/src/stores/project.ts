@@ -27,6 +27,7 @@ import { ref, shallowRef, watch } from 'vue';
 
 import type { AffineMapping, WorldPoint } from '@/domain/geometry/affine';
 import { pixelToWorld, worldToPixel } from '@/domain/geometry/affine';
+import { type AlignAction, type AlignAnchor, applyAlignAction } from '@/domain/editor/align';
 import { isValidEntityName, nextAutoName } from '@/domain/model/naming';
 import { distanceMm } from '@/domain/model/path';
 import type {
@@ -292,6 +293,15 @@ export const useProjectStore = defineStore('project', () => {
   const vehicles = ref<DraftVehicle[]>(hydrated?.vehicles ?? []);
   const selection = ref<SelectionRef | null>(hydrated?.selection ?? null);
 
+  /**
+   * PR3 — ephemeral multi-selection used by the toolbar's align /
+   * distribute buttons. Keys are `${kind}:${name}` so the existing
+   * `SelectionRef` shape can survive renames (we recompute lazily). Not
+   * persisted: cleared on hydrate / reload by design (sticky multi-select
+   * across reloads is more confusing than useful for a CAD-like editor).
+   */
+  const multiSelection = ref<Set<string>>(new Set());
+
   /** Transient first-click state for the Path tool. Not persisted. */
   const pathDraftSrc = ref<string | null>(null);
 
@@ -356,16 +366,20 @@ export const useProjectStore = defineStore('project', () => {
         blocks.value = [];
         vehicles.value = [];
         selection.value = null;
+        multiSelection.value = new Set();
         return;
       }
       const revived = JSON.parse(JSON.stringify(payload), nanReviver) as Partial<PersistedDraft>;
       points.value = (revived.points ?? []).map(withProperties) as DraftPoint[];
       paths.value = (revived.paths ?? []).map(withProperties) as DraftPath[];
-      locationTypes.value = (revived.locationTypes ?? []).map(withProperties) as DraftLocationType[];
+      locationTypes.value = (revived.locationTypes ?? []).map(
+        withProperties,
+      ) as DraftLocationType[];
       locations.value = (revived.locations ?? []).map(withProperties) as DraftLocation[];
       blocks.value = (revived.blocks ?? []).map(withProperties) as DraftBlock[];
       vehicles.value = (revived.vehicles ?? []).map(withProperties) as DraftVehicle[];
       selection.value = revived.selection ?? null;
+      multiSelection.value = new Set();
     } finally {
       // Defer clearing the flag until after the deep watcher (flush: 'pre')
       // has run for this reassignment batch, so the watcher's callback sees
@@ -375,7 +389,6 @@ export const useProjectStore = defineStore('project', () => {
       }, 0);
     }
   }
-
 
   /* ---------------------------- Background ----------------------------- */
 
@@ -1131,6 +1144,13 @@ export const useProjectStore = defineStore('project', () => {
     } else if (sel.kind === 'vehicle') {
       vehicles.value = vehicles.value.filter((v) => v.name !== sel.name);
     }
+    // PR3: drop the deleted entity from the multi-selection set if present.
+    const delKey = `${sel.kind}:${sel.name}`;
+    if (multiSelection.value.has(delKey)) {
+      const next = new Set(multiSelection.value);
+      next.delete(delKey);
+      multiSelection.value = next;
+    }
     selection.value = null;
   }
 
@@ -1143,8 +1163,100 @@ export const useProjectStore = defineStore('project', () => {
     blocks.value = [];
     vehicles.value = [];
     selection.value = null;
+    multiSelection.value = new Set();
     pathDraftSrc.value = null;
   }
+
+  /* ------------------------- PR3: multi-selection ----------------------- */
+  //
+  // Multi-selection is layered on top of the existing single-`selection`
+  // ref. The single selection still drives the property panel and the
+  // canvas highlight; the multi-selection drives toolbar batch ops only.
+  // Toggling a leaf in the resource tree (Ctrl/Cmd-click) updates this
+  // set; clicking elsewhere does NOT clear it (so the user can pick a
+  // few items, click a button, then continue).
+
+  function isMultiSelected(kind: EntityKind, name: string): boolean {
+    return multiSelection.value.has(`${kind}:${name}`);
+  }
+
+  function toggleMultiSelection(kind: EntityKind, name: string): void {
+    const next = new Set(multiSelection.value);
+    const key = `${kind}:${name}`;
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    multiSelection.value = next;
+  }
+
+  function clearMultiSelection(): void {
+    if (multiSelection.value.size === 0) return;
+    multiSelection.value = new Set();
+  }
+
+  /** Names of selected entities of a given alignable kind. Used by tests + UI. */
+  function multiSelectedNamesByKind(kind: 'point' | 'location' | 'vehicle'): string[] {
+    const prefix = `${kind}:`;
+    const out: string[] = [];
+    for (const k of multiSelection.value) {
+      if (k.startsWith(prefix)) out.push(k.slice(prefix.length));
+    }
+    return out;
+  }
+
+  /** True when at least one alignable entity is in the multi-selection set. */
+  function hasAlignableMultiSelection(): boolean {
+    for (const k of multiSelection.value) {
+      if (k.startsWith('point:') || k.startsWith('location:') || k.startsWith('vehicle:')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Apply an alignment / distribution action to every entity currently in
+   * `multiSelection` whose kind owns a `layout.pixel{X,Y}` (Point /
+   * Location / Vehicle). Path / Block / LocationType are silently
+   * skipped because they have no canvas geometry of their own.
+   *
+   * Returns the number of entities actually moved (= 0 when not enough
+   * anchors are selected for the chosen op).
+   */
+  function applyAlign(action: AlignAction): number {
+    interface AnchorWithKind extends AlignAnchor {
+      kind: 'point' | 'location' | 'vehicle';
+    }
+    const anchors: AnchorWithKind[] = [];
+    for (const key of multiSelection.value) {
+      const colon = key.indexOf(':');
+      if (colon < 0) continue;
+      const kind = key.slice(0, colon) as EntityKind;
+      const name = key.slice(colon + 1);
+      if (kind === 'point') {
+        const p = findPoint(name);
+        if (p) anchors.push({ kind: 'point', name, x: p.layout.pixelX, y: p.layout.pixelY });
+      } else if (kind === 'location') {
+        const l = findLocation(name);
+        if (l) anchors.push({ kind: 'location', name, x: l.layout.pixelX, y: l.layout.pixelY });
+      } else if (kind === 'vehicle') {
+        const v = findVehicle(name);
+        if (v) anchors.push({ kind: 'vehicle', name, x: v.layout.pixelX, y: v.layout.pixelY });
+      }
+    }
+    const moved = applyAlignAction(action, anchors);
+    if (moved.length === 0) return 0;
+    let count = 0;
+    moved.forEach((next, i) => {
+      const orig = anchors[i];
+      if (next.x === orig.x && next.y === orig.y) return;
+      const pixel = { x: next.x, y: next.y };
+      if (orig.kind === 'point') movePoint(orig.name, pixel);
+      else if (orig.kind === 'location') moveLocation(orig.name, pixel);
+      else if (orig.kind === 'vehicle') moveVehicle(orig.name, pixel);
+      count += 1;
+    });
+    return count;
+  }
+  // ---------------------------------------------------------------
 
   return {
     // state
@@ -1156,6 +1268,7 @@ export const useProjectStore = defineStore('project', () => {
     blocks,
     vehicles,
     selection,
+    multiSelection,
     pathDraftSrc,
     // background actions
     setBackground,
@@ -1210,6 +1323,13 @@ export const useProjectStore = defineStore('project', () => {
     // selection + delete
     select,
     deleteSelected,
+    // multi-selection (PR3)
+    isMultiSelected,
+    toggleMultiSelection,
+    clearMultiSelection,
+    multiSelectedNamesByKind,
+    hasAlignableMultiSelection,
+    applyAlign,
     clearAll,
     // S7: draft payload bridge for cloud persistence.
     serializeDraftPayload,

@@ -433,3 +433,19 @@ S7 BFF 接口实现要点：① 全部走流式 IO；② `meta.json` 写入用 "
   - `KernelServicePortal` 每次发布即用即关，**不缓存**——若后续需要短间隔多次发布可在 PublishHandler 上层再做节流
   - `fieldPath` 路径表达式自由形式（如 `paths[name=p1].sourcePoint`），SPA 仅做透传 + 跳回 editor `?focus=` 提示，editor 端的实际选中跳转留待 S9 再补
 - 下一阶段入口文件：`opentcs-spa/src/views/OrdersView.vue`（S9 起手：订单 + SSE 实时可视化；将首次正式消费 BFF SSE bridge，路由 `/orders`；订单创建/取消复用 `useProjectsStore` 的当前模型上下文）
+
+### S9（2026-05-26）订单 + SSE 实时可视化
+
+- 已完成：
+  - BFF：`TransportOrder` schema 扩出必填 `state`（新枚举 `TransportOrderState`：RAW/ACTIVE/DISPATCHABLE/BEING_PROCESSED/WITHDRAWN/FINISHED/FAILED/UNROUTABLE）+ 可选 `processingVehicle`；`TransportOrderConverter.toDto()` 同步填值；`POST /api/v1/transport-orders` 与 `GET /api/v1/sse?vehicles=true&transportOrders=true` 复用 S2/S?? 已就位的实现，未新增端点
+  - SPA：`src/api/types/bff.ts` 加 `TransportOrderState` + 扩 `TransportOrder` + 新 `TransportOrderRequest` + 常量 `TRANSPORT_ORDER_OPERATIONS = ['NOP','MOVE','LIFT','DROP']`；新 endpoint 文件 `transportOrders.ts`、`sseEvents.ts`（仅薄包装 `src/api/sse.ts` 的 `SseClient`，禁止再 `new EventSource`）
+  - 新 Pinia store `src/stores/liveStatus.ts`：单例 SSE 客户端 + `vehicles`/`transportOrders` Map + `orderTimeline` 200 条环形 + `start()/stop()` 幂等 + `recordCreatedOrder()`；`App.vue` 顶层挂载/卸载，全局唯一
+  - 新 composable `src/composables/useLiveVehicleOverlay.ts`：把 `project.vehicles`（草稿）与 `liveStatus.vehicles`（Kernel）合成 `OverlayVehicle[]`，由 `currentPosition` 解析点像素；`AnnotationLayer.vue` Vehicle 段切到该数据源，几何主干（Point/Path/Location/Block）零改动；Kernel 接管时 `draggable=false`
+  - 新视图 `src/views/OrdersView.vue`：路由 `/projects/:projectId/orders`，下拉选车 + 多目的地表（target Point/Location 名 + operation 枚举 + 上下移/删）+ 提交（`{toastOnError:false}`，自定义 `code: message + fieldPath` toast）；新组件 `src/components/OrderStatusSidebar.vue` 挂在 EditorView 右栏，pill 显示 SSE 状态 + 时间线（newest first，top 50）；`ProjectsView` 行内追加「订单」按钮；EditorView 右栏追加「下达运输订单 →」CTA
+- 已知坑：
+  - BFF `Vehicle` DTO 仅有 `currentPosition`（Point 名），没有 `precisePosition`/`orientationAngle`，因此画布只在 Point 间"跳点"显示；要做连续插值需要先扩 BFF schema（留 S10）
+  - 订单历史不落盘：刷新页面后 `OrderStatusSidebar` 时间线清空，符合任务边界（不新建 DB），README 已注
+  - SSE 仍走 `src/api/sse.ts` 的指数退避（既有），断线 toast 不弹，只在 sidebar pill 提示，避免与画布交互抢焦点
+  - 操作枚举只暴露 NOP/MOVE/LIFT/DROP 四个；driver 端实际接受任意字符串，若 Kernel 侧扩展自定义 op 需要更新常量 + 类型联合
+  - `incompleteName: true` + `name = "spa-${Date.now()}"`，让 Kernel 兜底唯一性；不要在 SPA 端复用同一 timestamp 连发
+- 下一阶段入口文件：`docs/spa-frontend-roadmap.md` §1 S10 行（收尾：BFF Vehicle 精确位姿 + 订单历史持久化 + 端到端 e2e 录制 + README 与许可证审计）

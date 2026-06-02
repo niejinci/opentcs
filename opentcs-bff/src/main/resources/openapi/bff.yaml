@@ -72,6 +72,49 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/KernelUnavailable'
+  /api/v1/vehicles/{name}/integrationLevel:
+    put:
+      tags:
+        - Vehicles
+      summary: Update a vehicle's integration level.
+      description: >-
+        Forwards the new integration level to the kernel via
+        `VehicleService#updateVehicleIntegrationLevel`. The kernel rejects illegal transitions
+        (e.g. lowering the integration level while the vehicle is processing an order) with
+        `400 BAD_REQUEST`. The response body is the updated vehicle DTO.
+      operationId: updateVehicleIntegrationLevel
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: The name of the vehicle.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleIntegrationLevelUpdate'
+      responses:
+        '200':
+          description: The updated vehicle.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vehicle'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No vehicle with the given name exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/KernelUnavailable'
   /api/v1/transport-orders:
     post:
       tags:
@@ -143,6 +186,25 @@ paths:
               schema:
                 type: string
                 description: A stream of SSE messages (see endpoint description for the payload format).
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/sse/ping:
+    get:
+      tags:
+        - Events
+      summary: No-side-effect health probe for the SSE channel.
+      description: >-
+        Returns a small JSON payload describing the current state of the SSE channel without
+        opening a long-lived `text/event-stream` connection. Useful for monitoring and for
+        client-side pre-flight checks before opening an `EventSource`.
+      operationId: pingSse
+      responses:
+        '200':
+          description: SSE channel state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SsePingResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /api/v1/projects:
@@ -442,6 +504,46 @@ components:
           type: string
           nullable: true
           description: The name of the point the vehicle currently occupies, or null if unknown.
+        precisePosition:
+          $ref: '#/components/schemas/Triple'
+          nullable: true
+          description: |
+            The vehicle's measured pose position in millimetres, as reported by the
+            comm-adapter. Distinct from `currentPosition` (which is the kernel-resolved
+            nearest Point name): this field is the raw measured AGV pose used to
+            visualise "实测停靠点 vs 最近 Point 距离 vs 容差". `null` if the adapter has
+            not reported a precise pose yet.
+        orientationAngle:
+          type: number
+          format: double
+          nullable: true
+          description: |
+            The vehicle's measured orientation in degrees in the range [-360, 360], as
+            reported by the comm-adapter. `null` if the adapter has not reported an
+            orientation yet (kernel uses `Double.NaN` internally; the BFF normalises
+            that to `null`).
+    Triple:
+      type: object
+      description: |
+        A 3D position in millimetres (integer). Mirrors the kernel's
+        `org.opentcs.data.model.Triple`.
+      required:
+        - x
+        - y
+        - z
+      properties:
+        x:
+          type: integer
+          format: int64
+          description: x in millimetres.
+        y:
+          type: integer
+          format: int64
+          description: y in millimetres.
+        z:
+          type: integer
+          format: int64
+          description: z in millimetres.
     VehicleState:
       type: string
       description: The vehicle's current state.
@@ -467,6 +569,14 @@ components:
         - TO_BE_NOTICED
         - TO_BE_RESPECTED
         - TO_BE_UTILIZED
+    VehicleIntegrationLevelUpdate:
+      type: object
+      description: Request body for `PUT /api/v1/vehicles/{name}/integrationLevel`.
+      required:
+        - integrationLevel
+      properties:
+        integrationLevel:
+          $ref: '#/components/schemas/VehicleIntegrationLevel'
     ErrorResponse:
       type: object
       description: An error returned by the BFF.
@@ -575,6 +685,7 @@ components:
       required:
         - name
         - type
+        - state
         - destinations
       properties:
         name:
@@ -583,15 +694,37 @@ components:
         type:
           type: string
           description: The type of the transport order.
+        state:
+          $ref: '#/components/schemas/TransportOrderState'
         intendedVehicle:
           type: string
           nullable: true
           description: The name of the vehicle intended to execute the order.
+        processingVehicle:
+          type: string
+          nullable: true
+          description: >-
+            The name of the vehicle that is currently processing this order, or `null` if no
+            vehicle has been assigned yet.
         destinations:
           type: array
           description: The destinations of the transport order.
           items:
             $ref: '#/components/schemas/Destination'
+    TransportOrderState:
+      type: string
+      description: >-
+        Lifecycle state of a transport order. Mirrors the openTCS Kernel's
+        `org.opentcs.data.order.TransportOrder.State` enum.
+      enum:
+        - RAW
+        - ACTIVE
+        - DISPATCHABLE
+        - BEING_PROCESSED
+        - WITHDRAWN
+        - FINISHED
+        - FAILED
+        - UNROUTABLE
     SseEventEnvelope:
       type: object
       description: >-
@@ -611,6 +744,30 @@ components:
             - $ref: '#/components/schemas/Vehicle'
             - $ref: '#/components/schemas/TransportOrder'
           nullable: true
+    SsePingResponse:
+      type: object
+      description: >-
+        Lightweight status payload returned by `GET /api/v1/sse/ping`. Reports the number of
+        currently subscribed SSE clients and the set of supported event types.
+      required: [ok, connections, supportedEvents, serverTime]
+      properties:
+        ok:
+          type: boolean
+          description: Always `true`; included for client-side schema validation symmetry.
+        connections:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Current number of subscribed SSE clients.
+        supportedEvents:
+          type: array
+          description: SSE event-type names this BFF instance can broadcast.
+          items:
+            type: string
+        serverTime:
+          type: integer
+          format: int64
+          description: Server clock at the time of the response, milliseconds since the Unix epoch.
     ProjectSummary:
       type: object
       required: [id, name, updatedAt]

@@ -4,10 +4,12 @@ package org.opentcs.bff.vehicle;
 
 import static java.util.Objects.requireNonNull;
 
+import org.opentcs.bff.api.v1.model.Triple;
 import org.opentcs.bff.api.v1.model.Vehicle;
 import org.opentcs.bff.api.v1.model.VehicleIntegrationLevel;
 import org.opentcs.bff.api.v1.model.VehicleProcState;
 import org.opentcs.bff.api.v1.model.VehicleState;
+import org.opentcs.data.model.Pose;
 
 /**
  * Converts between the openTCS kernel's {@link org.opentcs.data.model.Vehicle} domain object and
@@ -38,6 +40,21 @@ public final class VehicleConverter {
     dto.setCurrentPosition(
         vehicle.getCurrentPosition() == null ? null : vehicle.getCurrentPosition().getName()
     );
+    Pose pose = vehicle.getPose();
+    if (pose != null) {
+      org.opentcs.data.model.Triple kp = pose.getPosition();
+      if (kp != null) {
+        Triple precise = new Triple();
+        precise.setX(kp.getX());
+        precise.setY(kp.getY());
+        precise.setZ(kp.getZ());
+        dto.setPrecisePosition(precise);
+      }
+      double angle = pose.getOrientationAngle();
+      if (!Double.isNaN(angle)) {
+        dto.setOrientationAngle(angle);
+      }
+    }
     return dto;
   }
 }

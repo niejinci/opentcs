@@ -43,13 +43,16 @@ class ProjectAssetsHandlerTest {
         new PlantModelSummaryHandler(kernelClient),
         new ListVehiclesHandler(kernelClient),
         new GetVehicleHandler(kernelClient),
+        new org.opentcs.bff.vehicle.UpdateVehicleIntegrationLevelHandler(kernelClient),
         new CreateTransportOrderHandler(kernelClient),
         new ProjectsHandler(store),
         new ProjectAssetsHandler(store),
         org.mockito.Mockito.mock(org.opentcs.bff.publish.PublishHandler.class),
         new OpenApiSpecHandler(),
         sse,
-        new KernelEventPoller(kernelClient, sse)
+        new org.opentcs.bff.events.SsePingHandler(sse),
+        new KernelEventPoller(kernelClient, sse),
+        new org.opentcs.bff.events.SseHeartbeatScheduler(sse)
     );
   }
 

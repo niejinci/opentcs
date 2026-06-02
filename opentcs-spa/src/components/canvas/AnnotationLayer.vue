@@ -26,6 +26,9 @@ import { computed } from 'vue';
 
 import type { EditorToolId } from '@/domain/editor/tools';
 import type { DraftLocation, DraftPath, DraftPoint, DraftVehicle } from '@/domain/model/types';
+import { resolveToleranceMm, toleranceMmToStagePx } from '@/domain/editor/tolerance';
+import { useLiveVehicleOverlay } from '@/composables/useLiveVehicleOverlay';
+import { useEditorSettingsStore } from '@/stores/editorSettings';
 import { useProjectStore } from '@/stores/project';
 
 const props = defineProps<{
@@ -41,6 +44,8 @@ const emit = defineEmits<{
 }>();
 
 const store = useProjectStore();
+const settings = useEditorSettingsStore();
+const { overlay: vehicleOverlay } = useLiveVehicleOverlay();
 
 /* --------------------------- Visual constants -------------------------- */
 
@@ -200,8 +205,77 @@ function locationFill(l: DraftLocation): string {
 }
 
 function vehicleFill(v: DraftVehicle): string {
-  return v.layout.routeColorRgb;
+  // S9: when a kernel SSE tick has reported a state for this vehicle,
+  // use the state-derived colour from `useLiveVehicleOverlay`; otherwise
+  // fall back to the draft route colour so empty / disconnected sessions
+  // still render the icons.
+  const entry = vehicleOverlay.value.find((o) => o.name === v.name);
+  return entry?.fillRgb ?? v.layout.routeColorRgb;
 }
+
+function vehiclePixel(v: DraftVehicle): { x: number; y: number } {
+  // S9: kernel `currentPosition` (if any) wins over draft layout.
+  const entry = vehicleOverlay.value.find((o) => o.name === v.name);
+  if (entry && entry.isLive) {
+    return { x: entry.pixelX, y: entry.pixelY };
+  }
+  return { x: v.layout.pixelX, y: v.layout.pixelY };
+}
+
+function vehicleIsLive(v: DraftVehicle): boolean {
+  return vehicleOverlay.value.find((o) => o.name === v.name)?.isLive === true;
+}
+
+/* ----------------------- PR3: Point tolerance circle ------------------- */
+//
+// Each Point is rendered with a dashed circle whose radius is the Point's
+// positioning tolerance, in stage-pixel units (= mm / (1000 * resolution)).
+// Visible when:
+//   - the global `editorSettings.toleranceShow` toggle is on, OR
+//   - the Point is currently selected (single or multi).
+//
+// Stroke width is divided by the stage scale so the dash stays roughly
+// screen-constant under zoom (same trick used by `pointStroke`).
+
+interface ToleranceRing {
+  pointName: string;
+  x: number;
+  y: number;
+  radius: number;
+  selected: boolean;
+}
+
+const TOLERANCE_STROKE_CSS_PX = 1.2;
+const toleranceStrokeWidth = computed(() => TOLERANCE_STROKE_CSS_PX / safeScale(props.scale));
+
+const toleranceRings = computed<ToleranceRing[]>(() => {
+  const bg = store.background;
+  if (!bg) return [];
+  const radiusFor = (p: DraftPoint): number | null => {
+    const mm = resolveToleranceMm(p, settings.toleranceDefaultMm);
+    return toleranceMmToStagePx(mm, bg.yaml.resolution);
+  };
+  const rings: ToleranceRing[] = [];
+  const sel = store.selection;
+  for (const p of store.points) {
+    const isSelected =
+      (sel?.kind === 'point' && sel.name === p.name) || store.isMultiSelected('point', p.name);
+    if (!settings.toleranceShow && !isSelected) continue;
+    const r = radiusFor(p);
+    if (r === null || r <= 0) continue;
+    rings.push({
+      pointName: p.name,
+      x: p.layout.pixelX,
+      y: p.layout.pixelY,
+      radius: r,
+      selected: isSelected,
+    });
+  }
+  return rings;
+});
+
+const TOLERANCE_STROKE_DEFAULT = '#0969da';
+const TOLERANCE_STROKE_SELECTED = '#bf3989';
 
 function vehicleStrokeWidth(v: DraftVehicle): number {
   const selected = store.selection?.kind === 'vehicle' && store.selection.name === v.name;
@@ -325,6 +399,44 @@ function onVehicleDragMove(v: DraftVehicle, e: KonvaEventObject<DragEvent>): voi
 function isEntityDraggable(): boolean {
   return props.tool === 'select';
 }
+
+/* ---------------- AGV measured-position ("实测点") layer ---------------- */
+//
+// Rendered as a small red crosshair + filled centre dot at the vehicle's
+// `precisePosition` (mm) projected through the background's AffineMapping.
+// Visually distinct from:
+//   - the Point circle (green / blue, larger, on grid)
+//   - the Vehicle rectangle (state-coloured, oriented body)
+// so the operator can see "实测停靠点 vs 最近 Point 距离 vs 容差" at a glance.
+
+interface PreciseMarker {
+  name: string;
+  x: number;
+  y: number;
+  orientationDeg: number | null;
+}
+
+const PRECISE_MARKER_CSS_PX = 5; // half-length of crosshair arms / dot radius
+const PRECISE_STROKE_CSS_PX = 1.4;
+const PRECISE_FILL = '#cf222e'; // GitHub red.500
+const PRECISE_STROKE = '#ffffff'; // white outline so it's visible on dark bg
+
+const preciseMarkerHalf = computed(() => PRECISE_MARKER_CSS_PX / safeScale(props.scale));
+const preciseMarkerStroke = computed(() => PRECISE_STROKE_CSS_PX / safeScale(props.scale));
+
+const preciseMarkers = computed<PreciseMarker[]>(() => {
+  const out: PreciseMarker[] = [];
+  for (const o of vehicleOverlay.value) {
+    if (!o.precisePixel) continue;
+    out.push({
+      name: o.name,
+      x: o.precisePixel.x,
+      y: o.precisePixel.y,
+      orientationDeg: o.preciseOrientationDeg,
+    });
+  }
+  return out;
+});
 </script>
 
 <template>
@@ -414,6 +526,24 @@ function isEntityDraggable(): boolean {
       />
     </template>
 
+    <!-- PR3: Point tolerance circles — rendered before Points so the small
+         circle (the Point itself) draws on top of the dashed outline. -->
+    <template v-for="ring in toleranceRings" :key="`tol-${ring.pointName}`">
+      <v-circle
+        :config="{
+          x: ring.x,
+          y: ring.y,
+          radius: ring.radius,
+          stroke: ring.selected ? TOLERANCE_STROKE_SELECTED : TOLERANCE_STROKE_DEFAULT,
+          strokeWidth: toleranceStrokeWidth,
+          dash: [toleranceStrokeWidth * 4, toleranceStrokeWidth * 3],
+          listening: false,
+          opacity: ring.selected ? 0.8 : 0.45,
+          name: 'point-tolerance',
+        }"
+      />
+    </template>
+
     <!-- Points (circles) — kept after Locations so small points sit on top. -->
     <template v-for="p in store.points" :key="`pt-${p.name}`">
       <v-circle
@@ -449,8 +579,8 @@ function isEntityDraggable(): boolean {
     <template v-for="v in store.vehicles" :key="`veh-${v.name}`">
       <v-rect
         :config="{
-          x: v.layout.pixelX,
-          y: v.layout.pixelY,
+          x: vehiclePixel(v).x,
+          y: vehiclePixel(v).y,
           width: vehicleLength,
           height: vehicleWidth,
           offsetX: vehicleLength / 2,
@@ -460,7 +590,7 @@ function isEntityDraggable(): boolean {
           stroke: VEHICLE_STROKE,
           strokeWidth: vehicleStrokeWidth(v),
           opacity: 0.85,
-          draggable: isEntityDraggable(),
+          draggable: isEntityDraggable() && !vehicleIsLive(v),
           name: 'draft-vehicle',
         }"
         @click="(e: KonvaEventObject<MouseEvent>) => onVehicleClick(v, e)"
@@ -470,11 +600,58 @@ function isEntityDraggable(): boolean {
       />
       <v-text
         :config="{
-          x: v.layout.pixelX + vehicleLength * 0.6,
-          y: v.layout.pixelY - vehicleWidth * 0.6,
+          x: vehiclePixel(v).x + vehicleLength * 0.6,
+          y: vehiclePixel(v).y - vehicleWidth * 0.6,
           text: v.name,
           fontSize: labelFontSize,
           fill: '#1f2328',
+          listening: false,
+        }"
+      />
+    </template>
+
+    <!-- AGV measured-position markers ("实测点"): rendered last so they
+         sit above the Vehicle body and Points. A red crosshair + centre
+         dot makes them visually unambiguous against the green/blue
+         editor entities. -->
+    <template v-for="m in preciseMarkers" :key="`precise-${m.name}`">
+      <v-line
+        :config="{
+          points: [m.x - preciseMarkerHalf, m.y, m.x + preciseMarkerHalf, m.y],
+          stroke: PRECISE_FILL,
+          strokeWidth: preciseMarkerStroke,
+          listening: false,
+          name: 'agv-precise-crosshair',
+        }"
+      />
+      <v-line
+        :config="{
+          points: [m.x, m.y - preciseMarkerHalf, m.x, m.y + preciseMarkerHalf],
+          stroke: PRECISE_FILL,
+          strokeWidth: preciseMarkerStroke,
+          listening: false,
+          name: 'agv-precise-crosshair',
+        }"
+      />
+      <v-circle
+        :config="{
+          x: m.x,
+          y: m.y,
+          radius: preciseMarkerStroke * 1.2,
+          fill: PRECISE_FILL,
+          stroke: PRECISE_STROKE,
+          strokeWidth: preciseMarkerStroke * 0.6,
+          listening: false,
+          name: 'agv-precise-dot',
+        }"
+      />
+      <v-text
+        :config="{
+          x: m.x + preciseMarkerHalf * 1.4,
+          y: m.y + preciseMarkerHalf * 0.4,
+          text: `实测·${m.name}`,
+          fontSize: labelFontSize * 0.9,
+          fill: PRECISE_FILL,
           listening: false,
         }"
       />

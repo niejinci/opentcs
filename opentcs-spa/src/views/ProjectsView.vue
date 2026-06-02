@@ -64,6 +64,10 @@ async function publish(id: string): Promise<void> {
   await router.push({ name: 'project-publish', params: { projectId: id } });
 }
 
+async function openOrders(id: string): Promise<void> {
+  await router.push({ name: 'project-orders', params: { projectId: id } });
+}
+
 function startRename(id: string, currentName: string): void {
   renameTarget.value = id;
   renameValue.value = currentName;
@@ -167,6 +171,7 @@ function fmt(ts: string): string {
           <td class="actions">
             <button type="button" class="btn" @click="open(p.id)">打开</button>
             <button type="button" class="btn" @click="publish(p.id)">发布</button>
+            <button type="button" class="btn" @click="openOrders(p.id)">订单</button>
             <button type="button" class="btn" @click="startRename(p.id, p.name)">重命名</button>
             <button type="button" class="btn" @click="startCopy(p.id, p.name)">另存为</button>
             <button type="button" class="btn danger" @click="remove(p.id, p.name)">删除</button>

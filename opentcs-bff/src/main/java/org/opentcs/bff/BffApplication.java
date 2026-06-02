@@ -23,6 +23,8 @@ import org.opentcs.access.KernelRuntimeException;
 import org.opentcs.bff.error.ErrorResponses;
 import org.opentcs.bff.events.KernelEventPoller;
 import org.opentcs.bff.events.SseEventBridge;
+import org.opentcs.bff.events.SseHeartbeatScheduler;
+import org.opentcs.bff.events.SsePingHandler;
 import org.opentcs.bff.health.HealthHandler;
 import org.opentcs.bff.plantmodel.PlantModelSummaryHandler;
 import org.opentcs.bff.project.AssetNotFoundException;
@@ -40,6 +42,7 @@ import org.opentcs.bff.swagger.OpenApiSpecHandler;
 import org.opentcs.bff.transportorder.CreateTransportOrderHandler;
 import org.opentcs.bff.vehicle.GetVehicleHandler;
 import org.opentcs.bff.vehicle.ListVehiclesHandler;
+import org.opentcs.bff.vehicle.UpdateVehicleIntegrationLevelHandler;
 import org.opentcs.data.ObjectExistsException;
 import org.opentcs.data.ObjectUnknownException;
 import org.slf4j.Logger;
@@ -86,6 +89,7 @@ public class BffApplication {
   private final Javalin javalin;
   private final KernelEventPoller kernelEventPoller;
   private final SseEventBridge sseEventBridge;
+  private final SseHeartbeatScheduler sseHeartbeatScheduler;
   private volatile boolean started;
 
   /**
@@ -98,6 +102,8 @@ public class BffApplication {
    * {@code GET /api/v1/plant-model/summary}.
    * @param listVehiclesHandler The handler serving {@code GET /api/v1/vehicles}.
    * @param getVehicleHandler The handler serving {@code GET /api/v1/vehicles/{name}}.
+   * @param updateVehicleIntegrationLevelHandler The handler serving
+   * {@code PUT /api/v1/vehicles/{name}/integrationLevel}.
    * @param createTransportOrderHandler The handler serving
    * {@code POST /api/v1/transport-orders}.
    * @param projectsHandler The handler bundle serving {@code /api/v1/projects} CRUD endpoints.
@@ -105,7 +111,9 @@ public class BffApplication {
    * {@code /api/v1/projects/{id}/assets} endpoints.
    * @param openApiSpecHandler The handler serving the OpenAPI specification.
    * @param sseEventBridge The bridge that broadcasts kernel events to connected SSE clients.
+   * @param ssePingHandler The handler serving {@code GET /api/v1/sse/ping}.
    * @param kernelEventPoller The poller that fetches kernel events and feeds the bridge.
+   * @param sseHeartbeatScheduler Periodically broadcasts SSE keep-alive comments.
    */
   @Inject
   public BffApplication(
@@ -115,13 +123,16 @@ public class BffApplication {
       PlantModelSummaryHandler plantModelSummaryHandler,
       ListVehiclesHandler listVehiclesHandler,
       GetVehicleHandler getVehicleHandler,
+      UpdateVehicleIntegrationLevelHandler updateVehicleIntegrationLevelHandler,
       CreateTransportOrderHandler createTransportOrderHandler,
       ProjectsHandler projectsHandler,
       ProjectAssetsHandler projectAssetsHandler,
       PublishHandler publishHandler,
       OpenApiSpecHandler openApiSpecHandler,
       SseEventBridge sseEventBridge,
-      KernelEventPoller kernelEventPoller
+      SsePingHandler ssePingHandler,
+      KernelEventPoller kernelEventPoller,
+      SseHeartbeatScheduler sseHeartbeatScheduler
   ) {
     this.configuration = requireNonNull(configuration, "configuration");
     requireNonNull(authenticator, "authenticator");
@@ -129,13 +140,19 @@ public class BffApplication {
     requireNonNull(plantModelSummaryHandler, "plantModelSummaryHandler");
     requireNonNull(listVehiclesHandler, "listVehiclesHandler");
     requireNonNull(getVehicleHandler, "getVehicleHandler");
+    requireNonNull(
+        updateVehicleIntegrationLevelHandler, "updateVehicleIntegrationLevelHandler"
+    );
     requireNonNull(createTransportOrderHandler, "createTransportOrderHandler");
     requireNonNull(projectsHandler, "projectsHandler");
     requireNonNull(projectAssetsHandler, "projectAssetsHandler");
     requireNonNull(publishHandler, "publishHandler");
     requireNonNull(openApiSpecHandler, "openApiSpecHandler");
+    requireNonNull(ssePingHandler, "ssePingHandler");
     this.sseEventBridge = requireNonNull(sseEventBridge, "sseEventBridge");
     this.kernelEventPoller = requireNonNull(kernelEventPoller, "kernelEventPoller");
+    this.sseHeartbeatScheduler
+        = requireNonNull(sseHeartbeatScheduler, "sseHeartbeatScheduler");
     this.javalin = Javalin.create(cfg -> {
       cfg.startup.showJavalinBanner = false;
       cfg.jetty.host = configuration.bindAddress();
@@ -169,7 +186,10 @@ public class BffApplication {
           });
           path("/vehicles", () -> {
             get(listVehiclesHandler);
-            get("/{" + GetVehicleHandler.NAME_PARAM + "}", getVehicleHandler);
+            path("/{" + GetVehicleHandler.NAME_PARAM + "}", () -> {
+              get(getVehicleHandler);
+              put("/integrationLevel", updateVehicleIntegrationLevelHandler);
+            });
           });
           path("/transport-orders", () -> {
             post(createTransportOrderHandler);
@@ -200,6 +220,7 @@ public class BffApplication {
             });
           });
           sse("/sse", sseEventBridge::register);
+          get("/sse/ping", ssePingHandler);
         });
       });
 
@@ -283,6 +304,7 @@ public class BffApplication {
     }
     javalin.start();
     kernelEventPoller.start();
+    sseHeartbeatScheduler.start();
     started = true;
     LOG.info(
         "BFF started on {}:{} (configured port: {})",
@@ -300,6 +322,7 @@ public class BffApplication {
       return;
     }
     kernelEventPoller.stop();
+    sseHeartbeatScheduler.stop();
     sseEventBridge.closeAll();
     javalin.stop();
     started = false;

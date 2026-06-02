@@ -17,6 +17,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.opentcs.access.CredentialsException;
 import org.opentcs.access.KernelRuntimeException;
 import org.opentcs.access.KernelServicePortal;
 import org.opentcs.components.kernel.services.PlantModelService;
@@ -177,6 +178,56 @@ class KernelClientTest {
 
     // The next call must re-create + re-login a fresh portal because the previous one was dropped.
     kernelClient.getPlantModel();
+    verify(portalFactory, times(2)).create(anyString(), anyString());
+    verify(portal, times(2)).login(anyString(), anyInt());
+  }
+
+  @Test
+  void retriesOnceWhenKernelReportsCredentialsExceptionOnListVehicles() {
+    // First call: kernel has forgotten our session → CredentialsException.
+    // Second call (after re-login): success.
+    Set<Vehicle> vehicles = new LinkedHashSet<>();
+    vehicles.add(new Vehicle("v1"));
+    when(vehicleService.fetch(Vehicle.class))
+        .thenThrow(new CredentialsException("Client permissions insufficient."))
+        .thenReturn(vehicles);
+
+    Set<Vehicle> result = kernelClient.listVehicles();
+
+    assertThat(result).isSameAs(vehicles);
+    // Should have logged in twice (initial + after invalidate).
+    verify(portalFactory, times(2)).create(anyString(), anyString());
+    verify(portal, times(2)).login(anyString(), anyInt());
+    // And called fetch twice (the failed attempt + the retry).
+    verify(vehicleService, times(2)).fetch(Vehicle.class);
+  }
+
+  @Test
+  void propagatesCredentialsExceptionWhenRetryAlsoFails() {
+    when(vehicleService.fetch(Vehicle.class))
+        .thenThrow(new CredentialsException("Client permissions insufficient."))
+        .thenThrow(new CredentialsException("Client permissions insufficient."));
+
+    assertThatThrownBy(() -> kernelClient.listVehicles())
+        .isInstanceOf(CredentialsException.class);
+
+    verify(vehicleService, times(2)).fetch(Vehicle.class);
+  }
+
+  @Test
+  void retriesOnceWhenFetchEventsHitsCredentialsException() {
+    // Force an initial connection so we can verify a second login on the retry.
+    when(plantModelService.getPlantModel()).thenReturn(new PlantModel("test"));
+    kernelClient.getPlantModel();
+
+    java.util.List<Object> events = java.util.List.of(new Object());
+    when(portal.fetchEvents(org.mockito.ArgumentMatchers.anyLong()))
+        .thenThrow(new CredentialsException("Client permissions insufficient."))
+        .thenReturn(events);
+
+    java.util.List<Object> result = kernelClient.fetchEvents(100L);
+
+    assertThat(result).isSameAs(events);
     verify(portalFactory, times(2)).create(anyString(), anyString());
     verify(portal, times(2)).login(anyString(), anyInt());
   }
