@@ -249,7 +249,7 @@ public class KernelClient {
       return call.get();
     }
     catch (CredentialsException e) {
-      LOG.info("Kernel session no longer recognised; reconnecting and retrying once.", e);
+      LOG.info("Kernel session no longer recognized; reconnecting and retrying once.", e);
       invalidate();
       return call.get();
     }
