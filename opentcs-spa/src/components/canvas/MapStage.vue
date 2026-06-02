@@ -25,9 +25,13 @@ import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from
 
 import AnnotationLayer from '@/components/canvas/AnnotationLayer.vue';
 import BackgroundLayer from '@/components/canvas/BackgroundLayer.vue';
+import GridLayer from '@/components/canvas/GridLayer.vue';
 import HoverLayer from '@/components/canvas/HoverLayer.vue';
+import MiniMap from '@/components/canvas/MiniMap.vue';
 import { getEditorTool, type EditorToolId } from '@/domain/editor/tools';
+import { snapToGrid } from '@/domain/editor/grid';
 import { pixelToWorld, type AffineMapping } from '@/domain/geometry/affine';
+import { useEditorSettingsStore } from '@/stores/editorSettings';
 
 const props = defineProps<{
   image: HTMLImageElement;
@@ -36,6 +40,8 @@ const props = defineProps<{
   affine: AffineMapping;
   tool: EditorToolId;
 }>();
+
+const settings = useEditorSettingsStore();
 
 const emit = defineEmits<{
   /** Fires while the cursor moves over the stage; values in pixel + world space. */
@@ -167,10 +173,18 @@ function onStageClick(): void {
   }
   const cursor = cursorStage.value;
   if (!cursor) return;
+  // Snap creation tools to the nearest grid intersection when grid-snap
+  // is enabled. The `select` tool keeps the raw cursor so empty-canvas
+  // clicks remain pixel-accurate (selection logic does not care about
+  // sub-grid offsets).
+  const snap = settings.gridSnap && props.tool !== 'select';
+  const pixel = snap
+    ? snapToGrid(cursor, settings.gridSpacingPx)
+    : cursor;
   emit('tool-fire', {
     tool: props.tool,
-    pixel: cursor,
-    world: pixelToWorld(props.affine, cursor),
+    pixel,
+    world: pixelToWorld(props.affine, pixel),
   });
 }
 
@@ -179,6 +193,17 @@ function onStageClick(): void {
 let entityClickPending = false;
 function onEntityClick(): void {
   entityClickPending = true;
+}
+
+/**
+ * Recenter the main viewport on a stage-space point chosen via the
+ * mini-map. The minimap component already converted the click into a
+ * (stageX, stageY) translation that places the picked point in the centre
+ * of the visible canvas.
+ */
+function onMinimapRecenter(payload: { stageX: number; stageY: number }): void {
+  stageX.value = payload.stageX;
+  stageY.value = payload.stageY;
 }
 
 function onStageDragEnd(): void {
@@ -293,10 +318,33 @@ defineSlots<{
         @dragend="onStageDragEnd"
       >
         <BackgroundLayer :image="image" :width="imageWidth" :height="imageHeight" />
+        <GridLayer
+          v-if="settings.gridSnap"
+          :image-width="imageWidth"
+          :image-height="imageHeight"
+          :stage-width="stageWidth"
+          :stage-height="stageHeight"
+          :scale="scale"
+          :stage-x="stageX"
+          :stage-y="stageY"
+          :spacing-px="settings.gridSpacingPx"
+        />
         <AnnotationLayer :tool="tool" :scale="scale" @entity-click="onEntityClick" />
         <HoverLayer :cursor="cursorStage" :tool="tool" :scale="scale" />
       </v-stage>
     </div>
+    <MiniMap
+      v-if="settings.minimap"
+      :image="image"
+      :image-width="imageWidth"
+      :image-height="imageHeight"
+      :stage-width="stageWidth"
+      :stage-height="stageHeight"
+      :scale="scale"
+      :stage-x="stageX"
+      :stage-y="stageY"
+      @recenter="onMinimapRecenter"
+    />
     <slot
       name="status"
       :scale="scale"

@@ -190,7 +190,8 @@ function pointTypeBadge(): string {
         <kbd>V</kbd> 选择 · <kbd>P</kbd> Point · <kbd>L</kbd> Path · <kbd>O</kbd> Location ·
         <kbd>B</kbd> Block · <kbd>K</kbd> Vehicle；<kbd>Delete</kbd> 删除选中 ·
         <kbd>Esc</kbd> 取消半态。左侧资源树支持单击选中、<kbd>↑↓</kbd> 切换、<kbd>←→</kbd>
-        折叠、<kbd>Enter</kbd> 选中。草稿自动落本机 <code>localStorage</code>（刷新页面不丢）。
+        折叠、<kbd>Enter</kbd> 选中。工具栏底部可开关「网格吸附」与「缩略图」（右下角点击/拖动可重定位视口）。草稿自动落本机
+        <code>localStorage</code>（刷新页面不丢）。
       </p>
     </header>
 
