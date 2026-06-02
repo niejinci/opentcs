@@ -33,7 +33,11 @@ import {
   MIN_TOLERANCE_MM,
 } from '@/domain/editor/tolerance';
 import { EDITOR_TOOLS, type EditorToolId } from '@/domain/editor/tools';
-import { useEditorSettingsStore } from '@/stores/editorSettings';
+import {
+  MAX_TOOLBAR_WIDTH_PX,
+  MIN_TOOLBAR_WIDTH_PX,
+  useEditorSettingsStore,
+} from '@/stores/editorSettings';
 import { useProjectStore } from '@/stores/project';
 
 defineProps<{ activeTool: EditorToolId }>();
@@ -97,10 +101,68 @@ function onAlignClick(action: AlignAction): void {
 function onClearMultiSelection(): void {
   project.clearMultiSelection();
 }
+
+/* ----------------------------- Resize handle ---------------------------- */
+//
+// Pointer-driven drag on the right edge of the toolbar. We track the
+// pointer on `window` (not the handle itself) so a fast drag that briefly
+// outruns the handle's hit-region keeps resizing instead of getting stuck.
+// `pointerId` capture would also work but window-scoped listeners compose
+// better with the existing global keydown handler in EditorView.
+
+let dragStartX = 0;
+let dragStartWidth = 0;
+
+function onResizePointerDown(e: PointerEvent): void {
+  // Left-button only; ignore touch-zoom / right-click.
+  if (e.button !== 0) return;
+  e.preventDefault();
+  dragStartX = e.clientX;
+  dragStartWidth = settings.toolbarWidthPx;
+  window.addEventListener('pointermove', onResizePointerMove);
+  window.addEventListener('pointerup', onResizePointerUp, { once: true });
+  window.addEventListener('pointercancel', onResizePointerUp, { once: true });
+  // Prevent text selection / iframe stealing focus mid-drag.
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = 'col-resize';
+}
+
+function onResizePointerMove(e: PointerEvent): void {
+  const dx = e.clientX - dragStartX;
+  settings.setToolbarWidthPx(dragStartWidth + dx);
+}
+
+function onResizePointerUp(): void {
+  window.removeEventListener('pointermove', onResizePointerMove);
+  document.body.style.userSelect = '';
+  document.body.style.cursor = '';
+}
+
+function onResizeKeyDown(e: KeyboardEvent): void {
+  // Keyboard accessibility — ←/→ adjust by 8px, Shift accelerates to 32px.
+  const step = e.shiftKey ? 32 : 8;
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    settings.setToolbarWidthPx(settings.toolbarWidthPx - step);
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    settings.setToolbarWidthPx(settings.toolbarWidthPx + step);
+  } else if (e.key === 'Home') {
+    e.preventDefault();
+    settings.setToolbarWidthPx(MIN_TOOLBAR_WIDTH_PX);
+  } else if (e.key === 'End') {
+    e.preventDefault();
+    settings.setToolbarWidthPx(MAX_TOOLBAR_WIDTH_PX);
+  }
+}
 </script>
 
 <template>
-  <aside class="editor-toolbar" aria-label="编辑器工具栏">
+  <aside
+    class="editor-toolbar"
+    aria-label="编辑器工具栏"
+    :style="{ width: `${settings.toolbarWidthPx}px` }"
+  >
     <button
       v-for="t in EDITOR_TOOLS"
       :key="t.id"
@@ -219,19 +281,43 @@ function onClearMultiSelection(): void {
         清空多选
       </button>
     </div>
+
+    <div
+      class="toolbar-resize"
+      role="separator"
+      tabindex="0"
+      aria-orientation="vertical"
+      :aria-valuemin="MIN_TOOLBAR_WIDTH_PX"
+      :aria-valuemax="MAX_TOOLBAR_WIDTH_PX"
+      :aria-valuenow="settings.toolbarWidthPx"
+      :aria-label="`选择面板宽度（${settings.toolbarWidthPx} px，按住左右拖动或使用 ←/→ 键调整）`"
+      :title="`拖动调整宽度（${settings.toolbarWidthPx} px）`"
+      data-testid="toolbar-resize"
+      @pointerdown="onResizePointerDown"
+      @keydown="onResizeKeyDown"
+    >
+      <span class="toolbar-resize__grip" aria-hidden="true"></span>
+    </div>
   </aside>
 </template>
 
 <style scoped>
 .editor-toolbar {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
   padding: 0.5rem;
+  /* Reserve room on the right for the drag handle so its hit-area
+     doesn't overlap toolbar content. */
+  padding-right: 0.85rem;
   background: #ffffff;
   border: 1px solid #d0d7de;
   border-radius: 6px;
-  min-width: 90px;
+  /* Width is set inline (`style="width: …px"`) and persisted via
+     `useEditorSettingsStore`. The clamped range lives in the store. */
+  box-sizing: border-box;
+  flex: 0 0 auto;
 }
 
 .tool-button {
@@ -417,5 +503,44 @@ function onClearMultiSelection(): void {
 .align-clear:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Drag handle on the right edge — wider hit-area than the visible
+   grip so the cursor change feels generous. */
+.toolbar-resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  user-select: none;
+  /* Handle visually overlaps the right border so the grip sits on
+     top of it without doubling the line. */
+  background: transparent;
+  touch-action: none;
+}
+.toolbar-resize__grip {
+  display: block;
+  width: 2px;
+  height: 36px;
+  border-radius: 1px;
+  background: #d0d7de;
+  transition:
+    background 0.12s ease,
+    height 0.12s ease;
+}
+.toolbar-resize:hover .toolbar-resize__grip,
+.toolbar-resize:focus-visible .toolbar-resize__grip,
+.toolbar-resize:active .toolbar-resize__grip {
+  background: #0969da;
+  height: 56px;
+}
+.toolbar-resize:focus-visible {
+  box-shadow: inset -2px 0 0 #0969da;
 }
 </style>

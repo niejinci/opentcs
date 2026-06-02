@@ -18,6 +18,16 @@ import { ref, watch } from 'vue';
 import { clampGridSpacing, DEFAULT_GRID_SPACING_PX } from '@/domain/editor/grid';
 import { clampToleranceMm, DEFAULT_TOLERANCE_MM } from '@/domain/editor/tolerance';
 
+/** Editor toolbar ("选择" panel) width, in CSS pixels. */
+export const MIN_TOOLBAR_WIDTH_PX = 140;
+export const MAX_TOOLBAR_WIDTH_PX = 360;
+export const DEFAULT_TOOLBAR_WIDTH_PX = 200;
+
+export function clampToolbarWidthPx(px: number): number {
+  if (!Number.isFinite(px)) return DEFAULT_TOOLBAR_WIDTH_PX;
+  return Math.min(MAX_TOOLBAR_WIDTH_PX, Math.max(MIN_TOOLBAR_WIDTH_PX, Math.round(px)));
+}
+
 const STORAGE_KEY = 'opentcs-spa.editorSettings';
 const STORAGE_VERSION = 1;
 
@@ -33,6 +43,9 @@ interface PersistedShape {
   // Editor layout — collapsing the resource tree frees horizontal
   // real estate for the canvas. Additive on the same v=1 envelope.
   treeCollapsed: boolean;
+  // Width of the editor toolbar ("选择" panel) in pixels — user-resizable
+  // via a drag handle on its right edge so the canvas can reclaim space.
+  toolbarWidthPx: number;
 }
 
 function loadFromStorage(): Partial<PersistedShape> | null {
@@ -91,12 +104,31 @@ export const useEditorSettingsStore = defineStore('editorSettings', () => {
   // users still see the tree; once collapsed the choice is remembered.
   const treeCollapsed = ref<boolean>(stored?.treeCollapsed === true);
 
+  // Editor toolbar ("选择" panel) width — resizable via the drag handle
+  // on its right edge. Clamped on read/write so corrupt or out-of-range
+  // payloads (older builds, hand-edited storage) cannot break the layout.
+  const toolbarWidthPx = ref<number>(
+    clampToolbarWidthPx(
+      typeof stored?.toolbarWidthPx === 'number'
+        ? stored.toolbarWidthPx
+        : DEFAULT_TOOLBAR_WIDTH_PX,
+    ),
+  );
+
   // Persist after every change. Pinia composables run inside an effect
   // scope tied to the active app instance, so this watcher is cleaned up
   // automatically when the app is unmounted (e.g. in vitest tear-down).
   watch(
-    [gridSnap, gridSpacingPx, minimap, toleranceShow, toleranceDefaultMm, treeCollapsed],
-    ([snap, spacing, mini, tolShow, tolMm, treeC]) => {
+    [
+      gridSnap,
+      gridSpacingPx,
+      minimap,
+      toleranceShow,
+      toleranceDefaultMm,
+      treeCollapsed,
+      toolbarWidthPx,
+    ],
+    ([snap, spacing, mini, tolShow, tolMm, treeC, toolbarW]) => {
       saveToStorage({
         v: STORAGE_VERSION,
         gridSnap: snap,
@@ -105,6 +137,7 @@ export const useEditorSettingsStore = defineStore('editorSettings', () => {
         toleranceShow: tolShow,
         toleranceDefaultMm: clampToleranceMm(tolMm),
         treeCollapsed: treeC,
+        toolbarWidthPx: clampToolbarWidthPx(toolbarW),
       });
     },
     { flush: 'post' },
@@ -134,6 +167,10 @@ export const useEditorSettingsStore = defineStore('editorSettings', () => {
     treeCollapsed.value = !treeCollapsed.value;
   }
 
+  function setToolbarWidthPx(px: number): void {
+    toolbarWidthPx.value = clampToolbarWidthPx(px);
+  }
+
   return {
     gridSnap,
     gridSpacingPx,
@@ -141,11 +178,13 @@ export const useEditorSettingsStore = defineStore('editorSettings', () => {
     toleranceShow,
     toleranceDefaultMm,
     treeCollapsed,
+    toolbarWidthPx,
     toggleGridSnap,
     setGridSpacingPx,
     toggleMinimap,
     toggleToleranceShow,
     setToleranceDefaultMm,
     toggleTreeCollapsed,
+    setToolbarWidthPx,
   };
 });
