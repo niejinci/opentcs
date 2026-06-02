@@ -26,10 +26,19 @@ import LocationForm from '@/components/property/LocationForm.vue';
 import LocationTypeForm from '@/components/property/LocationTypeForm.vue';
 import MiscPropertiesEditor from '@/components/property/MiscPropertiesEditor.vue';
 import VehicleForm from '@/components/property/VehicleForm.vue';
+import {
+  clampToleranceMm,
+  MAX_TOLERANCE_MM,
+  MIN_TOLERANCE_MM,
+  readToleranceOverrideMm,
+  TOLERANCE_PROPERTY_KEY,
+} from '@/domain/editor/tolerance';
+import { useEditorSettingsStore } from '@/stores/editorSettings';
 import { useProjectStore } from '@/stores/project';
 import { toastError } from '@/ui/toast/toastBus';
 
 const store = useProjectStore();
+const editorSettings = useEditorSettingsStore();
 
 /* --------------------------- Selected resolvers ------------------------ */
 
@@ -57,12 +66,14 @@ const pointForm = ref({
   worldY: 0, // meters
   z: 0, // mm
   orientationAngle: '' as string, // degrees, '' = NaN = unset
+  toleranceOverrideMm: '' as string, // mm, '' = use global default
 });
 
 watch(
   selectedPoint,
   (pt) => {
     if (!pt) return;
+    const override = readToleranceOverrideMm(pt);
     pointForm.value = {
       name: pt.name,
       type: pt.type,
@@ -72,6 +83,7 @@ watch(
       orientationAngle: Number.isFinite(pt.pose.orientationAngle)
         ? String(pt.pose.orientationAngle)
         : '',
+      toleranceOverrideMm: override === null ? '' : String(override),
     };
   },
   { immediate: true },
@@ -143,6 +155,28 @@ function commitPointOrientation(): void {
     return;
   }
   store.updatePointFields(pt.name, { orientationAngle: v });
+}
+
+function commitPointToleranceOverride(): void {
+  const pt = selectedPoint.value;
+  if (!pt) return;
+  const raw = pointForm.value.toleranceOverrideMm.trim();
+  if (raw === '') {
+    // Clear the per-point override so the global default takes over.
+    store.deleteEntityProperty('point', pt.name, TOLERANCE_PROPERTY_KEY);
+    pointForm.value.toleranceOverrideMm = '';
+    return;
+  }
+  const v = Number(raw);
+  if (!Number.isFinite(v) || v < MIN_TOLERANCE_MM) {
+    toastError(`容差半径必须是 ≥ ${MIN_TOLERANCE_MM} 的数字（mm），留空 = 用默认值`, 'Point');
+    const cur = readToleranceOverrideMm(pt);
+    pointForm.value.toleranceOverrideMm = cur === null ? '' : String(cur);
+    return;
+  }
+  const clamped = clampToleranceMm(v);
+  store.setEntityProperty('point', pt.name, TOLERANCE_PROPERTY_KEY, String(clamped));
+  pointForm.value.toleranceOverrideMm = String(clamped);
 }
 
 /* -------------------------- Path form bindings ------------------------- */
@@ -362,6 +396,20 @@ function onDeleteBlock(name: string): void {
           inputmode="decimal"
           placeholder="NaN"
           @change="commitPointOrientation"
+        />
+      </label>
+      <label>
+        <span>到位容差半径 (mm, 留空 = 用默认 {{ editorSettings.toleranceDefaultMm }})</span>
+        <input
+          v-model="pointForm.toleranceOverrideMm"
+          type="number"
+          :min="MIN_TOLERANCE_MM"
+          :max="MAX_TOLERANCE_MM"
+          :step="10"
+          inputmode="numeric"
+          :placeholder="String(editorSettings.toleranceDefaultMm)"
+          data-testid="point-tolerance-override"
+          @change="commitPointToleranceOverride"
         />
       </label>
       <p class="hint">

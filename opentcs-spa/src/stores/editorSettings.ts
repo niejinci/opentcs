@@ -15,10 +15,8 @@
 import { defineStore } from 'pinia';
 import { ref, watch } from 'vue';
 
-import {
-  clampGridSpacing,
-  DEFAULT_GRID_SPACING_PX,
-} from '@/domain/editor/grid';
+import { clampGridSpacing, DEFAULT_GRID_SPACING_PX } from '@/domain/editor/grid';
+import { clampToleranceMm, DEFAULT_TOLERANCE_MM } from '@/domain/editor/tolerance';
 
 const STORAGE_KEY = 'opentcs-spa.editorSettings';
 const STORAGE_VERSION = 1;
@@ -28,6 +26,10 @@ interface PersistedShape {
   gridSnap: boolean;
   gridSpacingPx: number;
   minimap: boolean;
+  // PR3 additions — additive on the same v=1 envelope; older payloads
+  // simply fall back to the defaults computed below.
+  toleranceShow: boolean;
+  toleranceDefaultMm: number;
 }
 
 function loadFromStorage(): Partial<PersistedShape> | null {
@@ -66,24 +68,35 @@ export const useEditorSettingsStore = defineStore('editorSettings', () => {
   const gridSnap = ref<boolean>(stored?.gridSnap === true);
   const gridSpacingPx = ref<number>(
     clampGridSpacing(
-      typeof stored?.gridSpacingPx === 'number'
-        ? stored.gridSpacingPx
-        : DEFAULT_GRID_SPACING_PX,
+      typeof stored?.gridSpacingPx === 'number' ? stored.gridSpacingPx : DEFAULT_GRID_SPACING_PX,
     ),
   );
   const minimap = ref<boolean>(stored?.minimap !== false);
+
+  // PR3 — Point tolerance circles. Disabled globally by default (still
+  // shown around the currently-selected Point in AnnotationLayer).
+  const toleranceShow = ref<boolean>(stored?.toleranceShow === true);
+  const toleranceDefaultMm = ref<number>(
+    clampToleranceMm(
+      typeof stored?.toleranceDefaultMm === 'number'
+        ? stored.toleranceDefaultMm
+        : DEFAULT_TOLERANCE_MM,
+    ),
+  );
 
   // Persist after every change. Pinia composables run inside an effect
   // scope tied to the active app instance, so this watcher is cleaned up
   // automatically when the app is unmounted (e.g. in vitest tear-down).
   watch(
-    [gridSnap, gridSpacingPx, minimap],
-    ([snap, spacing, mini]) => {
+    [gridSnap, gridSpacingPx, minimap, toleranceShow, toleranceDefaultMm],
+    ([snap, spacing, mini, tolShow, tolMm]) => {
       saveToStorage({
         v: STORAGE_VERSION,
         gridSnap: snap,
         gridSpacingPx: clampGridSpacing(spacing),
         minimap: mini,
+        toleranceShow: tolShow,
+        toleranceDefaultMm: clampToleranceMm(tolMm),
       });
     },
     { flush: 'post' },
@@ -101,12 +114,24 @@ export const useEditorSettingsStore = defineStore('editorSettings', () => {
     minimap.value = !minimap.value;
   }
 
+  function toggleToleranceShow(): void {
+    toleranceShow.value = !toleranceShow.value;
+  }
+
+  function setToleranceDefaultMm(mm: number): void {
+    toleranceDefaultMm.value = clampToleranceMm(mm);
+  }
+
   return {
     gridSnap,
     gridSpacingPx,
     minimap,
+    toleranceShow,
+    toleranceDefaultMm,
     toggleGridSnap,
     setGridSpacingPx,
     toggleMinimap,
+    toggleToleranceShow,
+    setToleranceDefaultMm,
   };
 });

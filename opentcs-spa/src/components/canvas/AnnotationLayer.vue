@@ -26,7 +26,9 @@ import { computed } from 'vue';
 
 import type { EditorToolId } from '@/domain/editor/tools';
 import type { DraftLocation, DraftPath, DraftPoint, DraftVehicle } from '@/domain/model/types';
+import { resolveToleranceMm, toleranceMmToStagePx } from '@/domain/editor/tolerance';
 import { useLiveVehicleOverlay } from '@/composables/useLiveVehicleOverlay';
+import { useEditorSettingsStore } from '@/stores/editorSettings';
 import { useProjectStore } from '@/stores/project';
 
 const props = defineProps<{
@@ -42,6 +44,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useProjectStore();
+const settings = useEditorSettingsStore();
 const { overlay: vehicleOverlay } = useLiveVehicleOverlay();
 
 /* --------------------------- Visual constants -------------------------- */
@@ -222,6 +225,57 @@ function vehiclePixel(v: DraftVehicle): { x: number; y: number } {
 function vehicleIsLive(v: DraftVehicle): boolean {
   return vehicleOverlay.value.find((o) => o.name === v.name)?.isLive === true;
 }
+
+/* ----------------------- PR3: Point tolerance circle ------------------- */
+//
+// Each Point is rendered with a dashed circle whose radius is the Point's
+// positioning tolerance, in stage-pixel units (= mm / (1000 * resolution)).
+// Visible when:
+//   - the global `editorSettings.toleranceShow` toggle is on, OR
+//   - the Point is currently selected (single or multi).
+//
+// Stroke width is divided by the stage scale so the dash stays roughly
+// screen-constant under zoom (same trick used by `pointStroke`).
+
+interface ToleranceRing {
+  pointName: string;
+  x: number;
+  y: number;
+  radius: number;
+  selected: boolean;
+}
+
+const TOLERANCE_STROKE_CSS_PX = 1.2;
+const toleranceStrokeWidth = computed(() => TOLERANCE_STROKE_CSS_PX / safeScale(props.scale));
+
+const toleranceRings = computed<ToleranceRing[]>(() => {
+  const bg = store.background;
+  if (!bg) return [];
+  const radiusFor = (p: DraftPoint): number | null => {
+    const mm = resolveToleranceMm(p, settings.toleranceDefaultMm);
+    return toleranceMmToStagePx(mm, bg.yaml.resolution);
+  };
+  const rings: ToleranceRing[] = [];
+  const sel = store.selection;
+  for (const p of store.points) {
+    const isSelected =
+      (sel?.kind === 'point' && sel.name === p.name) || store.isMultiSelected('point', p.name);
+    if (!settings.toleranceShow && !isSelected) continue;
+    const r = radiusFor(p);
+    if (r === null || r <= 0) continue;
+    rings.push({
+      pointName: p.name,
+      x: p.layout.pixelX,
+      y: p.layout.pixelY,
+      radius: r,
+      selected: isSelected,
+    });
+  }
+  return rings;
+});
+
+const TOLERANCE_STROKE_DEFAULT = '#0969da';
+const TOLERANCE_STROKE_SELECTED = '#bf3989';
 
 function vehicleStrokeWidth(v: DraftVehicle): number {
   const selected = store.selection?.kind === 'vehicle' && store.selection.name === v.name;
@@ -430,6 +484,24 @@ function isEntityDraggable(): boolean {
           fontSize: labelFontSize,
           fill: '#1f2328',
           listening: false,
+        }"
+      />
+    </template>
+
+    <!-- PR3: Point tolerance circles — rendered before Points so the small
+         circle (the Point itself) draws on top of the dashed outline. -->
+    <template v-for="ring in toleranceRings" :key="`tol-${ring.pointName}`">
+      <v-circle
+        :config="{
+          x: ring.x,
+          y: ring.y,
+          radius: ring.radius,
+          stroke: ring.selected ? TOLERANCE_STROKE_SELECTED : TOLERANCE_STROKE_DEFAULT,
+          strokeWidth: toleranceStrokeWidth,
+          dash: [toleranceStrokeWidth * 4, toleranceStrokeWidth * 3],
+          listening: false,
+          opacity: ring.selected ? 0.8 : 0.45,
+          name: 'point-tolerance',
         }"
       />
     </template>

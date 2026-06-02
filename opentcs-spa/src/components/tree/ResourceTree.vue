@@ -194,7 +194,15 @@ function focusNode(domId: string): void {
 
 /* --------------------------- Click handlers ---------------------------- */
 
-function onLeafClick(kind: EntityKind, name: string): void {
+function onLeafClick(kind: EntityKind, name: string, evt?: MouseEvent | KeyboardEvent): void {
+  // PR3: Ctrl/Cmd-click toggles the multi-selection set used by the
+  // align/distribute toolbar; the single `selection` is left in place
+  // so the property panel doesn't lose its target.
+  if (evt && (evt.ctrlKey || evt.metaKey)) {
+    store.toggleMultiSelection(kind, name);
+    focusNode(leafId(kind, name));
+    return;
+  }
   store.select({ kind, name });
   focusNode(leafId(kind, name));
 }
@@ -299,7 +307,7 @@ const activeDescendantId = computed<string | null>(() => selectionDomId());
   <aside class="resource-tree" aria-label="资源树">
     <header class="resource-tree__header">
       <h3>资源树</h3>
-      <span class="hint">单击选中 · ↑↓ 切换 · ←→ 折叠 · Enter 选中</span>
+      <span class="hint">单击选中 · Ctrl/⌘+单击 多选 · ↑↓ 切换 · ←→ 折叠 · Enter 选中</span>
     </header>
     <ul
       ref="treeEl"
@@ -341,11 +349,12 @@ const activeDescendantId = computed<string | null>(() => selectionDomId());
             class="leaf"
             :class="{
               'is-selected': isLeafSelected(g.kind, name),
+              'is-multi': store.isMultiSelected(g.kind, name),
               'is-focus': focusId === leafId(g.kind, name),
             }"
             :data-kind="g.kind"
             :data-name="name"
-            @click="onLeafClick(g.kind, name)"
+            @click="(e: MouseEvent) => onLeafClick(g.kind, name, e)"
           >
             <span class="leaf__glyph" aria-hidden="true">{{ g.glyph }}</span>
             <span class="leaf__name">{{ name }}</span>
@@ -470,6 +479,13 @@ const activeDescendantId = computed<string | null>(() => selectionDomId());
   background: #ddf4ff;
   color: #0a3069;
   font-weight: 600;
+}
+.leaf.is-multi {
+  outline: 2px dashed #1a7f37;
+  outline-offset: -2px;
+}
+.leaf.is-multi.is-selected {
+  outline-color: #0a3069;
 }
 .leaf__glyph {
   display: inline-block;
