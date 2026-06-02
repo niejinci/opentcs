@@ -51,6 +51,13 @@ export type VehicleIntegrationLevel =
   | 'TO_BE_RESPECTED'
   | 'TO_BE_UTILIZED';
 
+/** Mirrors `components.schemas.Triple`. Units = millimetres, integer. */
+export interface BffTriple {
+  x: number;
+  y: number;
+  z: number;
+}
+
 /** Mirrors `components.schemas.Vehicle`. */
 export interface Vehicle {
   name: string;
@@ -60,6 +67,18 @@ export interface Vehicle {
   paused: boolean;
   energyLevel: number;
   currentPosition?: string | null;
+  /**
+   * Measured AGV pose position in millimetres, as reported by the comm-adapter.
+   * Distinct from `currentPosition` (which is the kernel-resolved nearest Point name).
+   * `null` when the adapter has not reported a precise pose yet.
+   */
+  precisePosition?: BffTriple | null;
+  /**
+   * Measured orientation in degrees in the range [-360, 360], as reported by the
+   * comm-adapter. `null` when the adapter has not reported an orientation yet
+   * (kernel `Double.NaN` is normalised to `null` by the BFF).
+   */
+  orientationAngle?: number | null;
 }
 
 /* ------------------------------------------------------------------ */

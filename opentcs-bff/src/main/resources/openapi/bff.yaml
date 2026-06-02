@@ -504,6 +504,46 @@ components:
           type: string
           nullable: true
           description: The name of the point the vehicle currently occupies, or null if unknown.
+        precisePosition:
+          $ref: '#/components/schemas/Triple'
+          nullable: true
+          description: |
+            The vehicle's measured pose position in millimetres, as reported by the
+            comm-adapter. Distinct from `currentPosition` (which is the kernel-resolved
+            nearest Point name): this field is the raw measured AGV pose used to
+            visualise "实测停靠点 vs 最近 Point 距离 vs 容差". `null` if the adapter has
+            not reported a precise pose yet.
+        orientationAngle:
+          type: number
+          format: double
+          nullable: true
+          description: |
+            The vehicle's measured orientation in degrees in the range [-360, 360], as
+            reported by the comm-adapter. `null` if the adapter has not reported an
+            orientation yet (kernel uses `Double.NaN` internally; the BFF normalises
+            that to `null`).
+    Triple:
+      type: object
+      description: |
+        A 3D position in millimetres (integer). Mirrors the kernel's
+        `org.opentcs.data.model.Triple`.
+      required:
+        - x
+        - y
+        - z
+      properties:
+        x:
+          type: integer
+          format: int64
+          description: x in millimetres.
+        y:
+          type: integer
+          format: int64
+          description: y in millimetres.
+        z:
+          type: integer
+          format: int64
+          description: z in millimetres.
     VehicleState:
       type: string
       description: The vehicle's current state.

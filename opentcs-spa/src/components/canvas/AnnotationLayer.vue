@@ -399,6 +399,44 @@ function onVehicleDragMove(v: DraftVehicle, e: KonvaEventObject<DragEvent>): voi
 function isEntityDraggable(): boolean {
   return props.tool === 'select';
 }
+
+/* ---------------- AGV measured-position ("实测点") layer ---------------- */
+//
+// Rendered as a small red crosshair + filled centre dot at the vehicle's
+// `precisePosition` (mm) projected through the background's AffineMapping.
+// Visually distinct from:
+//   - the Point circle (green / blue, larger, on grid)
+//   - the Vehicle rectangle (state-coloured, oriented body)
+// so the operator can see "实测停靠点 vs 最近 Point 距离 vs 容差" at a glance.
+
+interface PreciseMarker {
+  name: string;
+  x: number;
+  y: number;
+  orientationDeg: number | null;
+}
+
+const PRECISE_MARKER_CSS_PX = 5; // half-length of crosshair arms / dot radius
+const PRECISE_STROKE_CSS_PX = 1.4;
+const PRECISE_FILL = '#cf222e'; // GitHub red.500
+const PRECISE_STROKE = '#ffffff'; // white outline so it's visible on dark bg
+
+const preciseMarkerHalf = computed(() => PRECISE_MARKER_CSS_PX / safeScale(props.scale));
+const preciseMarkerStroke = computed(() => PRECISE_STROKE_CSS_PX / safeScale(props.scale));
+
+const preciseMarkers = computed<PreciseMarker[]>(() => {
+  const out: PreciseMarker[] = [];
+  for (const o of vehicleOverlay.value) {
+    if (!o.precisePixel) continue;
+    out.push({
+      name: o.name,
+      x: o.precisePixel.x,
+      y: o.precisePixel.y,
+      orientationDeg: o.preciseOrientationDeg,
+    });
+  }
+  return out;
+});
 </script>
 
 <template>
@@ -567,6 +605,53 @@ function isEntityDraggable(): boolean {
           text: v.name,
           fontSize: labelFontSize,
           fill: '#1f2328',
+          listening: false,
+        }"
+      />
+    </template>
+
+    <!-- AGV measured-position markers ("实测点"): rendered last so they
+         sit above the Vehicle body and Points. A red crosshair + centre
+         dot makes them visually unambiguous against the green/blue
+         editor entities. -->
+    <template v-for="m in preciseMarkers" :key="`precise-${m.name}`">
+      <v-line
+        :config="{
+          points: [m.x - preciseMarkerHalf, m.y, m.x + preciseMarkerHalf, m.y],
+          stroke: PRECISE_FILL,
+          strokeWidth: preciseMarkerStroke,
+          listening: false,
+          name: 'agv-precise-crosshair',
+        }"
+      />
+      <v-line
+        :config="{
+          points: [m.x, m.y - preciseMarkerHalf, m.x, m.y + preciseMarkerHalf],
+          stroke: PRECISE_FILL,
+          strokeWidth: preciseMarkerStroke,
+          listening: false,
+          name: 'agv-precise-crosshair',
+        }"
+      />
+      <v-circle
+        :config="{
+          x: m.x,
+          y: m.y,
+          radius: preciseMarkerStroke * 1.2,
+          fill: PRECISE_FILL,
+          stroke: PRECISE_STROKE,
+          strokeWidth: preciseMarkerStroke * 0.6,
+          listening: false,
+          name: 'agv-precise-dot',
+        }"
+      />
+      <v-text
+        :config="{
+          x: m.x + preciseMarkerHalf * 1.4,
+          y: m.y + preciseMarkerHalf * 0.4,
+          text: `实测·${m.name}`,
+          fontSize: labelFontSize * 0.9,
+          fill: PRECISE_FILL,
           listening: false,
         }"
       />

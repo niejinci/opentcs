@@ -32,6 +32,7 @@ import { computed, type ComputedRef } from 'vue';
 
 import type { Vehicle, VehicleState } from '@/api/types/bff';
 import type { DraftVehicle } from '@/domain/model/types';
+import { worldToPixel } from '@/domain/geometry/affine';
 import { useLiveStatusStore } from '@/stores/liveStatus';
 import { useProjectStore } from '@/stores/project';
 
@@ -56,6 +57,22 @@ export interface OverlayVehicle {
   kernelState: VehicleState | null;
   /** Backing draft vehicle, for the existing click / drag handlers. */
   draft: DraftVehicle;
+  /**
+   * The vehicle's measured AGV pose in stage-pixel coordinates, computed
+   * from the kernel `precisePosition` (mm) via the background AffineMapping.
+   * `null` when the adapter has not reported a precise pose yet (or the
+   * editor has no background image so we cannot project mm → pixels).
+   * Visualised by AnnotationLayer as a separate "实测点" crosshair so the
+   * operator can see "实测停靠点 vs 最近 Point 距离 vs 容差" at a glance.
+   */
+  precisePixel: { x: number; y: number } | null;
+  /**
+   * The measured orientation angle in degrees, or `null` when the adapter
+   * has not reported one yet.
+   */
+  preciseOrientationDeg: number | null;
+  /** The raw measured position in millimetres (mirror of the BFF DTO). */
+  precisePositionMm: { x: number; y: number; z: number } | null;
 }
 
 const STATE_COLOR: Record<VehicleState, string | null> = {
@@ -78,6 +95,7 @@ export function useLiveVehicleOverlay(): LiveVehicleOverlay {
 
   const overlay = computed<OverlayVehicle[]>(() => {
     const out: OverlayVehicle[] = [];
+    const bg = project.background;
     for (const draft of project.vehicles) {
       const kernel: Vehicle | undefined = live.vehicles[draft.name];
       let pixelX = draft.layout.pixelX;
@@ -92,6 +110,29 @@ export function useLiveVehicleOverlay(): LiveVehicleOverlay {
         }
       }
       const stateColor = kernel ? STATE_COLOR[kernel.state] : null;
+      // Project the measured AGV position (mm) into stage pixels via the
+      // background's AffineMapping. Without a background image we cannot
+      // project, so leave precisePixel null (the renderer skips the layer).
+      let precisePixel: { x: number; y: number } | null = null;
+      let precisePositionMm: { x: number; y: number; z: number } | null = null;
+      if (kernel?.precisePosition) {
+        precisePositionMm = {
+          x: kernel.precisePosition.x,
+          y: kernel.precisePosition.y,
+          z: kernel.precisePosition.z,
+        };
+        if (bg) {
+          const px = worldToPixel(bg.affine, {
+            x: precisePositionMm.x / 1000,
+            y: precisePositionMm.y / 1000,
+          });
+          precisePixel = { x: px.x, y: px.y };
+        }
+      }
+      const preciseOrientationDeg
+        = typeof kernel?.orientationAngle === 'number' && Number.isFinite(kernel.orientationAngle)
+          ? kernel.orientationAngle
+          : null;
       out.push({
         name: draft.name,
         pixelX,
@@ -101,6 +142,9 @@ export function useLiveVehicleOverlay(): LiveVehicleOverlay {
         isLive,
         kernelState: kernel?.state ?? null,
         draft,
+        precisePixel,
+        preciseOrientationDeg,
+        precisePositionMm,
       });
     }
     return out;
