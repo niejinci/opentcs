@@ -22,6 +22,7 @@ import EditorToolbar from '@/components/canvas/EditorToolbar.vue';
 import MapStage from '@/components/canvas/MapStage.vue';
 import OrderStatusSidebar from '@/components/OrderStatusSidebar.vue';
 import PropertyPanel from '@/components/property/PropertyPanel.vue';
+import ResourceTree from '@/components/tree/ResourceTree.vue';
 import VehicleStatusPanel from '@/components/VehicleStatusPanel.vue';
 import { useBackgroundMap } from '@/composables/useBackgroundMap';
 import { useCloudDraftSync } from '@/composables/useCloudDraftSync';
@@ -65,7 +66,11 @@ async function activateProjectFromRoute(): Promise<void> {
   }
 }
 
-watch(() => route.params.projectId, () => void activateProjectFromRoute(), { immediate: true });
+watch(
+  () => route.params.projectId,
+  () => void activateProjectFromRoute(),
+  { immediate: true },
+);
 
 const activeTool = ref<EditorToolId>('select');
 const mapStageRef = useTemplateRef<{ resetView: () => void } | null>('mapStageRef');
@@ -184,7 +189,8 @@ function pointTypeBadge(): string {
       <p class="hint">
         <kbd>V</kbd> 选择 · <kbd>P</kbd> Point · <kbd>L</kbd> Path · <kbd>O</kbd> Location ·
         <kbd>B</kbd> Block · <kbd>K</kbd> Vehicle；<kbd>Delete</kbd> 删除选中 ·
-        <kbd>Esc</kbd> 取消半态。草稿自动落本机 <code>localStorage</code>（刷新页面不丢）。
+        <kbd>Esc</kbd> 取消半态。左侧资源树支持单击选中、<kbd>↑↓</kbd> 切换、<kbd>←→</kbd>
+        折叠、<kbd>Enter</kbd> 选中。草稿自动落本机 <code>localStorage</code>（刷新页面不丢）。
       </p>
     </header>
 
@@ -194,6 +200,7 @@ function pointTypeBadge(): string {
     </div>
 
     <div v-else class="editor__workspace">
+      <ResourceTree />
       <EditorToolbar :active-tool="activeTool" @switch-tool="setTool" />
 
       <div class="editor__stage">
@@ -322,15 +329,15 @@ function pointTypeBadge(): string {
   background: #0a5cb6;
 }
 
- .editor__workspace {
-   display: grid;
-   grid-template-columns: auto 1fr 280px;
+.editor__workspace {
+  display: grid;
+  grid-template-columns: 240px auto 1fr 280px;
   /* Bound the row height to the viewport so the canvas area cannot
      grow with its own content (which would re-trigger ResizeObserver). */
   grid-template-rows: minmax(560px, calc(100vh - 220px));
   gap: 0.75rem;
   align-items: stretch;
- }
+}
 
 .editor__stage {
   position: relative;
