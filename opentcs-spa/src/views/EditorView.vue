@@ -32,6 +32,7 @@ import {
   getEditorTool,
   type EditorToolId,
 } from '@/domain/editor/tools';
+import { useEditorSettingsStore } from '@/stores/editorSettings';
 import { useProjectStore } from '@/stores/project';
 import { useProjectsStore } from '@/stores/projects';
 import { toastError, toastInfo } from '@/ui/toast/toastBus';
@@ -39,6 +40,7 @@ import { toastError, toastInfo } from '@/ui/toast/toastBus';
 const { background, hasBackground } = useBackgroundMap();
 const store = useProjectStore();
 const projects = useProjectsStore();
+const settings = useEditorSettingsStore();
 const route = useRoute();
 const router = useRouter();
 
@@ -200,7 +202,7 @@ function pointTypeBadge(): string {
       <RouterLink to="/import" class="cta">前往「地图导入」上传三件套 →</RouterLink>
     </div>
 
-    <div v-else class="editor__workspace">
+    <div v-else class="editor__workspace" :data-tree-collapsed="settings.treeCollapsed">
       <ResourceTree />
       <EditorToolbar :active-tool="activeTool" @switch-tool="setTool" />
 
@@ -338,6 +340,11 @@ function pointTypeBadge(): string {
   grid-template-rows: minmax(560px, calc(100vh - 220px));
   gap: 0.75rem;
   align-items: stretch;
+}
+.editor__workspace[data-tree-collapsed='true'] {
+  /* Shrink the resource-tree track to a thin strip so the canvas can
+     reclaim the freed horizontal space. */
+  grid-template-columns: 32px auto 1fr 280px;
 }
 
 .editor__stage {

@@ -30,6 +30,9 @@ interface PersistedShape {
   // simply fall back to the defaults computed below.
   toleranceShow: boolean;
   toleranceDefaultMm: number;
+  // Editor layout — collapsing the resource tree frees horizontal
+  // real estate for the canvas. Additive on the same v=1 envelope.
+  treeCollapsed: boolean;
 }
 
 function loadFromStorage(): Partial<PersistedShape> | null {
@@ -84,12 +87,16 @@ export const useEditorSettingsStore = defineStore('editorSettings', () => {
     ),
   );
 
+  // Resource-tree collapse state. Default = expanded (false) so first-time
+  // users still see the tree; once collapsed the choice is remembered.
+  const treeCollapsed = ref<boolean>(stored?.treeCollapsed === true);
+
   // Persist after every change. Pinia composables run inside an effect
   // scope tied to the active app instance, so this watcher is cleaned up
   // automatically when the app is unmounted (e.g. in vitest tear-down).
   watch(
-    [gridSnap, gridSpacingPx, minimap, toleranceShow, toleranceDefaultMm],
-    ([snap, spacing, mini, tolShow, tolMm]) => {
+    [gridSnap, gridSpacingPx, minimap, toleranceShow, toleranceDefaultMm, treeCollapsed],
+    ([snap, spacing, mini, tolShow, tolMm, treeC]) => {
       saveToStorage({
         v: STORAGE_VERSION,
         gridSnap: snap,
@@ -97,6 +104,7 @@ export const useEditorSettingsStore = defineStore('editorSettings', () => {
         minimap: mini,
         toleranceShow: tolShow,
         toleranceDefaultMm: clampToleranceMm(tolMm),
+        treeCollapsed: treeC,
       });
     },
     { flush: 'post' },
@@ -122,16 +130,22 @@ export const useEditorSettingsStore = defineStore('editorSettings', () => {
     toleranceDefaultMm.value = clampToleranceMm(mm);
   }
 
+  function toggleTreeCollapsed(): void {
+    treeCollapsed.value = !treeCollapsed.value;
+  }
+
   return {
     gridSnap,
     gridSpacingPx,
     minimap,
     toleranceShow,
     toleranceDefaultMm,
+    treeCollapsed,
     toggleGridSnap,
     setGridSpacingPx,
     toggleMinimap,
     toggleToleranceShow,
     setToleranceDefaultMm,
+    toggleTreeCollapsed,
   };
 });

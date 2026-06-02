@@ -364,7 +364,9 @@ function onClearMultiSelection(): void {
 }
 .align-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Single column so the buttons stack vertically. Keeps the toolbar
+     narrow and preserves more horizontal real estate for the canvas. */
+  grid-template-columns: 1fr;
   gap: 0.25rem;
 }
 .align-btn {

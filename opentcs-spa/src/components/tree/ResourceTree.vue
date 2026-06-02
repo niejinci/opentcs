@@ -34,6 +34,7 @@
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
 
 import type { EntityKind } from '@/domain/model/types';
+import { useEditorSettingsStore } from '@/stores/editorSettings';
 import { useProjectStore } from '@/stores/project';
 
 interface GroupSpec {
@@ -54,6 +55,7 @@ const GROUPS: readonly GroupSpec[] = [
 ];
 
 const store = useProjectStore();
+const settings = useEditorSettingsStore();
 
 /* --------------------------- Per-group items --------------------------- */
 
@@ -304,18 +306,47 @@ const activeDescendantId = computed<string | null>(() => selectionDomId());
 </script>
 
 <template>
-  <aside class="resource-tree" aria-label="资源树">
-    <header class="resource-tree__header">
-      <h3>资源树</h3>
-      <span class="hint">单击选中 · Ctrl/⌘+单击 多选 · ↑↓ 切换 · ←→ 折叠 · Enter 选中</span>
-    </header>
-    <ul
-      ref="treeEl"
-      class="resource-tree__root"
-      role="tree"
-      :aria-activedescendant="activeDescendantId ?? undefined"
-      @keydown="onKeyDown"
+  <aside
+    class="resource-tree"
+    :class="{ 'resource-tree--collapsed': settings.treeCollapsed }"
+    aria-label="资源树"
+  >
+    <button
+      v-if="settings.treeCollapsed"
+      type="button"
+      class="resource-tree__expand"
+      title="展开资源树"
+      aria-label="展开资源树"
+      data-testid="resource-tree-expand"
+      @click="settings.toggleTreeCollapsed()"
     >
+      <span class="resource-tree__expand-glyph" aria-hidden="true">›</span>
+      <span class="resource-tree__expand-label" aria-hidden="true">资源树</span>
+    </button>
+    <template v-else>
+      <header class="resource-tree__header">
+        <div class="resource-tree__title">
+          <h3>资源树</h3>
+          <button
+            type="button"
+            class="resource-tree__collapse"
+            title="收起资源树"
+            aria-label="收起资源树"
+            data-testid="resource-tree-collapse"
+            @click="settings.toggleTreeCollapsed()"
+          >
+            ‹
+          </button>
+        </div>
+        <span class="hint">单击选中 · Ctrl/⌘+单击 多选 · ↑↓ 切换 · ←→ 折叠 · Enter 选中</span>
+      </header>
+      <ul
+        ref="treeEl"
+        class="resource-tree__root"
+        role="tree"
+        :aria-activedescendant="activeDescendantId ?? undefined"
+        @keydown="onKeyDown"
+      >
       <li
         v-for="g in GROUPS"
         :key="g.kind"
@@ -362,6 +393,7 @@ const activeDescendantId = computed<string | null>(() => selectionDomId());
         </ul>
       </li>
     </ul>
+    </template>
   </aside>
 </template>
 
@@ -381,9 +413,64 @@ const activeDescendantId = computed<string | null>(() => selectionDomId());
   border-bottom: 1px solid #eaeef2;
   background: #f6f8fa;
 }
-.resource-tree__header h3 {
+.resource-tree__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.resource-tree__title h3 {
   margin: 0;
   font-size: 0.95rem;
+  flex: 1 1 auto;
+}
+.resource-tree__collapse,
+.resource-tree__expand {
+  border: 1px solid #d0d7de;
+  background: #ffffff;
+  color: #57606a;
+  cursor: pointer;
+  font: inherit;
+  border-radius: 4px;
+  line-height: 1;
+}
+.resource-tree__collapse {
+  padding: 0.05rem 0.45rem;
+  font-size: 0.95rem;
+}
+.resource-tree__collapse:hover,
+.resource-tree__expand:hover {
+  background: #eaeef2;
+  color: #1f2328;
+}
+
+/* Collapsed mode — render as a thin vertical strip with a single
+   "expand" button. The grid track in EditorView shrinks to ~32px so
+   the canvas can spread into the freed horizontal space. */
+.resource-tree--collapsed {
+  /* Flex/min-height inherited; nothing else to override. */
+}
+.resource-tree__expand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  padding: 0.5rem 0.25rem;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #f6f8fa;
+  border-radius: 0;
+}
+.resource-tree__expand-glyph {
+  font-size: 1.1rem;
+  color: #0969da;
+}
+.resource-tree__expand-label {
+  writing-mode: vertical-rl;
+  letter-spacing: 0.15em;
+  color: #57606a;
+  font-size: 0.8rem;
 }
 .resource-tree__header .hint {
   display: block;
