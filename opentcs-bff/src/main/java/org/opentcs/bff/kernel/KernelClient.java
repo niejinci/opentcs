@@ -9,6 +9,8 @@ import jakarta.inject.Inject;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
+import org.opentcs.access.CredentialsException;
 import org.opentcs.access.KernelRuntimeException;
 import org.opentcs.access.KernelServicePortal;
 import org.opentcs.access.to.order.TransportOrderCreationTO;
@@ -27,6 +29,11 @@ import org.slf4j.LoggerFactory;
  *
  * <p>This class is intentionally focused on M2's read-only needs (plant model). Subsequent
  * milestones will broaden it (e.g. transport orders in M4, event subscription for SSE in M5).
+ *
+ * <p>If the kernel reports a {@link CredentialsException} on any call (typically because the
+ * kernel-side {@code UserManager} swept the BFF's client entry after a long idle period), the
+ * cached portal is invalidated and the call is retried once with a freshly logged-in portal so
+ * callers do not see a transient {@code 503} on the first request after an idle stretch.
  */
 @Singleton
 public class KernelClient {
@@ -60,7 +67,7 @@ public class KernelClient {
    * @throws KernelRuntimeException If the Kernel cannot be reached or the request fails.
    */
   public PlantModel getPlantModel() {
-    return ensureConnected().getPlantModelService().getPlantModel();
+    return executeWithReconnect(() -> ensureConnected().getPlantModelService().getPlantModel());
   }
 
   /**
@@ -70,7 +77,7 @@ public class KernelClient {
    * @throws KernelRuntimeException If the Kernel cannot be reached or the request fails.
    */
   public Set<Vehicle> listVehicles() {
-    return ensureConnected().getVehicleService().fetch(Vehicle.class);
+    return executeWithReconnect(() -> ensureConnected().getVehicleService().fetch(Vehicle.class));
   }
 
   /**
@@ -82,7 +89,9 @@ public class KernelClient {
    */
   public Optional<Vehicle> findVehicle(String name) {
     requireNonNull(name, "name");
-    return ensureConnected().getVehicleService().fetch(Vehicle.class, name);
+    return executeWithReconnect(
+        () -> ensureConnected().getVehicleService().fetch(Vehicle.class, name)
+    );
   }
 
   /**
@@ -104,16 +113,17 @@ public class KernelClient {
   ) {
     requireNonNull(name, "name");
     requireNonNull(integrationLevel, "integrationLevel");
-    var portal = ensureConnected();
-    var service = portal.getVehicleService();
-    Vehicle current = service.fetch(Vehicle.class, name)
-        .orElseThrow(
-            () -> new org.opentcs.data.ObjectUnknownException(
-                "No vehicle named '" + name + "' exists."
-            )
-        );
-    service.updateVehicleIntegrationLevel(current.getReference(), integrationLevel);
-    return service.fetch(Vehicle.class, name).orElse(current);
+    return executeWithReconnect(() -> {
+      var service = ensureConnected().getVehicleService();
+      Vehicle current = service.fetch(Vehicle.class, name)
+          .orElseThrow(
+              () -> new org.opentcs.data.ObjectUnknownException(
+                  "No vehicle named '" + name + "' exists."
+              )
+          );
+      service.updateVehicleIntegrationLevel(current.getReference(), integrationLevel);
+      return service.fetch(Vehicle.class, name).orElse(current);
+    });
   }
 
   /**
@@ -126,14 +136,22 @@ public class KernelClient {
    */
   public TransportOrder createTransportOrder(TransportOrderCreationTO to) {
     requireNonNull(to, "to");
-    return ensureConnected().getTransportOrderService().createTransportOrder(to);
+    return executeWithReconnect(
+        () -> ensureConnected().getTransportOrderService().createTransportOrder(to)
+    );
   }
 
   /**
    * Fetches events buffered for this client at the kernel side.
    *
-   * <p>If the underlying portal call fails (e.g. because the kernel went away), the cached portal
-   * is invalidated so that the next call to {@link #ensureConnected()} reconnects from scratch.
+   * <p>If the kernel reports that this client's session has been forgotten (a
+   * {@link CredentialsException}, typically caused by the kernel-side
+   * {@code UserManager} sweeping idle clients), the cached portal is invalidated and the call
+   * is retried once with a freshly logged-in portal so callers do not see a transient error.
+   *
+   * <p>If the underlying portal call fails for any other reason (e.g. the kernel went away),
+   * the cached portal is invalidated so that the next call to {@link #ensureConnected()}
+   * reconnects from scratch.
    *
    * @param timeout Maximum time (in ms) to wait for events to arrive.
    * @return The list of events that arrived.
@@ -141,7 +159,7 @@ public class KernelClient {
    */
   public List<Object> fetchEvents(long timeout) {
     try {
-      return ensureConnected().fetchEvents(timeout);
+      return executeWithReconnect(() -> ensureConnected().fetchEvents(timeout));
     }
     catch (KernelRuntimeException e) {
       invalidate();
@@ -207,6 +225,33 @@ public class KernelClient {
   private void invalidate() {
     synchronized (lock) {
       portal = null;
+    }
+  }
+
+  /**
+   * Executes a kernel call, transparently re-authenticating and retrying once if the kernel
+   * reports that this client's session has been forgotten (a {@link CredentialsException}).
+   *
+   * <p>This handles the case where the kernel's {@code UserManager} has swept the BFF's client
+   * entry out of its {@code knownClients} map after a long idle period — the cached portal still
+   * holds a now-stale {@code ClientID}, but the kernel no longer recognises it. Invalidating the
+   * cached portal forces {@link #ensureConnected()} to log in afresh.
+   *
+   * <p>Other {@link KernelRuntimeException}s (e.g. the kernel went away) are propagated unchanged
+   * so callers can decide how to react.
+   *
+   * @param call The kernel call to execute.
+   * @param <T> The call's return type.
+   * @return The call's return value.
+   */
+  private <T> T executeWithReconnect(Supplier<T> call) {
+    try {
+      return call.get();
+    }
+    catch (CredentialsException e) {
+      LOG.info("Kernel session no longer recognised; reconnecting and retrying once.", e);
+      invalidate();
+      return call.get();
     }
   }
 }
