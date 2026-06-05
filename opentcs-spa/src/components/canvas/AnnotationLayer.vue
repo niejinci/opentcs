@@ -79,18 +79,153 @@ interface RenderedPath {
   path: DraftPath;
   src: DraftPoint;
   dst: DraftPoint;
+  /**
+   * When the *reverse* path (dst → src) also exists, both paths are bent
+   * sideways via a quadratic Bézier so they no longer overlap and each
+   * has its own click hit-zone. `curveSign` selects which side to bend
+   * towards (+1 / -1); `null` means render as a straight v-arrow.
+   */
+  curveSign: 1 | -1 | null;
 }
+
+/**
+ * Internal delimiter used to encode `(src, dst)` pairs as a Map/Set key.
+ * U+0001 (SOH) is forbidden in entity names by `isValidEntityName`, so
+ * it can't collide with any user-chosen Point name.
+ */
+const PATH_PAIR_KEY_DELIM = '\u0001';
 
 const renderedPaths = computed<RenderedPath[]>(() => {
   const byName = new Map(store.points.map((p) => [p.name, p]));
+  // Collect the (src, dst) pairs of every renderable path so we can
+  // detect the bidirectional case in O(1).
+  const directed = new Set<string>();
+  for (const path of store.paths) {
+    if (byName.has(path.srcPointName) && byName.has(path.destPointName)) {
+      directed.add(`${path.srcPointName}${PATH_PAIR_KEY_DELIM}${path.destPointName}`);
+    }
+  }
   const out: RenderedPath[] = [];
   for (const path of store.paths) {
     const src = byName.get(path.srcPointName);
     const dst = byName.get(path.destPointName);
-    if (src && dst) out.push({ path, src, dst });
+    if (!src || !dst) continue;
+    const reverseExists = directed.has(
+      `${path.destPointName}${PATH_PAIR_KEY_DELIM}${path.srcPointName}`,
+    );
+    let curveSign: 1 | -1 | null = null;
+    if (reverseExists) {
+      // Stable side assignment: the path whose src name sorts before the
+      // dst name bends "+1", the reverse bends "-1". Using string compare
+      // avoids any draw-order dependency.
+      curveSign = path.srcPointName < path.destPointName ? 1 : -1;
+    }
+    out.push({ path, src, dst, curveSign });
   }
   return out;
 });
+
+/**
+ * Visual offset (in stage-pixel space) used to bend a bidirectional
+ * path's quadratic-Bézier control point off the straight-line midpoint.
+ * Kept screen-constant under zoom by dividing by the stage scale, just
+ * like every other "css-px" constant in this file.
+ */
+const PATH_CURVE_SAGITTA_CSS_PX = 16;
+const pathCurveSagitta = computed(() => PATH_CURVE_SAGITTA_CSS_PX / safeScale(props.scale));
+
+interface CurvedPathGeom {
+  /** SVG path data: `M sx sy Q cx cy dx dy` (or `M..L..` when straight). */
+  pathData: string;
+  /** Arrow-head triangle points, in stage-pixel coordinates (6-tuple). */
+  arrowHeadPoints: number[];
+}
+
+/**
+ * Geometry helper for bidirectional paths.
+ *
+ * For a straight segment (sx,sy)->(dx,dy), pick a control point offset
+ * perpendicularly from the midpoint by `±sagitta`, then derive the
+ * arrow-head from the tangent at the destination (= dst - control).
+ */
+function curvedPathGeom(rp: RenderedPath): CurvedPathGeom {
+  const sx = rp.src.layout.pixelX;
+  const sy = rp.src.layout.pixelY;
+  const dx = rp.dst.layout.pixelX;
+  const dy = rp.dst.layout.pixelY;
+  const ah = arrowSize.value;
+  if (rp.curveSign === null) {
+    // Straight: still emit an SVG path so the renderer can use a single
+    // <v-path> + arrow-head shape for both branches uniformly.
+    const len = Math.hypot(dx - sx, dy - sy);
+    if (len < 1e-6) {
+      return { pathData: `M ${sx} ${sy} L ${dx} ${dy}`, arrowHeadPoints: [] };
+    }
+    const tx = (dx - sx) / len;
+    const ty = (dy - sy) / len;
+    const headPoints = arrowHeadAt(dx, dy, tx, ty, ah);
+    return { pathData: `M ${sx} ${sy} L ${dx} ${dy}`, arrowHeadPoints: headPoints };
+  }
+  // Curved branch.
+  const sign = rp.curveSign;
+  const dxv = dx - sx;
+  const dyv = dy - sy;
+  const len = Math.hypot(dxv, dyv);
+  if (len < 1e-6) {
+    return { pathData: `M ${sx} ${sy} L ${dx} ${dy}`, arrowHeadPoints: [] };
+  }
+  // Right-hand normal of (src->dst), unit length.
+  const nx = -dyv / len;
+  const ny = dxv / len;
+  const sag = pathCurveSagitta.value * sign;
+  const cx = (sx + dx) / 2 + nx * sag;
+  const cy = (sy + dy) / 2 + ny * sag;
+  // Tangent at the destination of a quadratic Bézier == (dst - control),
+  // normalised. Drives the arrow-head orientation.
+  let tx = dx - cx;
+  let ty = dy - cy;
+  const tlen = Math.hypot(tx, ty);
+  if (tlen > 1e-6) {
+    tx /= tlen;
+    ty /= tlen;
+  } else {
+    tx = dxv / len;
+    ty = dyv / len;
+  }
+  return {
+    pathData: `M ${sx} ${sy} Q ${cx} ${cy} ${dx} ${dy}`,
+    arrowHeadPoints: arrowHeadAt(dx, dy, tx, ty, ah),
+  };
+}
+
+const renderedPathGeoms = computed<Array<RenderedPath & CurvedPathGeom>>(() => {
+  return renderedPaths.value.map((rp) => ({ ...rp, ...curvedPathGeom(rp) }));
+});
+
+/** Build a 3-vertex arrow head ending at (x,y) with tangent (tx,ty). */
+function arrowHeadAt(
+  x: number,
+  y: number,
+  tx: number,
+  ty: number,
+  size: number,
+): number[] {
+  // Base of the arrow-head (one "size" behind the tip along -tangent).
+  const bx = x - tx * size;
+  const by = y - ty * size;
+  // Half-width along the perpendicular.
+  const half = size * 0.5;
+  const px = -ty;
+  const py = tx;
+  return [
+    x,
+    y,
+    bx + px * half,
+    by + py * half,
+    bx - px * half,
+    by - py * half,
+  ];
+}
 
 /* ----------------------- Block outline geometry ----------------------- */
 
@@ -372,9 +507,56 @@ function onLocationDragMove(l: DraftLocation, e: KonvaEventObject<DragEvent>): v
   store.moveLocation(l.name, { x: node.x(), y: node.y() });
 }
 
+/**
+ * Threshold (in stage-pixel space, so it tracks zoom) used to decide
+ * whether a Vehicle's draft layout coincides with a Point. We can't
+ * trust strict equality because the user may have nudged the vehicle
+ * a fraction of a pixel; the Point circle visual radius is ~6 css px,
+ * so 1 stage-px is well inside the same visual cluster.
+ */
+const VEHICLE_POINT_OVERLAP_TOLERANCE_PX = 1.5;
+
+/** Returns the Point that visually overlaps with a Vehicle, or null. */
+function pointUnderVehicle(v: DraftVehicle): DraftPoint | null {
+  const pos = vehiclePixel(v);
+  for (const p of store.points) {
+    const dx = p.layout.pixelX - pos.x;
+    const dy = p.layout.pixelY - pos.y;
+    if (dx * dx + dy * dy <= VEHICLE_POINT_OVERLAP_TOLERANCE_PX ** 2) {
+      return p;
+    }
+  }
+  return null;
+}
+
 function onVehicleClick(v: DraftVehicle, e: KonvaEventObject<MouseEvent>): void {
-  e.cancelBubble = true;
   emit('entity-click');
+  // Alt+Click: hard pass-through to whatever Point is underneath the
+  // vehicle, so the user can always reach a Point that the vehicle
+  // visually covers.
+  if (e.evt && e.evt.altKey) {
+    const underlying = pointUnderVehicle(v);
+    if (underlying) {
+      e.cancelBubble = true;
+      store.select({ kind: 'point', name: underlying.name });
+      return;
+    }
+  }
+  // No-modifier click: if a Point is under the vehicle, cycle the
+  // selection between Point <-> Vehicle each time the user clicks the
+  // overlapping cluster. Otherwise fall back to "select the vehicle".
+  e.cancelBubble = true;
+  const underlying = pointUnderVehicle(v);
+  if (underlying) {
+    const sel = store.selection;
+    const pointSelected = sel?.kind === 'point' && sel.name === underlying.name;
+    if (pointSelected) {
+      store.select({ kind: 'vehicle', name: v.name });
+    } else {
+      store.select({ kind: 'point', name: underlying.name });
+    }
+    return;
+  }
   store.select({ kind: 'vehicle', name: v.name });
 }
 
@@ -383,6 +565,26 @@ function onVehicleDragStart(v: DraftVehicle, e: KonvaEventObject<DragEvent>): vo
     e.target.stopDrag();
     e.target.position({ x: v.layout.pixelX, y: v.layout.pixelY });
     return;
+  }
+  // S9 protective semantics: when the kernel SSE has reported a
+  // currentPosition for this vehicle, dragging only mutates the editor
+  // draft (it doesn't push the vehicle on the kernel side). Confirm
+  // before accepting the drag so the operator doesn't accidentally
+  // diverge the draft layout from the live state.
+  if (vehicleIsLive(v)) {
+    const ok =
+      typeof window !== 'undefined'
+        ? window.confirm(
+            `车辆 ${v.name} 正受 kernel 控制（SSE 在线）。\n` +
+              `本次拖动只会修改编辑模型，不会影响在线坐标。\n` +
+              `确认继续？`,
+          )
+        : true;
+    if (!ok) {
+      e.target.stopDrag();
+      e.target.position({ x: v.layout.pixelX, y: v.layout.pixelY });
+      return;
+    }
   }
   e.cancelBubble = true;
   store.select({ kind: 'vehicle', name: v.name });
@@ -471,27 +673,34 @@ const preciseMarkers = computed<PreciseMarker[]>(() => {
       />
     </template>
 
-    <!-- Paths next so they sit visually under the Points. -->
-    <template v-for="rp in renderedPaths" :key="rp.path.name">
-      <v-arrow
+    <!-- Paths next so they sit visually under the Points. Bidirectional
+         pairs (A->B + B->A) bend in opposite directions via a quadratic
+         Bézier so each branch has its own visual track and click-zone.
+         Single-direction paths stay straight. -->
+    <template v-for="rp in renderedPathGeoms" :key="rp.path.name">
+      <v-path
         :config="{
-          points: [
-            rp.src.layout.pixelX,
-            rp.src.layout.pixelY,
-            rp.dst.layout.pixelX,
-            rp.dst.layout.pixelY,
-          ],
+          data: rp.pathData,
           stroke: pathStrokeColor(rp),
-          fill: pathStrokeColor(rp),
           strokeWidth: isMemberHighlighted(rp.path.name) ? pathStroke * 2 : pathStroke,
-          pointerLength: arrowSize,
-          pointerWidth: arrowSize,
           dash: rp.path.locked ? [arrowSize, arrowSize] : undefined,
           hitStrokeWidth: Math.max(8, pathStroke * 4),
           listening: true,
+          name: 'draft-path',
         }"
         @click="(e: KonvaEventObject<MouseEvent>) => onPathClick(rp, e)"
         @tap="(e: KonvaEventObject<MouseEvent>) => onPathClick(rp, e)"
+      />
+      <v-line
+        v-if="rp.arrowHeadPoints.length === 6"
+        :config="{
+          points: rp.arrowHeadPoints,
+          fill: pathStrokeColor(rp),
+          stroke: pathStrokeColor(rp),
+          strokeWidth: pathStroke,
+          closed: true,
+          listening: false,
+        }"
       />
     </template>
 
@@ -590,7 +799,7 @@ const preciseMarkers = computed<PreciseMarker[]>(() => {
           stroke: VEHICLE_STROKE,
           strokeWidth: vehicleStrokeWidth(v),
           opacity: 0.85,
-          draggable: isEntityDraggable() && !vehicleIsLive(v),
+          draggable: isEntityDraggable(),
           name: 'draft-vehicle',
         }"
         @click="(e: KonvaEventObject<MouseEvent>) => onVehicleClick(v, e)"

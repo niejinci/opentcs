@@ -244,4 +244,17 @@ describe('ResourceTree', () => {
     expect(wrapper.find('[data-kind="point"][data-name="P-1"]').exists()).toBe(false);
     expect(wrapper.findAll('.leaf.is-selected')).toHaveLength(0);
   });
+
+  it('renders Path leaves as "src --- dst" while keeping name as the id', () => {
+    const store = useProjectStore();
+    store.points.push(makePoint('P-1'), makePoint('P-2'));
+    // Legacy auto-named path imported from an older project: the visible
+    // text must still resolve to the friendlier "src --- dst" form, but
+    // data-name (== selection key) stays the original name.
+    store.paths.push(makePath('Path-1', 'P-1', 'P-2'));
+    const wrapper = mount(ResourceTree);
+
+    const leaf = wrapper.get('[data-kind="path"][data-name="Path-1"]');
+    expect(leaf.find('.leaf__name').text()).toBe('P-1 --- P-2');
+  });
 });

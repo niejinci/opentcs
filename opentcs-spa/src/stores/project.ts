@@ -629,10 +629,19 @@ export const useProjectStore = defineStore('project', () => {
     const srcPt = findPoint(src);
     const dstPt = findPoint(destName);
     if (!srcPt || !dstPt) return null;
-    const name = nextAutoName(
-      'Path',
-      paths.value.map((p) => p.name),
-    );
+    // Match the Java modeleditor convention (AbstractConnection.java):
+    // path default name == "${src} --- ${dst}" so the resource tree and
+    // the property panel can show the route at a glance. We append a
+    // numeric suffix on collision (e.g. parallel paths between the
+    // same two points).
+    const baseName = `${src} --- ${destName}`;
+    const existingNames = new Set(paths.value.map((p) => p.name));
+    let name = baseName;
+    let suffix = 2;
+    while (existingNames.has(name) || nameTaken(name)) {
+      name = `${baseName}-${suffix}`;
+      suffix += 1;
+    }
     const created: DraftPath = {
       name,
       srcPointName: src,

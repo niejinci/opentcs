@@ -101,6 +101,26 @@ const itemsByKind = computed<Record<EntityKind, string[]>>(() => ({
   vehicle: namesFor('vehicle'),
 }));
 
+/**
+ * Display label for a leaf row. The internal `name` (used as DOM id /
+ * selection key / data attributes) stays untouched so a11y, roving focus
+ * and the canvas <-> tree selection round-trip keep working; we only
+ * change the visible text.
+ *
+ * For Path leaves we mirror the Java modeleditor convention
+ * (`AbstractConnection.composeName`) and show
+ * `${srcPointName} --- ${destPointName}` — even for legacy "Path-1"
+ * entries imported from older projects, so users can read the route at
+ * a glance without renaming.
+ */
+function labelFor(kind: EntityKind, name: string): string {
+  if (kind === 'path') {
+    const path = store.findPath(name);
+    if (path) return `${path.srcPointName} --- ${path.destPointName}`;
+  }
+  return name;
+}
+
 /* --------------------------- Expand / collapse ------------------------- */
 
 const expanded = ref<Record<EntityKind, boolean>>({
@@ -388,7 +408,7 @@ const activeDescendantId = computed<string | null>(() => selectionDomId());
             @click="(e: MouseEvent) => onLeafClick(g.kind, name, e)"
           >
             <span class="leaf__glyph" aria-hidden="true">{{ g.glyph }}</span>
-            <span class="leaf__name">{{ name }}</span>
+            <span class="leaf__name">{{ labelFor(g.kind, name) }}</span>
           </li>
         </ul>
       </li>
