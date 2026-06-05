@@ -27,13 +27,16 @@ import VehicleStatusPanel from '@/components/VehicleStatusPanel.vue';
 import { HttpError } from '@/api/errors';
 import { getDraft, getProject } from '@/api/endpoints/projects';
 import {
-  TRANSPORT_ORDER_OPERATIONS,
   type Destination,
-  type TransportOrderOperation,
   type TransportOrderRequest,
   type Vehicle,
   type VehicleIntegrationLevel,
 } from '@/api/types/bff';
+import {
+  allowedOperationsForTarget,
+  resolveOrderTargetInfos,
+  type TargetInfo,
+} from '@/domain/model/orderTargets';
 import { useLiveStatusStore } from '@/stores/liveStatus';
 import { toastError, toastSuccess } from '@/ui/toast/toastBus';
 
@@ -41,7 +44,7 @@ interface DestinationRow {
   /** Local row id (UUID-ish, just used as v-for key). */
   id: number;
   targetName: string;
-  operation: TransportOrderOperation;
+  operation: string;
   /** When true, the row renders a free-form input instead of the
    *  Point/Location dropdown — selected via the "(自定义…)" item. */
   customMode: boolean;
@@ -85,34 +88,19 @@ const targetSuggestions = ref<string[]>([]);
  * `#isValidOperationOnLocationType`) are:
  *   - Point destination → only `MOVE` or `PARK` are valid.
  *   - Location destination → `NOP`, or anything in the LocationType's
- *     `allowedOperations` (intersected with the attached Link's
- *     `allowedOperations` if non-empty).
+ *     `allowedOperations` (intersected with attached Link
+ *     `allowedOperations` when non-empty).
  * For unknown targets (user typed a name not in the draft) we keep the
  * full op list and let the BFF/Kernel produce the authoritative 4xx,
  * matching scenario #3 of the S9 acceptance script.
  */
-type TargetInfo = { kind: 'point' } | { kind: 'location'; allowedOps: ReadonlySet<string> };
 const targetInfoByName = ref<Map<string, TargetInfo>>(new Map());
 
-const POINT_OPS: readonly TransportOrderOperation[] = ['MOVE', 'PARK'];
-
-function resolveAllowedOps(targetName: string): readonly TransportOrderOperation[] {
-  const info = targetInfoByName.value.get(targetName.trim());
-  if (!info) return TRANSPORT_ORDER_OPERATIONS;
-  if (info.kind === 'point') return POINT_OPS;
-  // Location: NOP + MOVE are always accepted by the kernel; union with
-  // whatever the LocationType explicitly allows (filtered to the four
-  // well-known ops the SPA exposes).
-  const out: TransportOrderOperation[] = [];
-  for (const op of TRANSPORT_ORDER_OPERATIONS) {
-    if (op === 'NOP' || op === 'MOVE' || info.allowedOps.has(op)) {
-      out.push(op);
-    }
-  }
-  return out;
+function resolveAllowedOps(targetName: string): readonly string[] {
+  return allowedOperationsForTarget(targetInfoByName.value.get(targetName.trim()));
 }
 
-function rowAllowedOps(row: DestinationRow): readonly TransportOrderOperation[] {
+function rowAllowedOps(row: DestinationRow): readonly string[] {
   return resolveAllowedOps(row.targetName);
 }
 
@@ -233,41 +221,62 @@ async function loadDraftTargets(): Promise<void> {
     const payload = (env.payload ?? {}) as Record<string, unknown>;
     const arr = (k: string): unknown[] =>
       Array.isArray(payload[k]) ? (payload[k] as unknown[]) : [];
-    const names = new Set<string>();
-    const info = new Map<string, TargetInfo>();
-
-    // Build a lookup of LocationType name → allowed ops first so we can
-    // copy it onto each Location.
-    const typeAllowedOps = new Map<string, ReadonlySet<string>>();
-    for (const t of arr('locationTypes')) {
-      const obj = t as { name?: unknown; allowedOperations?: unknown };
-      if (typeof obj.name !== 'string' || obj.name.length === 0) continue;
-      const ops = Array.isArray(obj.allowedOperations)
-        ? (obj.allowedOperations as unknown[]).filter((x): x is string => typeof x === 'string')
-        : [];
-      typeAllowedOps.set(obj.name, new Set(ops));
-    }
-
-    for (const p of arr('points')) {
-      const n = (p as { name?: unknown }).name;
-      if (typeof n === 'string' && n.length > 0) {
-        names.add(n);
-        info.set(n, { kind: 'point' });
-      }
-    }
-    for (const l of arr('locations')) {
-      const obj = l as { name?: unknown; typeName?: unknown };
-      const n = obj.name;
-      if (typeof n !== 'string' || n.length === 0) continue;
-      names.add(n);
-      const tn = typeof obj.typeName === 'string' ? obj.typeName : '';
-      info.set(n, {
-        kind: 'location',
-        allowedOps: typeAllowedOps.get(tn) ?? new Set<string>(),
-      });
-    }
-    targetSuggestions.value = [...names].sort();
-    targetInfoByName.value = info;
+    const resolved = resolveOrderTargetInfos({
+      points: arr('points')
+        .map((p) => {
+          const name = (p as { name?: unknown }).name;
+          return typeof name === 'string' ? { name } : null;
+        })
+        .filter((p): p is { name: string } => p !== null),
+      locationTypes: arr('locationTypes')
+        .map((t) => {
+          const obj = t as { name?: unknown; allowedOperations?: unknown };
+          if (typeof obj.name !== 'string') return null;
+          const allowedOperations =
+            typeof obj.allowedOperations === 'string' || Array.isArray(obj.allowedOperations)
+              ? obj.allowedOperations
+              : [];
+          return { name: obj.name, allowedOperations };
+        })
+        .filter(
+          (t): t is { name: string; allowedOperations: string | string[] } => t !== null,
+        ),
+      locations: arr('locations')
+        .map((l) => {
+          const obj = l as { name?: unknown; typeName?: unknown; links?: unknown };
+          if (typeof obj.name !== 'string') return null;
+          const links = Array.isArray(obj.links)
+            ? obj.links
+                .map((link) => {
+                  const lk = link as { pointName?: unknown; allowedOperations?: unknown };
+                  if (typeof lk.pointName !== 'string') return null;
+                  const allowedOperations =
+                    typeof lk.allowedOperations === 'string' || Array.isArray(lk.allowedOperations)
+                      ? lk.allowedOperations
+                      : [];
+                  return { pointName: lk.pointName, allowedOperations };
+                })
+                .filter(
+                  (link): link is { pointName: string; allowedOperations: string | string[] } =>
+                    link !== null,
+                )
+            : [];
+          return {
+            name: obj.name,
+            typeName: typeof obj.typeName === 'string' ? obj.typeName : '',
+            links,
+          };
+        })
+        .filter(
+          (l): l is {
+            name: string;
+            typeName: string;
+            links: { pointName: string; allowedOperations: string | string[] }[];
+          } => l !== null,
+        ),
+    });
+    targetSuggestions.value = resolved.targetSuggestions;
+    targetInfoByName.value = resolved.targetInfoByName;
   } catch {
     // Non-fatal — user can still type names manually.
     targetSuggestions.value = [];

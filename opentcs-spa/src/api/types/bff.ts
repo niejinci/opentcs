@@ -134,14 +134,11 @@ export interface TransportOrderRequest {
 }
 
 /**
- * Standard openTCS destination operations exposed in the SPA's order
- * builder. The Kernel accepts arbitrary strings (driver-specific ops),
- * but the verification suite calls out at least `NOP / MOVE / LIFT /
- * DROP` and we surface those four as a dropdown. Free-form text input is
- * intentionally NOT offered in MVP to keep the failure mode of "typo →
- * 404" off the table for the happy path.
+ * Standard point-destination operations exposed by the SPA. Location
+ * destinations are model-driven and may use arbitrary strings from the
+ * referenced LocationType's allowedOperations.
  */
-export const TRANSPORT_ORDER_OPERATIONS = ['NOP', 'MOVE', 'PARK', 'LIFT', 'DROP'] as const;
+export const TRANSPORT_ORDER_OPERATIONS = ['NOP', 'MOVE', 'PARK'] as const;
 export type TransportOrderOperation = (typeof TRANSPORT_ORDER_OPERATIONS)[number];
 
 /* ------------------------------------------------------------------ */
