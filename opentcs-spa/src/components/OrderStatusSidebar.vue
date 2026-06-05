@@ -13,24 +13,17 @@
 
 import { computed, ref } from 'vue';
 
-import { useLiveStatusStore } from '@/stores/liveStatus';
+import { TERMINAL_ORDER_STATES, useLiveStatusStore } from '@/stores/liveStatus';
 import type { TransportOrderState } from '@/api/types/bff';
 
 const live = useLiveStatusStore();
-
-const TERMINAL_STATES: ReadonlySet<TransportOrderState> = new Set<TransportOrderState>([
-  'FINISHED',
-  'FAILED',
-  'WITHDRAWN',
-  'UNROUTABLE',
-]);
 
 /** When true, hide entries whose state is terminal. */
 const onlyActive = ref(false);
 
 const visibleEntries = computed(() => {
   const src = onlyActive.value
-    ? live.orderTimeline.filter((e) => !TERMINAL_STATES.has(e.state))
+    ? live.orderTimeline.filter((e) => !TERMINAL_ORDER_STATES.has(e.state))
     : live.orderTimeline;
   return src.slice(0, 50);
 });

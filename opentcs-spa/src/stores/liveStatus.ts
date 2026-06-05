@@ -59,12 +59,13 @@ const ORDER_TIMELINE_CAP = 200;
  * eligible for the auto-prune in `pushTimelineEntry` and the manual
  * "clear finished" action exposed to the sidebar.
  */
-const TERMINAL_ORDER_STATES: ReadonlySet<TransportOrderState> = new Set<TransportOrderState>([
-  'FINISHED',
-  'FAILED',
-  'WITHDRAWN',
-  'UNROUTABLE',
-]);
+/**
+ * Terminal transport-order states. Exported so UI components can share
+ * the same definition (the `OrderStatusSidebar` "仅显示进行中" filter
+ * relies on this set), avoiding a parallel copy that could drift.
+ */
+export const TERMINAL_ORDER_STATES: ReadonlySet<TransportOrderState>
+  = new Set<TransportOrderState>(['FINISHED', 'FAILED', 'WITHDRAWN', 'UNROUTABLE']);
 
 /** Default age threshold (ms) after which terminal entries are pruned. */
 const TERMINAL_PRUNE_MS = 30_000;

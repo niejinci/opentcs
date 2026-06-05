@@ -517,7 +517,7 @@ watch(
                   <option v-for="n in targetSuggestions" :key="n" :value="n" />
                 </datalist>
                 <button
-                  v-if="targetSuggestions.length > 0 && row.customMode"
+                  v-if="row.customMode"
                   type="button"
                   class="dest-back"
                   title="返回下拉选择"
