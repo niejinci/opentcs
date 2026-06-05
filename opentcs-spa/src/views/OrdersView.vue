@@ -42,6 +42,9 @@ interface DestinationRow {
   id: number;
   targetName: string;
   operation: TransportOrderOperation;
+  /** When true, the row renders a free-form input instead of the
+   *  Point/Location dropdown — selected via the "(自定义…)" item. */
+  customMode: boolean;
 }
 
 const route = useRoute();
@@ -61,7 +64,7 @@ const lastPublishedAt = ref<string | null>(null);
 
 const intendedVehicle = ref<string>('');
 const destRows = ref<DestinationRow[]>([
-  { id: 1, targetName: '', operation: 'MOVE' },
+  { id: 1, targetName: '', operation: 'MOVE', customMode: false },
 ]);
 let nextRowId = 2;
 
@@ -88,9 +91,7 @@ const targetSuggestions = ref<string[]>([]);
  * full op list and let the BFF/Kernel produce the authoritative 4xx,
  * matching scenario #3 of the S9 acceptance script.
  */
-type TargetInfo =
-  | { kind: 'point' }
-  | { kind: 'location'; allowedOps: ReadonlySet<string> };
+type TargetInfo = { kind: 'point' } | { kind: 'location'; allowedOps: ReadonlySet<string> };
 const targetInfoByName = ref<Map<string, TargetInfo>>(new Map());
 
 const POINT_OPS: readonly TransportOrderOperation[] = ['MOVE', 'PARK'];
@@ -137,14 +138,47 @@ const selectedVehicle = computed<Vehicle | null>(() => {
 /** Pending UI selection for the "set integration level" picker. */
 const integrationLevelDraft = ref<VehicleIntegrationLevel | ''>('');
 const integrationLevelBusy = ref(false);
+/**
+ * Tracks whether the user has manually changed the integration-level
+ * dropdown since the last sync. While `true`, SSE-driven vehicle
+ * snapshots must NOT overwrite the draft — otherwise a kernel tick
+ * arriving in the few hundred ms between "user opens dropdown" and
+ * "user clicks 应用" silently snaps the selection back to the server's
+ * current value (e.g. TO_BE_RESPECTED), which is exactly defect 3-A.
+ */
+const integrationLevelDirty = ref(false);
 
+// Sync the draft only when the user switches the *selected vehicle*
+// (i.e. picks a different name in the upper dropdown) or when the
+// vehicle list first arrives with a value for the selected name.
+// Watching `intendedVehicle` instead of the whole `selectedVehicle`
+// computed ensures every SSE-driven `live.vehicles` replacement no
+// longer triggers a reset.
 watch(
-  selectedVehicle,
-  (veh) => {
+  () => intendedVehicle.value,
+  (name) => {
+    integrationLevelDirty.value = false;
+    const veh = name ? (live.vehicles[name] ?? null) : null;
     integrationLevelDraft.value = veh ? veh.integrationLevel : '';
   },
   { immediate: true },
 );
+// One-shot follow-up: when the vehicle list is primed by REST/SSE
+// after the page first renders, populate the draft with the kernel's
+// current value — but only while the user has not started editing.
+watch(
+  () => (intendedVehicle.value ? live.vehicles[intendedVehicle.value]?.integrationLevel : ''),
+  (level) => {
+    if (integrationLevelDirty.value) return;
+    if (level && integrationLevelDraft.value === '') {
+      integrationLevelDraft.value = level;
+    }
+  },
+);
+
+function onIntegrationLevelInput(): void {
+  integrationLevelDirty.value = true;
+}
 
 async function applyIntegrationLevel(): Promise<void> {
   const veh = selectedVehicle.value;
@@ -158,6 +192,7 @@ async function applyIntegrationLevel(): Promise<void> {
     // single key) to match the pattern used by `applyVehicleEnvelope` and
     // guarantee Pinia reactivity.
     live.vehicles = { ...live.vehicles, [updated.name]: updated };
+    integrationLevelDirty.value = false;
     toastSuccess(`${updated.name} → ${updated.integrationLevel}`);
   } catch (err) {
     if (err instanceof HttpError) {
@@ -208,9 +243,7 @@ async function loadDraftTargets(): Promise<void> {
       const obj = t as { name?: unknown; allowedOperations?: unknown };
       if (typeof obj.name !== 'string' || obj.name.length === 0) continue;
       const ops = Array.isArray(obj.allowedOperations)
-        ? (obj.allowedOperations as unknown[]).filter(
-            (x): x is string => typeof x === 'string',
-          )
+        ? (obj.allowedOperations as unknown[]).filter((x): x is string => typeof x === 'string')
         : [];
       typeAllowedOps.set(obj.name, new Set(ops));
     }
@@ -243,7 +276,7 @@ async function loadDraftTargets(): Promise<void> {
 }
 
 function addDestination(): void {
-  destRows.value.push({ id: nextRowId++, targetName: '', operation: 'MOVE' });
+  destRows.value.push({ id: nextRowId++, targetName: '', operation: 'MOVE', customMode: false });
 }
 
 /**
@@ -258,6 +291,29 @@ function onTargetChanged(row: DestinationRow): void {
   if (allowed.length > 0 && !allowed.includes(row.operation)) {
     row.operation = allowed[0];
   }
+}
+
+/**
+ * `<select>` change handler for the destination dropdown. The sentinel
+ * value `__custom__` flips the row into free-form input mode so the
+ * user can type a name that isn't part of the published draft. Picking
+ * an actual suggestion just commits the name and re-aligns the
+ * operation dropdown to a valid op for the new target kind.
+ */
+function onTargetSelected(row: DestinationRow, value: string): void {
+  if (value === '__custom__') {
+    row.customMode = true;
+    row.targetName = '';
+    return;
+  }
+  row.targetName = value;
+  onTargetChanged(row);
+}
+
+/** Switch a row back to the dropdown picker (clears any free-form input). */
+function exitCustomMode(row: DestinationRow): void {
+  row.customMode = false;
+  row.targetName = '';
 }
 
 function removeDestination(id: number): void {
@@ -378,8 +434,8 @@ watch(
         <code>NOT_FOUND</code>）。请先回到画布编辑器使用「发布到内核」按钮。
       </div>
       <div v-else class="publish-banner info" role="status">
-        上次发布：{{ lastPublishedAt }} ——
-        若画布中新增或重命名了 Point / Location，请重新发布后再下单。
+        上次发布：{{ lastPublishedAt }} —— 若画布中新增或重命名了 Point /
+        Location，请重新发布后再下单。
       </div>
 
       <div class="vehicle-pick">
@@ -403,6 +459,7 @@ watch(
           :id="`int-lvl-${selectedVehicle.name}`"
           v-model="integrationLevelDraft"
           :disabled="integrationLevelBusy"
+          @change="onIntegrationLevelInput"
         >
           <option v-for="lvl in INTEGRATION_LEVELS" :key="lvl" :value="lvl">
             {{ lvl }}
@@ -412,16 +469,16 @@ watch(
           type="button"
           :disabled="
             integrationLevelBusy ||
-              !integrationLevelDraft ||
-              integrationLevelDraft === selectedVehicle.integrationLevel
+            !integrationLevelDraft ||
+            integrationLevelDraft === selectedVehicle.integrationLevel
           "
           @click="applyIntegrationLevel"
         >
           {{ integrationLevelBusy ? '应用中…' : '应用' }}
         </button>
         <span class="hint">
-          当前：<code>{{ selectedVehicle.integrationLevel }}</code> ——
-          调度执行需 <code>TO_BE_UTILIZED</code>。
+          当前：<code>{{ selectedVehicle.integrationLevel }}</code> —— 调度执行需
+          <code>TO_BE_UTILIZED</code>。
         </span>
       </div>
 
@@ -435,18 +492,40 @@ watch(
           <li v-for="(row, idx) in destRows" :key="row.id" class="dest-row-wrap">
             <div class="dest-row">
               <span class="idx">{{ idx + 1 }}.</span>
-              <input
-                v-model="row.targetName"
-                :list="`dest-targets-${row.id}`"
-                placeholder="Point / Location 名"
-                spellcheck="false"
-                autocomplete="off"
+              <select
+                v-if="targetSuggestions.length > 0 && !row.customMode"
+                :value="row.targetName"
                 class="target"
-                @change="onTargetChanged(row)"
-              />
-              <datalist :id="`dest-targets-${row.id}`">
-                <option v-for="n in targetSuggestions" :key="n" :value="n" />
-              </datalist>
+                @change="onTargetSelected(row, ($event.target as HTMLSelectElement).value)"
+              >
+                <option value="" disabled>选择 Point / Location…</option>
+                <option v-for="n in targetSuggestions" :key="n" :value="n">{{ n }}</option>
+                <option value="__custom__">(自定义…)</option>
+              </select>
+              <template v-else>
+                <input
+                  v-model="row.targetName"
+                  :list="`dest-targets-${row.id}`"
+                  placeholder="Point / Location 名"
+                  spellcheck="false"
+                  autocomplete="off"
+                  class="target"
+                  @change="onTargetChanged(row)"
+                  @blur="onTargetChanged(row)"
+                />
+                <datalist :id="`dest-targets-${row.id}`">
+                  <option v-for="n in targetSuggestions" :key="n" :value="n" />
+                </datalist>
+                <button
+                  v-if="targetSuggestions.length > 0 && row.customMode"
+                  type="button"
+                  class="dest-back"
+                  title="返回下拉选择"
+                  @click="exitCustomMode(row)"
+                >
+                  ↩
+                </button>
+              </template>
               <select v-model="row.operation" class="op">
                 <option v-for="op in rowAllowedOps(row)" :key="op" :value="op">
                   {{ op }}
@@ -470,10 +549,7 @@ watch(
                 </button>
               </div>
             </div>
-            <p
-              v-if="row.targetName.trim().length > 0 && !rowIsValid(row)"
-              class="row-warn"
-            >
+            <p v-if="row.targetName.trim().length > 0 && !rowIsValid(row)" class="row-warn">
               「{{ row.operation }}」对该目标不可用，请选择上方下拉中的有效操作。
             </p>
           </li>
@@ -481,12 +557,7 @@ watch(
       </div>
 
       <div class="actions">
-        <button
-          type="button"
-          class="submit"
-          :disabled="!canSubmit"
-          @click="submit"
-        >
+        <button type="button" class="submit" :disabled="!canSubmit" @click="submit">
           {{ submitting ? '提交中…' : '提交订单' }}
         </button>
       </div>

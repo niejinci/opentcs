@@ -138,9 +138,7 @@ describe('liveStatus timeline dedup', () => {
     // (it has no replay context).
     cb({ currentObjectState: makeOrder('o', 'DISPATCHABLE'), previousObjectState: null });
 
-    const states = store.orderTimeline
-      .filter((e) => e.name === 'o')
-      .map((e) => e.state);
+    const states = store.orderTimeline.filter((e) => e.name === 'o').map((e) => e.state);
     expect(states).toEqual(['DISPATCHABLE', 'RAW']); // newest-first, no third entry.
   });
 
@@ -176,5 +174,62 @@ describe('liveStatus timeline dedup', () => {
     expect(entries).toHaveLength(2);
     expect(entries[0].order).toBeNull();
     expect(entries[1].order).not.toBeNull();
+  });
+
+  it('clearOrderTimeline empties the timeline', () => {
+    const store = useLiveStatusStore();
+    store.start();
+    const cb = lastOptions.onTransportOrderEvent!;
+
+    cb({ currentObjectState: makeOrder('a', 'RAW'), previousObjectState: null });
+    cb({ currentObjectState: makeOrder('b', 'RAW'), previousObjectState: null });
+    expect(store.orderTimeline.length).toBeGreaterThan(0);
+
+    store.clearOrderTimeline();
+    expect(store.orderTimeline).toEqual([]);
+  });
+
+  it('pruneFinishedOrderTimeline(0) drops every terminal entry but keeps active ones', () => {
+    const store = useLiveStatusStore();
+    store.start();
+    const cb = lastOptions.onTransportOrderEvent!;
+
+    cb({ currentObjectState: makeOrder('a', 'BEING_PROCESSED'), previousObjectState: null });
+    cb({
+      currentObjectState: makeOrder('b', 'FINISHED'),
+      previousObjectState: makeOrder('b', 'BEING_PROCESSED'),
+    });
+    cb({
+      currentObjectState: makeOrder('c', 'FAILED'),
+      previousObjectState: makeOrder('c', 'BEING_PROCESSED'),
+    });
+    cb({
+      currentObjectState: makeOrder('d', 'WITHDRAWN'),
+      previousObjectState: makeOrder('d', 'BEING_PROCESSED'),
+    });
+    cb({
+      currentObjectState: makeOrder('e', 'UNROUTABLE'),
+      previousObjectState: makeOrder('e', 'DISPATCHABLE'),
+    });
+
+    store.pruneFinishedOrderTimeline(0);
+    const remainingNames = store.orderTimeline.map((e) => e.name);
+    expect(remainingNames).toEqual(['a']);
+  });
+
+  it('pruneFinishedOrderTimeline keeps recent terminal entries when maxAge is generous', () => {
+    const store = useLiveStatusStore();
+    store.start();
+    const cb = lastOptions.onTransportOrderEvent!;
+
+    cb({
+      currentObjectState: makeOrder('o', 'FINISHED'),
+      previousObjectState: makeOrder('o', 'BEING_PROCESSED'),
+    });
+    expect(store.orderTimeline).toHaveLength(1);
+
+    // Generous threshold (1 minute) → entry is younger than that → kept.
+    store.pruneFinishedOrderTimeline(60_000);
+    expect(store.orderTimeline).toHaveLength(1);
   });
 });

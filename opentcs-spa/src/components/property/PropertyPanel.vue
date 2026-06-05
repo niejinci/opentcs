@@ -495,9 +495,9 @@ function onDeleteBlock(name: string): void {
           :disabled="!snapCandidate"
           :title="
             snapCandidate
-              ? `将 Point 坐标设为车辆 ${snapCandidate.vehicleName} 的实测位置`
-                + ` (距离 ${Math.round(snapCandidate.distanceMm)} mm`
-                + `${snapCandidate.isAtThisPoint ? '，AGV 当前停在此点' : ''})`
+              ? `将 Point 坐标设为车辆 ${snapCandidate.vehicleName} 的实测位置` +
+                ` (距离 ${Math.round(snapCandidate.distanceMm)} mm` +
+                `${snapCandidate.isAtThisPoint ? '，AGV 当前停在此点' : ''})`
               : '当前没有车辆上报实测位置'
           "
           data-testid="point-snap-to-vehicle"
@@ -506,8 +506,7 @@ function onDeleteBlock(name: string): void {
           贴齐到车辆当前位置
         </button>
         <span v-if="snapCandidate" class="snap-hint">
-          → {{ snapCandidate.vehicleName }}
-          · Δ{{ Math.round(snapCandidate.distanceMm) }} mm
+          → {{ snapCandidate.vehicleName }} · Δ{{ Math.round(snapCandidate.distanceMm) }} mm
           <span v-if="snapCandidate.isAtThisPoint">· 当前停靠</span>
         </span>
       </div>
@@ -603,6 +602,11 @@ function onDeleteBlock(name: string): void {
   gap: 0.75rem;
   overflow-y: auto;
   min-width: 0;
+  min-height: 0;
+  /* Inside the editor sidebar grid this row resolves to `1fr`, so the
+     panel takes the remaining space and scrolls internally instead of
+     being collapsed to the height of its header by sibling panels. */
+  height: 100%;
 }
 .property-panel__header h3 {
   margin: 0;

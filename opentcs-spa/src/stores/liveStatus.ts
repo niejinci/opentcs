@@ -54,6 +54,21 @@ export interface OrderTimelineEntry {
 
 const ORDER_TIMELINE_CAP = 200;
 
+/**
+ * Set of terminal transport-order states. Entries in those states are
+ * eligible for the auto-prune in `pushTimelineEntry` and the manual
+ * "clear finished" action exposed to the sidebar.
+ */
+const TERMINAL_ORDER_STATES: ReadonlySet<TransportOrderState> = new Set<TransportOrderState>([
+  'FINISHED',
+  'FAILED',
+  'WITHDRAWN',
+  'UNROUTABLE',
+]);
+
+/** Default age threshold (ms) after which terminal entries are pruned. */
+const TERMINAL_PRUNE_MS = 30_000;
+
 export const useLiveStatusStore = defineStore('liveStatus', () => {
   /* ----------------------------- State -------------------------------- */
 
@@ -155,9 +170,9 @@ export const useLiveStatusStore = defineStore('liveStatus', () => {
     // than the global head, since orders interleave on the timeline.
     const lastForOrder = orderTimeline.value.find((e) => e.name === entry.name);
     if (
-      lastForOrder
-      && lastForOrder.state === entry.state
-      && (lastForOrder.order === null) === (entry.order === null)
+      lastForOrder &&
+      lastForOrder.state === entry.state &&
+      (lastForOrder.order === null) === (entry.order === null)
     ) {
       return;
     }
@@ -166,6 +181,47 @@ export const useLiveStatusStore = defineStore('liveStatus', () => {
       list.length = ORDER_TIMELINE_CAP;
     }
     orderTimeline.value = list;
+
+    // Auto-prune: when a terminal entry is added, schedule a delayed
+    // sweep so finished orders disappear from the sidebar without the
+    // user having to click "清空". The timer references the seq of the
+    // entry it was scheduled for so a later "clear" call doesn't have
+    // to cancel anything explicitly — the prune is a no-op if the
+    // entry is already gone.
+    if (TERMINAL_ORDER_STATES.has(entry.state)) {
+      scheduleTerminalPrune();
+    }
+  }
+
+  /**
+   * Discard timeline entries whose state is terminal (FINISHED / FAILED
+   * / WITHDRAWN / UNROUTABLE) and whose `receivedAt` is older than
+   * `maxAgeMs`. Pass `0` to drop every terminal entry regardless of age
+   * (used by the "清除已完成" UI button).
+   */
+  function pruneFinishedOrderTimeline(maxAgeMs: number = TERMINAL_PRUNE_MS): void {
+    if (orderTimeline.value.length === 0) return;
+    const cutoff = Date.now() - Math.max(0, maxAgeMs);
+    const filtered = orderTimeline.value.filter(
+      (e) => !TERMINAL_ORDER_STATES.has(e.state) || e.receivedAt > cutoff,
+    );
+    if (filtered.length !== orderTimeline.value.length) {
+      orderTimeline.value = filtered;
+    }
+  }
+
+  /** Manually clear the entire order timeline (UI "清空" button). */
+  function clearOrderTimeline(): void {
+    orderTimeline.value = [];
+  }
+
+  let pruneTimer: ReturnType<typeof setTimeout> | null = null;
+  function scheduleTerminalPrune(): void {
+    if (pruneTimer !== null) return;
+    pruneTimer = setTimeout(() => {
+      pruneTimer = null;
+      pruneFinishedOrderTimeline(TERMINAL_PRUNE_MS);
+    }, TERMINAL_PRUNE_MS);
   }
 
   /* ----------------------------- Lifecycle ---------------------------- */
@@ -223,6 +279,10 @@ export const useLiveStatusStore = defineStore('liveStatus', () => {
       client.value.close();
       client.value = null;
     }
+    if (pruneTimer !== null) {
+      clearTimeout(pruneTimer);
+      pruneTimer = null;
+    }
     vehicles.value = {};
     transportOrders.value = {};
     orderTimeline.value = [];
@@ -277,5 +337,7 @@ export const useLiveStatusStore = defineStore('liveStatus', () => {
     start,
     stop,
     recordCreatedOrder,
+    clearOrderTimeline,
+    pruneFinishedOrderTimeline,
   };
 });

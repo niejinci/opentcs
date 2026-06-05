@@ -11,14 +11,38 @@
 //
 // S9 scope: read-only. Withdraw / cancel actions land in S10+.
 
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import { useLiveStatusStore } from '@/stores/liveStatus';
 import type { TransportOrderState } from '@/api/types/bff';
 
 const live = useLiveStatusStore();
 
-const visibleEntries = computed(() => live.orderTimeline.slice(0, 50));
+const TERMINAL_STATES: ReadonlySet<TransportOrderState> = new Set<TransportOrderState>([
+  'FINISHED',
+  'FAILED',
+  'WITHDRAWN',
+  'UNROUTABLE',
+]);
+
+/** When true, hide entries whose state is terminal. */
+const onlyActive = ref(false);
+
+const visibleEntries = computed(() => {
+  const src = onlyActive.value
+    ? live.orderTimeline.filter((e) => !TERMINAL_STATES.has(e.state))
+    : live.orderTimeline;
+  return src.slice(0, 50);
+});
+
+function onClear(): void {
+  live.clearOrderTimeline();
+}
+
+function onClearFinished(): void {
+  // Drop *all* terminal entries regardless of age (UI "清除已完成").
+  live.pruneFinishedOrderTimeline(0);
+}
 
 const sseLabel = computed(() => {
   switch (live.sseState) {
@@ -66,6 +90,28 @@ function formatTime(ts: number): string {
       <h3>订单状态</h3>
       <span class="sse-pill" :data-tone="sseTone">SSE · {{ sseLabel }}</span>
     </header>
+    <div class="toolbar">
+      <label class="filter">
+        <input v-model="onlyActive" type="checkbox" />
+        <span>仅显示进行中</span>
+      </label>
+      <button
+        type="button"
+        class="tb-btn"
+        :disabled="live.orderTimeline.length === 0"
+        @click="onClearFinished"
+      >
+        清除已完成
+      </button>
+      <button
+        type="button"
+        class="tb-btn"
+        :disabled="live.orderTimeline.length === 0"
+        @click="onClear"
+      >
+        清空
+      </button>
+    </div>
     <div v-if="live.activeOrders.length > 0" class="active-summary">
       在执行：{{ live.activeOrders.length }}
     </div>
@@ -83,9 +129,7 @@ function formatTime(ts: number): string {
         </div>
         <div class="row2">
           <span class="oname">{{ entry.name }}</span>
-          <span v-if="entry.previousState" class="prev">
-            ← {{ entry.previousState }}
-          </span>
+          <span v-if="entry.previousState" class="prev"> ← {{ entry.previousState }} </span>
           <span v-if="entry.order?.processingVehicle" class="veh">
             · 车 {{ entry.order.processingVehicle }}
           </span>
@@ -139,6 +183,41 @@ function formatTime(ts: number): string {
   padding: 0.25rem 0.75rem;
   color: #57606a;
   border-bottom: 1px solid #eaeef2;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid #eaeef2;
+  font-size: 0.75rem;
+  color: #57606a;
+}
+.toolbar .filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+}
+.toolbar .tb-btn {
+  margin-left: auto;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid #d0d7de;
+  background: #ffffff;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+}
+.toolbar .tb-btn + .tb-btn {
+  margin-left: 0;
+}
+.toolbar .tb-btn:hover:not(:disabled) {
+  background: #eaeef2;
+}
+.toolbar .tb-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 .timeline {
   list-style: none;
