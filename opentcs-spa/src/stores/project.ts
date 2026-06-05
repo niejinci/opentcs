@@ -29,7 +29,7 @@ import type { AffineMapping, WorldPoint } from '@/domain/geometry/affine';
 import { pixelToWorld, worldToPixel } from '@/domain/geometry/affine';
 import { type AlignAction, type AlignAnchor, applyAlignAction } from '@/domain/editor/align';
 import { isValidEntityName, nextAutoName } from '@/domain/model/naming';
-import { distanceMm } from '@/domain/model/path';
+import { distanceMm, findDirectedPath, uniqueDirectedPaths } from '@/domain/model/path';
 import type {
   BlockType,
   DraftBlock,
@@ -145,7 +145,7 @@ function loadPersisted(): PersistedDraft | null {
     return {
       v: STORAGE_VERSION,
       points: (parsed.points as DraftPoint[]).map(withProperties),
-      paths: (parsed.paths as DraftPath[]).map(withProperties),
+      paths: uniqueDirectedPaths((parsed.paths as DraftPath[]).map(withProperties)),
       locationTypes: Array.isArray(parsed.locationTypes)
         ? (parsed.locationTypes as DraftLocationType[]).map(withProperties)
         : [],
@@ -371,7 +371,7 @@ export const useProjectStore = defineStore('project', () => {
       }
       const revived = JSON.parse(JSON.stringify(payload), nanReviver) as Partial<PersistedDraft>;
       points.value = (revived.points ?? []).map(withProperties) as DraftPoint[];
-      paths.value = (revived.paths ?? []).map(withProperties) as DraftPath[];
+      paths.value = uniqueDirectedPaths((revived.paths ?? []).map(withProperties) as DraftPath[]);
       locationTypes.value = (revived.locationTypes ?? []).map(
         withProperties,
       ) as DraftLocationType[];
@@ -621,19 +621,28 @@ export const useProjectStore = defineStore('project', () => {
     pathDraftSrc.value = null;
   }
 
-  function completePath(destName: string): DraftPath | null {
+  function completePath(destName: string): { path: DraftPath | null; error?: string } {
     const src = pathDraftSrc.value;
-    if (!src) return null;
+    if (!src) return { path: null };
     pathDraftSrc.value = null;
-    if (src === destName) return null;
+    if (src === destName) return { path: null };
     const srcPt = findPoint(src);
     const dstPt = findPoint(destName);
-    if (!srcPt || !dstPt) return null;
+    if (!srcPt || !dstPt) return { path: null };
+
+    const duplicate = findDirectedPath(paths.value, src, destName);
+    if (duplicate) {
+      selection.value = { kind: 'path', name: duplicate.name };
+      return {
+        path: null,
+        error: `已存在同方向 Path：${src} -> ${destName}`,
+      };
+    }
+
     // Match the Java modeleditor convention (AbstractConnection.java):
     // path default name == "${src} --- ${dst}" so the resource tree and
-    // the property panel can show the route at a glance. We append a
-    // numeric suffix on collision (e.g. parallel paths between the
-    // same two points).
+    // the property panel can show the route at a glance. We still append
+    // a numeric suffix on name collision with other entity kinds.
     const baseName = `${src} --- ${destName}`;
     const existingNames = new Set(paths.value.map((p) => p.name));
     let name = baseName;
@@ -654,7 +663,7 @@ export const useProjectStore = defineStore('project', () => {
     };
     paths.value.push(created);
     selection.value = { kind: 'path', name };
-    return created;
+    return { path: created };
   }
 
   function renamePath(oldName: string, newName: string): { ok: boolean; error?: string } {

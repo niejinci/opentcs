@@ -27,9 +27,15 @@ import { computed } from 'vue';
 import type { EditorToolId } from '@/domain/editor/tools';
 import type { DraftLocation, DraftPath, DraftPoint, DraftVehicle } from '@/domain/model/types';
 import { resolveToleranceMm, toleranceMmToStagePx } from '@/domain/editor/tolerance';
+import {
+  directedPathArrowGeometry,
+  directedPathKey,
+  type PathArrowGeometry,
+} from '@/domain/model/path';
 import { useLiveVehicleOverlay } from '@/composables/useLiveVehicleOverlay';
 import { useEditorSettingsStore } from '@/stores/editorSettings';
 import { useProjectStore } from '@/stores/project';
+import { toastError } from '@/ui/toast/toastBus';
 
 const props = defineProps<{
   tool: EditorToolId;
@@ -88,13 +94,6 @@ interface RenderedPath {
   curveSign: 1 | -1 | null;
 }
 
-/**
- * Internal delimiter used to encode `(src, dst)` pairs as a Map/Set key.
- * U+0001 (SOH) is forbidden in entity names by `isValidEntityName`, so
- * it can't collide with any user-chosen Point name.
- */
-const PATH_PAIR_KEY_DELIM = '\u0001';
-
 const renderedPaths = computed<RenderedPath[]>(() => {
   const byName = new Map(store.points.map((p) => [p.name, p]));
   // Collect the (src, dst) pairs of every renderable path so we can
@@ -102,7 +101,7 @@ const renderedPaths = computed<RenderedPath[]>(() => {
   const directed = new Set<string>();
   for (const path of store.paths) {
     if (byName.has(path.srcPointName) && byName.has(path.destPointName)) {
-      directed.add(`${path.srcPointName}${PATH_PAIR_KEY_DELIM}${path.destPointName}`);
+      directed.add(directedPathKey(path.srcPointName, path.destPointName));
     }
   }
   const out: RenderedPath[] = [];
@@ -110,9 +109,7 @@ const renderedPaths = computed<RenderedPath[]>(() => {
     const src = byName.get(path.srcPointName);
     const dst = byName.get(path.destPointName);
     if (!src || !dst) continue;
-    const reverseExists = directed.has(
-      `${path.destPointName}${PATH_PAIR_KEY_DELIM}${path.srcPointName}`,
-    );
+    const reverseExists = directed.has(directedPathKey(path.destPointName, path.srcPointName));
     let curveSign: 1 | -1 | null = null;
     if (reverseExists) {
       // Stable side assignment: the path whose src name sorts before the
@@ -134,98 +131,23 @@ const renderedPaths = computed<RenderedPath[]>(() => {
 const PATH_CURVE_SAGITTA_CSS_PX = 16;
 const pathCurveSagitta = computed(() => PATH_CURVE_SAGITTA_CSS_PX / safeScale(props.scale));
 
-interface CurvedPathGeom {
-  /** SVG path data: `M sx sy Q cx cy dx dy` (or `M..L..` when straight). */
-  pathData: string;
-  /** Arrow-head triangle points, in stage-pixel coordinates (6-tuple). */
-  arrowHeadPoints: number[];
+function curvedPathGeom(rp: RenderedPath): PathArrowGeometry {
+  return directedPathArrowGeometry({
+    srcPointName: rp.path.srcPointName,
+    destPointName: rp.path.destPointName,
+    sx: rp.src.layout.pixelX,
+    sy: rp.src.layout.pixelY,
+    dx: rp.dst.layout.pixelX,
+    dy: rp.dst.layout.pixelY,
+    curveSign: rp.curveSign,
+    sagitta: pathCurveSagitta.value,
+    arrowSize: arrowSize.value,
+  });
 }
 
-/**
- * Geometry helper for bidirectional paths.
- *
- * For a straight segment (sx,sy)->(dx,dy), pick a control point offset
- * perpendicularly from the midpoint by `±sagitta`, then derive the
- * arrow-head from the tangent at the destination (= dst - control).
- */
-function curvedPathGeom(rp: RenderedPath): CurvedPathGeom {
-  const sx = rp.src.layout.pixelX;
-  const sy = rp.src.layout.pixelY;
-  const dx = rp.dst.layout.pixelX;
-  const dy = rp.dst.layout.pixelY;
-  const ah = arrowSize.value;
-  if (rp.curveSign === null) {
-    // Straight: still emit an SVG path so the renderer can use a single
-    // <v-path> + arrow-head shape for both branches uniformly.
-    const len = Math.hypot(dx - sx, dy - sy);
-    if (len < 1e-6) {
-      return { pathData: `M ${sx} ${sy} L ${dx} ${dy}`, arrowHeadPoints: [] };
-    }
-    const tx = (dx - sx) / len;
-    const ty = (dy - sy) / len;
-    const headPoints = arrowHeadAt(dx, dy, tx, ty, ah);
-    return { pathData: `M ${sx} ${sy} L ${dx} ${dy}`, arrowHeadPoints: headPoints };
-  }
-  // Curved branch.
-  const sign = rp.curveSign;
-  const dxv = dx - sx;
-  const dyv = dy - sy;
-  const len = Math.hypot(dxv, dyv);
-  if (len < 1e-6) {
-    return { pathData: `M ${sx} ${sy} L ${dx} ${dy}`, arrowHeadPoints: [] };
-  }
-  // Right-hand normal of (src->dst), unit length.
-  const nx = -dyv / len;
-  const ny = dxv / len;
-  const sag = pathCurveSagitta.value * sign;
-  const cx = (sx + dx) / 2 + nx * sag;
-  const cy = (sy + dy) / 2 + ny * sag;
-  // Tangent at the destination of a quadratic Bézier == (dst - control),
-  // normalised. Drives the arrow-head orientation.
-  let tx = dx - cx;
-  let ty = dy - cy;
-  const tlen = Math.hypot(tx, ty);
-  if (tlen > 1e-6) {
-    tx /= tlen;
-    ty /= tlen;
-  } else {
-    tx = dxv / len;
-    ty = dyv / len;
-  }
-  return {
-    pathData: `M ${sx} ${sy} Q ${cx} ${cy} ${dx} ${dy}`,
-    arrowHeadPoints: arrowHeadAt(dx, dy, tx, ty, ah),
-  };
-}
-
-const renderedPathGeoms = computed<Array<RenderedPath & CurvedPathGeom>>(() => {
+const renderedPathGeoms = computed<Array<RenderedPath & PathArrowGeometry>>(() => {
   return renderedPaths.value.map((rp) => ({ ...rp, ...curvedPathGeom(rp) }));
 });
-
-/** Build a 3-vertex arrow head ending at (x,y) with tangent (tx,ty). */
-function arrowHeadAt(
-  x: number,
-  y: number,
-  tx: number,
-  ty: number,
-  size: number,
-): number[] {
-  // Base of the arrow-head (one "size" behind the tip along -tangent).
-  const bx = x - tx * size;
-  const by = y - ty * size;
-  // Half-width along the perpendicular.
-  const half = size * 0.5;
-  const px = -ty;
-  const py = tx;
-  return [
-    x,
-    y,
-    bx + px * half,
-    by + py * half,
-    bx - px * half,
-    by - py * half,
-  ];
-}
 
 /* ----------------------- Block outline geometry ----------------------- */
 
@@ -453,7 +375,8 @@ function onPointClick(p: DraftPoint, e: KonvaEventObject<MouseEvent>): void {
       // Clicking the same point twice cancels the in-progress path.
       store.cancelPathDraft();
     } else {
-      store.completePath(p.name);
+      const res = store.completePath(p.name);
+      if (res.error) toastError(res.error, 'Path');
     }
     return;
   }
