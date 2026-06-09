@@ -50,6 +50,14 @@ interface DestinationRow {
   customMode: boolean;
 }
 
+interface RecentOrderSnapshot {
+  id: string;
+  orderName: string;
+  createdAt: string;
+  intendedVehicle: string | null;
+  destinations: Destination[];
+}
+
 const route = useRoute();
 const router = useRouter();
 const live = useLiveStatusStore();
@@ -72,6 +80,8 @@ const destRows = ref<DestinationRow[]>([
 let nextRowId = 2;
 
 const submitting = ref(false);
+const recentOrders = ref<RecentOrderSnapshot[]>([]);
+const selectedRecentOrderId = ref<string>('');
 
 /** Names of Points + Locations sourced from the project's BFF draft.
  *  Used purely as a dropdown convenience — the kernel is the
@@ -199,6 +209,12 @@ const canSubmit = computed(() => {
   return destRows.value.every((r) => rowIsValid(r));
 });
 
+const selectedRecentOrder = computed<RecentOrderSnapshot | null>(
+  () => recentOrders.value.find((order) => order.id === selectedRecentOrderId.value) ?? null,
+);
+
+const recentStorageKey = computed(() => `opentcs-spa:recent-orders:${projectId.value}:v1`);
+
 onMounted(async () => {
   if (!projectId.value) {
     toastError('缺少 projectId，无法创建订单');
@@ -213,7 +229,125 @@ onMounted(async () => {
     /* toast handled by client */
   }
   await loadDraftTargets();
+  loadRecentOrders();
 });
+
+function isDestination(value: unknown): value is Destination {
+  const obj = value as Destination;
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    typeof obj.locationName === 'string' &&
+    typeof obj.operation === 'string'
+  );
+}
+
+function isRecentOrderSnapshot(value: unknown): value is RecentOrderSnapshot {
+  const obj = value as RecentOrderSnapshot;
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    typeof obj.id === 'string' &&
+    typeof obj.orderName === 'string' &&
+    typeof obj.createdAt === 'string' &&
+    (typeof obj.intendedVehicle === 'string' || obj.intendedVehicle === null) &&
+    Array.isArray(obj.destinations) &&
+    obj.destinations.every(isDestination)
+  );
+}
+
+function loadRecentOrders(): void {
+  try {
+    const raw = window.localStorage.getItem(recentStorageKey.value);
+    if (!raw) {
+      recentOrders.value = [];
+      selectedRecentOrderId.value = '';
+      return;
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    recentOrders.value = Array.isArray(parsed)
+      ? parsed.filter(isRecentOrderSnapshot).slice(0, 5)
+      : [];
+    if (!recentOrders.value.some((order) => order.id === selectedRecentOrderId.value)) {
+      selectedRecentOrderId.value = '';
+    }
+  } catch {
+    recentOrders.value = [];
+    selectedRecentOrderId.value = '';
+  }
+}
+
+function saveRecentOrders(): void {
+  try {
+    window.localStorage.setItem(
+      recentStorageKey.value,
+      JSON.stringify(recentOrders.value.slice(0, 5)),
+    );
+  } catch {
+    // Non-fatal: order creation should not fail just because browser storage is unavailable.
+  }
+}
+
+function recentOrderSignature(
+  order: Pick<RecentOrderSnapshot, 'intendedVehicle' | 'destinations'>,
+): string {
+  return JSON.stringify({
+    intendedVehicle: order.intendedVehicle ?? null,
+    destinations: order.destinations.map((destination) => ({
+      locationName: destination.locationName.trim(),
+      operation: destination.operation,
+      properties: destination.properties ?? null,
+    })),
+  });
+}
+
+function rememberRecentOrder(orderName: string, request: TransportOrderRequest): void {
+  const snapshot: RecentOrderSnapshot = {
+    id: `${Date.now()}-${orderName}`,
+    orderName,
+    createdAt: new Date().toISOString(),
+    intendedVehicle: request.intendedVehicle ?? null,
+    destinations: request.destinations.map((destination) => ({ ...destination })),
+  };
+  const signature = recentOrderSignature(snapshot);
+  recentOrders.value = [
+    snapshot,
+    ...recentOrders.value.filter((order) => recentOrderSignature(order) !== signature),
+  ].slice(0, 5);
+  selectedRecentOrderId.value = snapshot.id;
+  saveRecentOrders();
+}
+
+function formatRecentOrderTime(value: string): string {
+  const time = new Date(value);
+  if (Number.isNaN(time.getTime())) return value;
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(time);
+}
+
+function makeDestinationRow(destination: Destination): DestinationRow {
+  const targetName = destination.locationName.trim();
+  const row: DestinationRow = {
+    id: nextRowId++,
+    targetName,
+    operation: destination.operation,
+    customMode: targetSuggestions.value.length > 0 && !targetSuggestions.value.includes(targetName),
+  };
+  onTargetChanged(row);
+  return row;
+}
+
+function applyRecentOrder(order: RecentOrderSnapshot): void {
+  selectedRecentOrderId.value = order.id;
+  intendedVehicle.value = order.intendedVehicle ?? '';
+  destRows.value = order.destinations.length
+    ? order.destinations.map(makeDestinationRow)
+    : [{ id: nextRowId++, targetName: '', operation: 'MOVE', customMode: false }];
+}
 
 async function loadDraftTargets(): Promise<void> {
   try {
@@ -238,9 +372,7 @@ async function loadDraftTargets(): Promise<void> {
               : [];
           return { name: obj.name, allowedOperations };
         })
-        .filter(
-          (t): t is { name: string; allowedOperations: string | string[] } => t !== null,
-        ),
+        .filter((t): t is { name: string; allowedOperations: string | string[] } => t !== null),
       locations: arr('locations')
         .map((l) => {
           const obj = l as { name?: unknown; typeName?: unknown; links?: unknown };
@@ -268,7 +400,9 @@ async function loadDraftTargets(): Promise<void> {
           };
         })
         .filter(
-          (l): l is {
+          (
+            l,
+          ): l is {
             name: string;
             typeName: string;
             links: { pointName: string; allowedOperations: string | string[] }[];
@@ -357,6 +491,7 @@ async function submit(): Promise<void> {
   try {
     const order = await createTransportOrder(request, { toastOnError: false });
     live.recordCreatedOrder(order);
+    rememberRecentOrder(order.name, request);
     toastSuccess(`已创建订单 ${order.name}`, '订单');
     // Back to map view — live SSE will animate the vehicle.
     void router.push({ name: 'editor', params: { projectId: projectId.value } });
@@ -490,6 +625,68 @@ watch(
           <code>TO_BE_UTILIZED</code>。
         </span>
       </div>
+
+      <section class="recent-orders" aria-labelledby="recent-orders-title">
+        <div class="recent-orders-hdr">
+          <div>
+            <h3 id="recent-orders-title">最近5条订单</h3>
+            <p>本地历史订单</p>
+          </div>
+          <span class="recent-count">{{ recentOrders.length }}/5</span>
+        </div>
+
+        <p v-if="recentOrders.length === 0" class="recent-empty">
+          暂无本地历史订单，成功提交后会自动记录。
+        </p>
+        <div v-else class="recent-layout">
+          <ol class="recent-list">
+            <li v-for="order in recentOrders" :key="order.id">
+              <button
+                type="button"
+                class="recent-item"
+                :class="{ active: order.id === selectedRecentOrderId }"
+                @click="applyRecentOrder(order)"
+              >
+                <span class="recent-main">
+                  <span class="recent-name">{{ order.orderName }}</span>
+                  <span class="recent-meta">
+                    {{ formatRecentOrderTime(order.createdAt) }} ·
+                    {{ order.intendedVehicle || 'Kernel 调度' }}
+                  </span>
+                </span>
+                <span class="recent-route">
+                  <span
+                    v-for="(destination, idx) in order.destinations"
+                    :key="`${order.id}-${idx}-${destination.locationName}`"
+                  >
+                    {{ destination.locationName }} / {{ destination.operation }}
+                  </span>
+                </span>
+              </button>
+            </li>
+          </ol>
+
+          <aside v-if="selectedRecentOrder" class="recent-detail" aria-label="历史订单详情">
+            <div class="recent-detail-hdr">
+              <strong>{{ selectedRecentOrder.orderName }}</strong>
+              <span>{{ formatRecentOrderTime(selectedRecentOrder.createdAt) }}</span>
+            </div>
+            <p>
+              执行车辆：
+              <code>{{ selectedRecentOrder.intendedVehicle || '由 Kernel 调度' }}</code>
+            </p>
+            <ol>
+              <li
+                v-for="(destination, idx) in selectedRecentOrder.destinations"
+                :key="`${selectedRecentOrder.id}-detail-${idx}`"
+              >
+                <code>{{ destination.locationName }}</code>
+                <span>{{ destination.operation }}</span>
+              </li>
+            </ol>
+          </aside>
+        </div>
+      </section>
 
       <div class="dest-block">
         <div class="dest-block-hdr">
@@ -662,6 +859,168 @@ watch(
 .hint.warn {
   color: #9a6700;
 }
+.recent-orders {
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  padding: 0.6rem 0.85rem 0.85rem;
+}
+.recent-orders-hdr {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.recent-orders-hdr h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.recent-orders-hdr p {
+  margin: 0.15rem 0 0;
+  color: #6e7781;
+  font-size: 0.8rem;
+}
+.recent-count {
+  color: #57606a;
+  border: 1px solid #d0d7de;
+  border-radius: 999px;
+  background: #f6f8fa;
+  padding: 0.05rem 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+.recent-empty {
+  margin: 0;
+  color: #6e7781;
+  font-size: 0.85rem;
+}
+.recent-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(15rem, 0.56fr);
+  gap: 0.75rem;
+}
+.recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.recent-item {
+  width: 100%;
+  min-height: 3.3rem;
+  display: grid;
+  grid-template-columns: minmax(9rem, 0.8fr) minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: center;
+  text-align: left;
+  border: 1px solid #d0d7de;
+  background: #f6f8fa;
+  border-radius: 4px;
+  padding: 0.4rem 0.55rem;
+  cursor: pointer;
+}
+.recent-item:hover,
+.recent-item.active {
+  border-color: #0969da;
+  background: #ddf4ff;
+}
+.recent-main,
+.recent-route {
+  min-width: 0;
+}
+.recent-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.recent-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+  color: #24292f;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent-meta {
+  color: #6e7781;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent-route {
+  display: flex;
+  gap: 0.25rem;
+  overflow: hidden;
+}
+.recent-route span {
+  flex: 0 0 auto;
+  max-width: 9.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #57606a;
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.76rem;
+}
+.recent-detail {
+  border: 1px solid #d8dee4;
+  border-radius: 4px;
+  background: #ffffff;
+  padding: 0.5rem 0.6rem;
+  min-width: 0;
+}
+.recent-detail-hdr {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+.recent-detail-hdr strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.recent-detail-hdr span,
+.recent-detail p {
+  color: #6e7781;
+  font-size: 0.78rem;
+}
+.recent-detail p {
+  margin: 0 0 0.45rem;
+}
+.recent-detail ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.recent-detail li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: #57606a;
+  font-size: 0.8rem;
+}
+.recent-detail code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
 .dest-block {
   background: #fff;
   border: 1px solid #d0d7de;
@@ -774,5 +1133,16 @@ watch(
   background: #ddf4ff;
   border: 1px solid #54aeff;
   color: #0550ae;
+}
+@media (max-width: 760px) {
+  .recent-layout {
+    grid-template-columns: 1fr;
+  }
+  .recent-item {
+    grid-template-columns: 1fr;
+  }
+  .recent-route {
+    flex-wrap: wrap;
+  }
 }
 </style>
