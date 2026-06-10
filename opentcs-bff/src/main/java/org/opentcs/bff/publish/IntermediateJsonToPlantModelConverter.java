@@ -46,6 +46,8 @@ import org.opentcs.access.to.model.VehicleCreationTO;
  */
 public final class IntermediateJsonToPlantModelConverter {
 
+  private static final String VDA5050_PATH_VEHICLE_ORIENTATION = "vda5050:vehicleOrientation";
+
   private IntermediateJsonToPlantModelConverter() {
   }
 
@@ -155,12 +157,45 @@ public final class IntermediateJsonToPlantModelConverter {
           fp + ".destPointName", "destPoint '" + dest + "' does not exist"
       );
     }
+    int maxReverseVelocity = node.path("maxReverseVelocity").asInt(0);
+    Map<String, String> properties = readProperties(node.path("properties"));
+    validateBackwardPathVelocity(name, maxReverseVelocity, properties, fp);
+
     return new PathCreationTO(name, src, dest)
         .withLength(Math.max(1L, node.path("length").asLong(1L)))
         .withMaxVelocity(node.path("maxVelocity").asInt(0))
-        .withMaxReverseVelocity(node.path("maxReverseVelocity").asInt(0))
+        .withMaxReverseVelocity(maxReverseVelocity)
         .withLocked(node.path("locked").asBoolean(false))
-        .withProperties(readProperties(node.path("properties")));
+        .withProperties(properties);
+  }
+
+  private static void validateBackwardPathVelocity(
+      String pathName,
+      int maxReverseVelocity,
+      Map<String, String> properties,
+      String fp
+  ) {
+    if (!isBackwardVehicleOrientation(properties.get(VDA5050_PATH_VEHICLE_ORIENTATION))) {
+      return;
+    }
+
+    if (maxReverseVelocity <= 0) {
+      throw new PublishValidationException(
+          fp + ".maxReverseVelocity",
+          "Path '" + pathName + "' has "
+              + VDA5050_PATH_VEHICLE_ORIENTATION
+              + "=BACKWARD but maxReverseVelocity is 0"
+      );
+    }
+  }
+
+  private static boolean isBackwardVehicleOrientation(String value) {
+    if (value == null) {
+      return false;
+    }
+
+    String normalizedValue = value.trim().toUpperCase();
+    return normalizedValue.equals("BACKWARD") || normalizedValue.equals("REVERSE");
   }
 
   /* --------------------------- LocationType ------------------------------- */

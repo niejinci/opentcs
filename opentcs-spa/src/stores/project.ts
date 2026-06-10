@@ -72,6 +72,8 @@ const STORAGE_KEY_BG = 'opentcs-spa.bgV1';
 const STORAGE_VERSION = 2;
 const STORAGE_VERSION_BG = 1;
 const PERSIST_DEBOUNCE_MS = 200;
+const VDA5050_PATH_VEHICLE_ORIENTATION = 'vda5050:vehicleOrientation';
+const DEFAULT_BACKWARD_PATH_MAX_REVERSE_VELOCITY = 200;
 
 /* The background travels in its own localStorage key so the (potentially
    multi-MB) PNG data URL doesn't get rewritten on every Point/Path edit. */
@@ -145,7 +147,9 @@ function loadPersisted(): PersistedDraft | null {
     return {
       v: STORAGE_VERSION,
       points: (parsed.points as DraftPoint[]).map(withProperties),
-      paths: uniqueDirectedPaths((parsed.paths as DraftPath[]).map(withProperties)),
+      paths: uniqueDirectedPaths(
+        (parsed.paths as DraftPath[]).map(withProperties).map(ensureReverseVelocityForBackwardPath),
+      ),
       locationTypes: Array.isArray(parsed.locationTypes)
         ? (parsed.locationTypes as DraftLocationType[]).map(withProperties)
         : [],
@@ -173,6 +177,20 @@ function loadPersisted(): PersistedDraft | null {
 function withProperties<T extends { properties?: Record<string, string> }>(entity: T): T {
   if (entity.properties && typeof entity.properties === 'object') return entity;
   return { ...entity, properties: {} };
+}
+
+function hasBackwardVehicleOrientation(path: DraftPath): boolean {
+  const value = path.properties[VDA5050_PATH_VEHICLE_ORIENTATION];
+  if (value === undefined) return false;
+  const normalized = value.trim().toUpperCase();
+  return normalized === 'BACKWARD' || normalized === 'REVERSE';
+}
+
+function ensureReverseVelocityForBackwardPath(path: DraftPath): DraftPath {
+  if (hasBackwardVehicleOrientation(path) && path.maxReverseVelocity <= 0) {
+    path.maxReverseVelocity = DEFAULT_BACKWARD_PATH_MAX_REVERSE_VELOCITY;
+  }
+  return path;
 }
 
 function savePersisted(payload: PersistedDraft): void {
@@ -371,7 +389,11 @@ export const useProjectStore = defineStore('project', () => {
       }
       const revived = JSON.parse(JSON.stringify(payload), nanReviver) as Partial<PersistedDraft>;
       points.value = (revived.points ?? []).map(withProperties) as DraftPoint[];
-      paths.value = uniqueDirectedPaths((revived.paths ?? []).map(withProperties) as DraftPath[]);
+      paths.value = uniqueDirectedPaths(
+        ((revived.paths ?? []).map(withProperties) as DraftPath[]).map(
+          ensureReverseVelocityForBackwardPath,
+        ),
+      );
       locationTypes.value = (revived.locationTypes ?? []).map(
         withProperties,
       ) as DraftLocationType[];
@@ -692,6 +714,7 @@ export const useProjectStore = defineStore('project', () => {
       p.maxReverseVelocity = Math.max(0, Math.round(patch.maxReverseVelocity));
     }
     if (patch.locked !== undefined) p.locked = patch.locked;
+    ensureReverseVelocityForBackwardPath(p);
   }
 
   /* ----------------------- LocationType actions ------------------------ */
@@ -1071,6 +1094,10 @@ export const useProjectStore = defineStore('project', () => {
     // Reassign the bag (not just mutate) so Pinia's deep watcher fires and
     // the persistence layer schedules a save.
     target.properties = { ...target.properties, [k]: value };
+    if (kind === 'path') {
+      const path = findPath(name);
+      if (path) ensureReverseVelocityForBackwardPath(path);
+    }
     return { ok: true };
   }
 
@@ -1103,6 +1130,10 @@ export const useProjectStore = defineStore('project', () => {
       else next[k] = v;
     }
     target.properties = next;
+    if (kind === 'path') {
+      const path = findPath(name);
+      if (path) ensureReverseVelocityForBackwardPath(path);
+    }
     return { ok: true };
   }
 

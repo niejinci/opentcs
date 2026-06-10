@@ -125,6 +125,38 @@ class IntermediateJsonToPlantModelConverterTest {
   }
 
   @Test
+  void rejectsBackwardVdaPathWithoutReverseVelocity()
+      throws Exception {
+    String json = """
+        {
+          "points": [
+            {"name": "Point-8", "type": "HALT_POSITION",
+             "pose": {"position": {"x": 0, "y": 0, "z": 0}, "orientationAngle": "NaN"},
+             "layout": {"pixelX": 0, "pixelY": 0}, "properties": {}},
+            {"name": "Point-7", "type": "HALT_POSITION",
+             "pose": {"position": {"x": 1000, "y": 0, "z": 0}, "orientationAngle": "NaN"},
+             "layout": {"pixelX": 1000, "pixelY": 0}, "properties": {}}
+          ],
+          "paths": [
+            {"name": "Point-8 --- Point-7", "srcPointName": "Point-8",
+             "destPointName": "Point-7", "length": 1000, "maxVelocity": 1000,
+             "maxReverseVelocity": 0, "locked": false,
+             "properties": {"vda5050:vehicleOrientation": "BACKWARD"}}
+          ]
+        }
+        """;
+
+    assertThatThrownBy(
+        () -> IntermediateJsonToPlantModelConverter.toCreationTO(mapper.readTree(json), "x")
+    )
+        .isInstanceOfSatisfying(PublishValidationException.class, ex -> {
+          assertThat(ex.getFieldPath()).isEqualTo("paths[0].maxReverseVelocity");
+          assertThat(ex.getMessage()).contains("Point-8 --- Point-7");
+          assertThat(ex.getMessage()).contains("BACKWARD");
+        });
+  }
+
+  @Test
   void rejectsLocationWithUnknownType()
       throws Exception {
     String json = """
