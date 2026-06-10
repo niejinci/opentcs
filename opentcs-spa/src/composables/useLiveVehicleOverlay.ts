@@ -46,8 +46,7 @@ export interface OverlayVehicle {
   /** Render pixel position (kernel-resolved when available). */
   pixelX: number;
   pixelY: number;
-  /** Render orientation in degrees (driven by draft only — the BFF
-   *  contract does not expose precisePose/orientationAngle yet). */
+  /** Render orientation in degrees for the vehicle body in the draft model. */
   orientationDeg: number;
   /** Render fill colour. */
   fillRgb: string;
@@ -55,6 +54,8 @@ export interface OverlayVehicle {
   isLive: boolean;
   /** Last-seen kernel state, if any. */
   kernelState: VehicleState | null;
+  /** Kernel-resolved logical point name, if the vehicle reports one. */
+  currentPosition: string | null;
   /** Backing draft vehicle, for the existing click / drag handlers. */
   draft: DraftVehicle;
   /**
@@ -129,8 +130,8 @@ export function useLiveVehicleOverlay(): LiveVehicleOverlay {
           precisePixel = { x: px.x, y: px.y };
         }
       }
-      const preciseOrientationDeg
-        = typeof kernel?.orientationAngle === 'number' && Number.isFinite(kernel.orientationAngle)
+      const preciseOrientationDeg =
+        typeof kernel?.orientationAngle === 'number' && Number.isFinite(kernel.orientationAngle)
           ? kernel.orientationAngle
           : null;
       out.push({
@@ -141,6 +142,7 @@ export function useLiveVehicleOverlay(): LiveVehicleOverlay {
         fillRgb: stateColor ?? draft.layout.routeColorRgb,
         isLive,
         kernelState: kernel?.state ?? null,
+        currentPosition: kernel?.currentPosition ?? null,
         draft,
         precisePixel,
         preciseOrientationDeg,

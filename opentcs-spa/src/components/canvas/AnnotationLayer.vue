@@ -22,7 +22,7 @@
 
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import type { EditorToolId } from '@/domain/editor/tools';
 import type { DraftLocation, DraftPath, DraftPoint, DraftVehicle } from '@/domain/model/types';
@@ -539,29 +539,86 @@ interface PreciseMarker {
   x: number;
   y: number;
   orientationDeg: number | null;
+  currentPosition: string | null;
+  positionMm: { x: number; y: number; z: number };
 }
 
 const PRECISE_MARKER_CSS_PX = 5; // half-length of crosshair arms / dot radius
+const PRECISE_MARKER_HIT_CSS_PX = 12;
 const PRECISE_STROKE_CSS_PX = 1.4;
 const PRECISE_FILL = '#cf222e'; // GitHub red.500
 const PRECISE_STROKE = '#ffffff'; // white outline so it's visible on dark bg
 
 const preciseMarkerHalf = computed(() => PRECISE_MARKER_CSS_PX / safeScale(props.scale));
+const preciseMarkerHitRadius = computed(() => PRECISE_MARKER_HIT_CSS_PX / safeScale(props.scale));
 const preciseMarkerStroke = computed(() => PRECISE_STROKE_CSS_PX / safeScale(props.scale));
+const preciseTooltipOffset = computed(() => 12 / safeScale(props.scale));
+const preciseTooltipFontSize = computed(() => 11 / safeScale(props.scale));
+const preciseTooltipPadding = computed(() => 6 / safeScale(props.scale));
+
+const hoveredPreciseVehicleName = ref<string | null>(null);
+const pinnedPreciseVehicleName = ref<string | null>(null);
 
 const preciseMarkers = computed<PreciseMarker[]>(() => {
   const out: PreciseMarker[] = [];
   for (const o of vehicleOverlay.value) {
-    if (!o.precisePixel) continue;
+    if (!o.precisePixel || !o.precisePositionMm) continue;
     out.push({
       name: o.name,
       x: o.precisePixel.x,
       y: o.precisePixel.y,
       orientationDeg: o.preciseOrientationDeg,
+      currentPosition: o.currentPosition,
+      positionMm: o.precisePositionMm,
     });
   }
   return out;
 });
+
+const activePreciseMarker = computed<PreciseMarker | null>(() => {
+  const activeName = hoveredPreciseVehicleName.value ?? pinnedPreciseVehicleName.value;
+  if (!activeName) return null;
+  return preciseMarkers.value.find((marker) => marker.name === activeName) ?? null;
+});
+
+function formatMeters(mm: number): string {
+  return (mm / 1000).toFixed(3);
+}
+
+function formatMm(mm: number): string {
+  return Math.round(mm).toString();
+}
+
+function formatYaw(deg: number | null): string {
+  return deg === null ? '—' : `${deg.toFixed(1)}°`;
+}
+
+function preciseMarkerTooltip(marker: PreciseMarker): string {
+  return [
+    `${marker.name} 实测坐标`,
+    `currentPosition: ${marker.currentPosition ?? '—'}`,
+    `x: ${formatMeters(marker.positionMm.x)} m (${formatMm(marker.positionMm.x)} mm)`,
+    `y: ${formatMeters(marker.positionMm.y)} m (${formatMm(marker.positionMm.y)} mm)`,
+    `yaw: ${formatYaw(marker.orientationDeg)}`,
+  ].join('\n');
+}
+
+function onPreciseMarkerEnter(marker: PreciseMarker): void {
+  hoveredPreciseVehicleName.value = marker.name;
+}
+
+function onPreciseMarkerLeave(marker: PreciseMarker): void {
+  if (hoveredPreciseVehicleName.value === marker.name) {
+    hoveredPreciseVehicleName.value = null;
+  }
+}
+
+function onPreciseMarkerClick(marker: PreciseMarker, e: KonvaEventObject<MouseEvent>): void {
+  e.cancelBubble = true;
+  emit('entity-click');
+  pinnedPreciseVehicleName.value =
+    pinnedPreciseVehicleName.value === marker.name ? null : marker.name;
+}
 </script>
 
 <template>
@@ -747,36 +804,56 @@ const preciseMarkers = computed<PreciseMarker[]>(() => {
          dot makes them visually unambiguous against the green/blue
          editor entities. -->
     <template v-for="m in preciseMarkers" :key="`precise-${m.name}`">
-      <v-line
-        :config="{
-          points: [m.x - preciseMarkerHalf, m.y, m.x + preciseMarkerHalf, m.y],
-          stroke: PRECISE_FILL,
-          strokeWidth: preciseMarkerStroke,
-          listening: false,
-          name: 'agv-precise-crosshair',
-        }"
-      />
-      <v-line
-        :config="{
-          points: [m.x, m.y - preciseMarkerHalf, m.x, m.y + preciseMarkerHalf],
-          stroke: PRECISE_FILL,
-          strokeWidth: preciseMarkerStroke,
-          listening: false,
-          name: 'agv-precise-crosshair',
-        }"
-      />
-      <v-circle
+      <v-group
         :config="{
           x: m.x,
           y: m.y,
-          radius: preciseMarkerStroke * 1.2,
-          fill: PRECISE_FILL,
-          stroke: PRECISE_STROKE,
-          strokeWidth: preciseMarkerStroke * 0.6,
-          listening: false,
-          name: 'agv-precise-dot',
+          listening: true,
+          name: 'agv-precise-marker',
         }"
-      />
+        @mouseenter="() => onPreciseMarkerEnter(m)"
+        @mouseleave="() => onPreciseMarkerLeave(m)"
+        @click="(e: KonvaEventObject<MouseEvent>) => onPreciseMarkerClick(m, e)"
+        @tap="(e: KonvaEventObject<MouseEvent>) => onPreciseMarkerClick(m, e)"
+      >
+        <v-circle
+          :config="{
+            radius: preciseMarkerHitRadius,
+            fill: PRECISE_FILL,
+            opacity: 0.001,
+            listening: true,
+            name: 'agv-precise-hit',
+          }"
+        />
+        <v-line
+          :config="{
+            points: [-preciseMarkerHalf, 0, preciseMarkerHalf, 0],
+            stroke: PRECISE_FILL,
+            strokeWidth: preciseMarkerStroke,
+            listening: false,
+            name: 'agv-precise-crosshair',
+          }"
+        />
+        <v-line
+          :config="{
+            points: [0, -preciseMarkerHalf, 0, preciseMarkerHalf],
+            stroke: PRECISE_FILL,
+            strokeWidth: preciseMarkerStroke,
+            listening: false,
+            name: 'agv-precise-crosshair',
+          }"
+        />
+        <v-circle
+          :config="{
+            radius: preciseMarkerStroke * 1.2,
+            fill: PRECISE_FILL,
+            stroke: PRECISE_STROKE,
+            strokeWidth: preciseMarkerStroke * 0.6,
+            listening: false,
+            name: 'agv-precise-dot',
+          }"
+        />
+      </v-group>
       <v-text
         :config="{
           x: m.x + preciseMarkerHalf * 1.4,
@@ -788,5 +865,35 @@ const preciseMarkers = computed<PreciseMarker[]>(() => {
         }"
       />
     </template>
+    <v-label
+      v-if="activePreciseMarker"
+      :config="{
+        x: activePreciseMarker.x + preciseTooltipOffset,
+        y: activePreciseMarker.y - preciseTooltipOffset,
+        listening: false,
+      }"
+    >
+      <v-tag
+        :config="{
+          fill: '#24292f',
+          opacity: 0.92,
+          cornerRadius: 4 / safeScale(props.scale),
+          pointerDirection: 'left',
+          pointerWidth: 8 / safeScale(props.scale),
+          pointerHeight: 8 / safeScale(props.scale),
+          lineJoin: 'round',
+        }"
+      />
+      <v-text
+        :config="{
+          text: preciseMarkerTooltip(activePreciseMarker),
+          fontSize: preciseTooltipFontSize,
+          lineHeight: 1.25,
+          padding: preciseTooltipPadding,
+          fill: '#ffffff',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+        }"
+      />
+    </v-label>
   </v-layer>
 </template>
