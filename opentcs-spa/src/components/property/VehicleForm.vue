@@ -13,7 +13,7 @@ import { computed, ref, watch } from 'vue';
 
 import MiscPropertiesEditor from '@/components/property/MiscPropertiesEditor.vue';
 import { useProjectStore } from '@/stores/project';
-import { toastError } from '@/ui/toast/toastBus';
+import { toastError, toastInfo } from '@/ui/toast/toastBus';
 
 const store = useProjectStore();
 
@@ -132,6 +132,20 @@ function commitColor(): void {
   const v = selected.value;
   if (!v) return;
   store.updateVehicleFields(v.name, { routeColorRgb: form.value.routeColorRgb });
+}
+
+function onCopy(): void {
+  const v = selected.value;
+  if (!v) return;
+  const res = store.copyVehicle(v.name);
+  if (!res.ok || !res.vehicle) {
+    toastError(res.error ?? '复制 Vehicle 失败', 'Vehicle');
+    return;
+  }
+  toastInfo(
+    `已复制为 ${res.vehicle.name}，请补充 vda5050:topicPrefix / vda5050:serialNumber`,
+    'Vehicle',
+  );
 }
 
 function onDelete(): void {
@@ -274,6 +288,7 @@ function onDelete(): void {
       拖动画布上车体或在选择工具下拖拽可调位置
     </p>
     <MiscPropertiesEditor kind="vehicle" :name="selected.name" />
+    <button class="secondary" type="button" @click="onCopy">复制此 Vehicle</button>
     <button class="danger" type="button" @click="onDelete">删除此 Vehicle</button>
   </section>
 </template>
@@ -348,8 +363,21 @@ fieldset legend {
   font-size: 0.8rem;
   margin: 0.25rem 0;
 }
-.danger {
+.secondary {
   margin-top: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #0969da;
+  background: #ffffff;
+  color: #0969da;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+}
+.secondary:hover {
+  background: #ddf4ff;
+}
+.danger {
   padding: 0.4rem 0.6rem;
   border: 1px solid #cf222e;
   background: #ffffff;

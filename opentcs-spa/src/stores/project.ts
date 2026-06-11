@@ -73,6 +73,10 @@ const STORAGE_VERSION = 2;
 const STORAGE_VERSION_BG = 1;
 const PERSIST_DEBOUNCE_MS = 200;
 const VDA5050_PATH_VEHICLE_ORIENTATION = 'vda5050:vehicleOrientation';
+const VDA5050_UNIQUE_VEHICLE_PROPERTY_KEYS = [
+  'vda5050:topicPrefix',
+  'vda5050:serialNumber',
+] as const;
 const DEFAULT_BACKWARD_PATH_MAX_REVERSE_VELOCITY = 200;
 
 /* The background travels in its own localStorage key so the (potentially
@@ -979,6 +983,38 @@ export const useProjectStore = defineStore('project', () => {
     return created;
   }
 
+  function copyVehicle(sourceName: string): { ok: boolean; vehicle?: DraftVehicle; error?: string } {
+    const source = findVehicle(sourceName);
+    if (!source) return { ok: false, error: `未找到 Vehicle '${sourceName}'` };
+
+    const name = nextAutoName(
+      'Vehicle',
+      vehicles.value.map((v) => v.name),
+    );
+    const properties = { ...source.properties };
+    for (const key of VDA5050_UNIQUE_VEHICLE_PROPERTY_KEYS) {
+      properties[key] = '';
+    }
+
+    const created: DraftVehicle = {
+      name,
+      boundingBox: { ...source.boundingBox },
+      energyLevelThresholdSet: { ...source.energyLevelThresholdSet },
+      maxVelocity: source.maxVelocity,
+      maxReverseVelocity: source.maxReverseVelocity,
+      envelopeKey: source.envelopeKey,
+      layout: {
+        ...source.layout,
+        pixelX: source.layout.pixelX + 40,
+        pixelY: source.layout.pixelY + 40,
+      },
+      properties,
+    };
+    vehicles.value.push(created);
+    selection.value = { kind: 'vehicle', name };
+    return { ok: true, vehicle: created };
+  }
+
   function moveVehicle(name: string, pixel: { x: number; y: number }): void {
     const v = findVehicle(name);
     if (!v) return;
@@ -1362,6 +1398,7 @@ export const useProjectStore = defineStore('project', () => {
     toggleBlockMember,
     // vehicle actions
     addVehicle,
+    copyVehicle,
     moveVehicle,
     renameVehicle,
     updateVehicleFields,

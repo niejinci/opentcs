@@ -32,6 +32,10 @@ const props = defineProps<{
 }>();
 
 const store = useProjectStore();
+const VDA5050_UNIQUE_VEHICLE_PROPERTY_KEYS = new Set([
+  'vda5050:topicPrefix',
+  'vda5050:serialNumber',
+]);
 
 /** Reactive view of the current entity's `properties` bag. */
 const entries = computed<Array<[string, string]>>(() => {
@@ -115,6 +119,14 @@ function deleteRow(row: RowDraft): void {
   store.deleteEntityProperty(props.kind, props.name, row.originalKey);
 }
 
+function isMissingVehicleUniqueProperty(row: RowDraft): boolean {
+  return (
+    props.kind === 'vehicle' &&
+    VDA5050_UNIQUE_VEHICLE_PROPERTY_KEYS.has(row.originalKey) &&
+    row.value.trim() === ''
+  );
+}
+
 /* --------------------------- Add-row buffer ---------------------------- */
 
 const draftKey = ref('');
@@ -158,6 +170,8 @@ function addRow(): void {
           v-model="row.value"
           type="text"
           class="row__value"
+          :class="{ 'row__value--required-empty': isMissingVehicleUniqueProperty(row) }"
+          :placeholder="isMissingVehicleUniqueProperty(row) ? '复制后需填写唯一值' : ''"
           aria-label="property value"
           @change="commitValue(row)"
         />
@@ -239,6 +253,11 @@ function addRow(): void {
 }
 .row__key {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.row__value--required-empty {
+  background: #f6f8fa;
+  border-color: #8c959f;
+  color: #57606a;
 }
 .row__del {
   border: none;
