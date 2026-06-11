@@ -452,7 +452,42 @@ function pointUnderVehicle(v: DraftVehicle): DraftPoint | null {
   return null;
 }
 
+function pointerPixel(e: KonvaEventObject<MouseEvent>): { x: number; y: number } | null {
+  const stage = e.target.getStage();
+  const pointer = stage?.getPointerPosition();
+  if (!stage || !pointer) return null;
+  return {
+    x: (pointer.x - stage.x()) / safeScale(stage.scaleX()),
+    y: (pointer.y - stage.y()) / safeScale(stage.scaleY()),
+  };
+}
+
+function pointNearPointer(e: KonvaEventObject<MouseEvent>): DraftPoint | null {
+  const pixel = pointerPixel(e);
+  if (!pixel) return null;
+  const radius = Math.max(pointRadius.value * 2, 8 / safeScale(props.scale));
+  let best: { point: DraftPoint; distanceSq: number } | null = null;
+  for (const p of store.points) {
+    const dx = p.layout.pixelX - pixel.x;
+    const dy = p.layout.pixelY - pixel.y;
+    const distanceSq = dx * dx + dy * dy;
+    if (distanceSq > radius * radius) continue;
+    if (!best || distanceSq < best.distanceSq) {
+      best = { point: p, distanceSq };
+    }
+  }
+  return best?.point ?? null;
+}
+
 function onVehicleClick(v: DraftVehicle, e: KonvaEventObject<MouseEvent>): void {
+  if (props.tool === 'path') {
+    const point = pointNearPointer(e) ?? pointUnderVehicle(v);
+    if (point) {
+      onPointClick(point, e);
+      return;
+    }
+  }
+
   emit('entity-click');
   // Alt+Click: hard pass-through to whatever Point is underneath the
   // vehicle, so the user can always reach a Point that the vehicle
