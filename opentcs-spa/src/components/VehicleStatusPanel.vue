@@ -24,12 +24,15 @@
 // this panel to the canvas selection store and is best done in a
 // follow-up PR.
 
-import { computed } from 'vue';
+import { computed, reactive } from 'vue';
 
+import { rerouteVehicle } from '@/api/endpoints/vehicles';
 import type { VehicleIntegrationLevel, VehicleState } from '@/api/types/bff';
 import { useLiveStatusStore } from '@/stores/liveStatus';
+import { toastSuccess, toastWarning } from '@/ui/toast/toastBus';
 
 const live = useLiveStatusStore();
+const rerouteBusyByKey = reactive<Record<string, boolean>>({});
 
 const vehicles = computed(() => live.vehicleList);
 
@@ -53,6 +56,36 @@ function formatEnergy(level: number): string {
   if (!Number.isFinite(level)) return '—';
   return `${Math.round(level)}%`;
 }
+
+function busyKey(name: string, forced: boolean): string {
+  return `${name}:${forced ? 'forced' : 'regular'}`;
+}
+
+function isRerouting(name: string, forced: boolean): boolean {
+  return rerouteBusyByKey[busyKey(name, forced)] === true;
+}
+
+async function requestReroute(name: string, forced: boolean): Promise<void> {
+  if (
+    forced &&
+    !window.confirm(
+      `确认对 ${name} 执行强制重路由？\n\n仅在车辆已停止且当前位置可作为重路由起点时使用。`,
+    )
+  ) {
+    return;
+  }
+
+  const key = busyKey(name, forced);
+  rerouteBusyByKey[key] = true;
+  try {
+    await rerouteVehicle(name, forced);
+    toastSuccess(`${name} ${forced ? '强制' : '普通'}重路由请求已发送`);
+  } catch {
+    toastWarning(`${name} 重路由请求失败`);
+  } finally {
+    rerouteBusyByKey[key] = false;
+  }
+}
 </script>
 
 <template>
@@ -73,6 +106,7 @@ function formatEnergy(level: number): string {
             <th scope="col">当前点位</th>
             <th scope="col">电量</th>
             <th scope="col">暂停</th>
+            <th scope="col">重路由</th>
           </tr>
         </thead>
         <tbody>
@@ -86,6 +120,25 @@ function formatEnergy(level: number): string {
             <td class="pos">{{ v.currentPosition || '—' }}</td>
             <td class="energy">{{ formatEnergy(v.energyLevel) }}</td>
             <td class="paused" :data-on="v.paused">{{ v.paused ? '是' : '否' }}</td>
+            <td class="actions">
+              <button
+                type="button"
+                :disabled="isRerouting(v.name, false)"
+                :title="`对 ${v.name} 发起普通重路由`"
+                @click="requestReroute(v.name, false)"
+              >
+                {{ isRerouting(v.name, false) ? '发送中' : '普通' }}
+              </button>
+              <button
+                type="button"
+                class="danger"
+                :disabled="isRerouting(v.name, true)"
+                :title="`对 ${v.name} 发起强制重路由`"
+                @click="requestReroute(v.name, true)"
+              >
+                {{ isRerouting(v.name, true) ? '发送中' : '强制' }}
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -203,5 +256,34 @@ function formatEnergy(level: number): string {
 .paused[data-on='true'] {
   color: #cf222e;
   font-weight: 600;
+}
+.actions {
+  display: flex;
+  gap: 0.35rem;
+}
+.actions button {
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  background: #f6f8fa;
+  color: #1f2328;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1.2;
+  padding: 0.15rem 0.45rem;
+  white-space: nowrap;
+}
+.actions button:hover:not(:disabled) {
+  background: #eef2f6;
+}
+.actions button:disabled {
+  color: #8c959f;
+  cursor: not-allowed;
+}
+.actions button.danger {
+  border-color: #ffabab;
+  color: #cf222e;
+}
+.actions button.danger:hover:not(:disabled) {
+  background: #ffebe9;
 }
 </style>

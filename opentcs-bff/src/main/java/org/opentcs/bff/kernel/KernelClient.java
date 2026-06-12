@@ -16,6 +16,7 @@ import org.opentcs.access.KernelServicePortal;
 import org.opentcs.access.to.order.TransportOrderCreationTO;
 import org.opentcs.data.model.PlantModel;
 import org.opentcs.data.model.Vehicle;
+import org.opentcs.data.order.ReroutingType;
 import org.opentcs.data.order.TransportOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,6 +124,33 @@ public class KernelClient {
           );
       service.updateVehicleIntegrationLevel(current.getReference(), integrationLevel);
       return service.fetch(Vehicle.class, name).orElse(current);
+    });
+  }
+
+  /**
+   * Requests a reroute for the named vehicle via the dispatcher service.
+   *
+   * @param name The name of the vehicle to reroute.
+   * @param reroutingType The rerouting type to use.
+   * @throws org.opentcs.data.ObjectUnknownException If no such vehicle exists.
+   * @throws KernelRuntimeException If the Kernel cannot be reached or the request fails.
+   */
+  public void rerouteVehicle(
+      String name,
+      ReroutingType reroutingType
+  ) {
+    requireNonNull(name, "name");
+    requireNonNull(reroutingType, "reroutingType");
+    executeWithReconnect(() -> {
+      var portal = ensureConnected();
+      Vehicle current = portal.getVehicleService().fetch(Vehicle.class, name)
+          .orElseThrow(
+              () -> new org.opentcs.data.ObjectUnknownException(
+                  "No vehicle named '" + name + "' exists."
+              )
+          );
+      portal.getDispatcherService().reroute(current.getReference(), reroutingType);
+      return null;
     });
   }
 

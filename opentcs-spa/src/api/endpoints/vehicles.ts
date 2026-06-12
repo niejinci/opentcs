@@ -31,3 +31,22 @@ export function updateVehicleIntegrationLevel(
     options,
   );
 }
+
+/**
+ * `POST /api/v1/vehicles/{name}/rerouteRequest` — request rerouting for a vehicle.
+ *
+ * Use `forced=true` only when the vehicle is known to be stopped and its reported current
+ * position is the intended reroute source.
+ */
+export function rerouteVehicle(
+  name: string,
+  forced = false,
+  options?: RequestOptions,
+): Promise<void> {
+  const query = forced ? '?forced=true' : '';
+  return apiClient.post<void>(
+    `/api/v1/vehicles/${encodeURIComponent(name)}/rerouteRequest${query}`,
+    undefined,
+    options,
+  );
+}

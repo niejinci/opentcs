@@ -28,6 +28,7 @@ import org.opentcs.bff.swagger.OpenApiSpecHandler;
 import org.opentcs.bff.transportorder.CreateTransportOrderHandler;
 import org.opentcs.bff.vehicle.GetVehicleHandler;
 import org.opentcs.bff.vehicle.ListVehiclesHandler;
+import org.opentcs.bff.vehicle.RerouteVehicleHandler;
 
 /**
  * JavalinTest-driven coverage of the {@code /api/v1/projects} endpoints.
@@ -51,6 +52,7 @@ class ProjectsHandlerTest {
         new ListVehiclesHandler(kernelClient),
         new GetVehicleHandler(kernelClient),
         new org.opentcs.bff.vehicle.UpdateVehicleIntegrationLevelHandler(kernelClient),
+        new RerouteVehicleHandler(kernelClient),
         new CreateTransportOrderHandler(kernelClient),
         new ProjectsHandler(store),
         new ProjectAssetsHandler(store),

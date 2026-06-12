@@ -20,10 +20,14 @@ vi.mock('@/api/endpoints/sseEvents', () => ({
 }));
 vi.mock('@/api/endpoints/vehicles', () => ({
   listVehicles: () => Promise.resolve([]),
+  rerouteVehicle: vi.fn(() => Promise.resolve()),
 }));
 
 import VehicleStatusPanel from '@/components/VehicleStatusPanel.vue';
+import { rerouteVehicle } from '@/api/endpoints/vehicles';
 import { useLiveStatusStore } from '@/stores/liveStatus';
+
+const rerouteVehicleMock = vi.mocked(rerouteVehicle);
 
 function vehicle(overrides: Partial<Vehicle> = {}): Vehicle {
   return {
@@ -41,6 +45,8 @@ function vehicle(overrides: Partial<Vehicle> = {}): Vehicle {
 describe('VehicleStatusPanel', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    rerouteVehicleMock.mockClear();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
   it('renders the empty placeholder when no vehicles are known (3.8)', () => {
@@ -68,7 +74,16 @@ describe('VehicleStatusPanel', () => {
     await wrapper.vm.$nextTick();
 
     const headers = wrapper.findAll('thead th').map((th) => th.text());
-    expect(headers).toEqual(['名称', '状态', '运行', '集成级别', '当前点位', '电量', '暂停']);
+    expect(headers).toEqual([
+      '名称',
+      '状态',
+      '运行',
+      '集成级别',
+      '当前点位',
+      '电量',
+      '暂停',
+      '重路由',
+    ]);
 
     const rows = wrapper.findAll('tbody tr');
     expect(rows).toHaveLength(2);
@@ -91,5 +106,23 @@ describe('VehicleStatusPanel', () => {
     };
     await wrapper.vm.$nextTick();
     expect(wrapper.findAll('tbody tr')[0].text()).toContain('Point-9');
+  });
+
+  it('requests regular and forced rerouting for a vehicle', async () => {
+    const store = useLiveStatusStore();
+    store.vehicles = {
+      'V-1': vehicle({ name: 'V-1' }),
+    };
+
+    const wrapper = mount(VehicleStatusPanel);
+    await wrapper.vm.$nextTick();
+
+    const buttons = wrapper.findAll('tbody button');
+    await buttons[0].trigger('click');
+    expect(rerouteVehicleMock).toHaveBeenCalledWith('V-1', false);
+
+    await buttons[1].trigger('click');
+    expect(window.confirm).toHaveBeenCalled();
+    expect(rerouteVehicleMock).toHaveBeenCalledWith('V-1', true);
   });
 });

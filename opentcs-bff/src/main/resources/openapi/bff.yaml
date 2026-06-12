@@ -115,6 +115,43 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/KernelUnavailable'
+  /api/v1/vehicles/{name}/rerouteRequest:
+    post:
+      tags:
+        - Vehicles
+      summary: Request rerouting for a vehicle.
+      description: >-
+        Forwards a regular or forced rerouting request to the kernel dispatcher. Forced rerouting
+        should only be used when it is known to be safe because the kernel will reroute from the
+        vehicle's current position.
+      operationId: rerouteVehicle
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: The name of the vehicle.
+          schema:
+            type: string
+        - name: forced
+          in: query
+          required: false
+          description: Whether to request forced rerouting.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: The reroute request was accepted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No vehicle with the given name exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/KernelUnavailable'
   /api/v1/transport-orders:
     post:
       tags:

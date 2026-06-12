@@ -20,10 +20,13 @@ import org.junit.jupiter.api.Test;
 import org.opentcs.access.CredentialsException;
 import org.opentcs.access.KernelRuntimeException;
 import org.opentcs.access.KernelServicePortal;
+import org.opentcs.components.kernel.services.DispatcherService;
 import org.opentcs.components.kernel.services.PlantModelService;
 import org.opentcs.components.kernel.services.VehicleService;
+import org.opentcs.data.ObjectUnknownException;
 import org.opentcs.data.model.PlantModel;
 import org.opentcs.data.model.Vehicle;
+import org.opentcs.data.order.ReroutingType;
 
 /**
  * Tests for {@link KernelClient}.
@@ -33,6 +36,7 @@ class KernelClientTest {
   private KernelServicePortal portal;
   private PlantModelService plantModelService;
   private VehicleService vehicleService;
+  private DispatcherService dispatcherService;
   private KernelServicePortalFactory portalFactory;
   private BffKernelConfiguration configuration;
   private KernelClient kernelClient;
@@ -44,6 +48,8 @@ class KernelClientTest {
     when(portal.getPlantModelService()).thenReturn(plantModelService);
     vehicleService = mock(VehicleService.class);
     when(portal.getVehicleService()).thenReturn(vehicleService);
+    dispatcherService = mock(DispatcherService.class);
+    when(portal.getDispatcherService()).thenReturn(dispatcherService);
 
     portalFactory = mock(KernelServicePortalFactory.class);
     when(portalFactory.create(anyString(), anyString())).thenReturn(portal);
@@ -152,6 +158,30 @@ class KernelClientTest {
     assertThat(kernelClient.findVehicle("ghost")).isEmpty();
     verify(vehicleService, times(1)).fetch(Vehicle.class, "alpha");
     verify(vehicleService, times(1)).fetch(Vehicle.class, "ghost");
+  }
+
+  @Test
+  void rerouteVehicleDelegatesToDispatcherService() {
+    Vehicle vehicle = new Vehicle("alpha");
+    when(vehicleService.fetch(Vehicle.class, "alpha")).thenReturn(Optional.of(vehicle));
+
+    kernelClient.rerouteVehicle("alpha", ReroutingType.FORCED);
+
+    verify(dispatcherService, times(1)).reroute(vehicle.getReference(), ReroutingType.FORCED);
+  }
+
+  @Test
+  void rerouteVehicleFailsForUnknownVehicle() {
+    when(vehicleService.fetch(Vehicle.class, "ghost")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> kernelClient.rerouteVehicle("ghost", ReroutingType.REGULAR))
+        .isInstanceOf(ObjectUnknownException.class)
+        .hasMessageContaining("ghost");
+
+    verify(dispatcherService, never()).reroute(
+        org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.any()
+    );
   }
 
   @Test

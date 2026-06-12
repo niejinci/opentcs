@@ -4,6 +4,7 @@ package org.opentcs.bff.vehicle;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -24,6 +25,7 @@ import org.opentcs.bff.error.ErrorResponses;
 import org.opentcs.bff.kernel.KernelClient;
 import org.opentcs.data.ObjectUnknownException;
 import org.opentcs.data.model.Vehicle;
+import org.opentcs.data.order.ReroutingType;
 
 /**
  * Tests for {@link ListVehiclesHandler} and {@link GetVehicleHandler}. The handlers are mounted
@@ -42,6 +44,7 @@ class VehicleHandlersTest {
     GetVehicleHandler getHandler = new GetVehicleHandler(kernelClient);
     UpdateVehicleIntegrationLevelHandler updateLevelHandler
         = new UpdateVehicleIntegrationLevelHandler(kernelClient);
+    RerouteVehicleHandler rerouteHandler = new RerouteVehicleHandler(kernelClient);
     app = Javalin.create(cfg -> {
       cfg.startup.showJavalinBanner = false;
       cfg.routes.apiBuilder(() -> {
@@ -49,6 +52,7 @@ class VehicleHandlersTest {
           ApiBuilder.get(listHandler);
           ApiBuilder.path("/{" + GetVehicleHandler.NAME_PARAM + "}", () -> {
             ApiBuilder.get(getHandler);
+            ApiBuilder.post("/rerouteRequest", rerouteHandler);
             ApiBuilder.put("/integrationLevel", updateLevelHandler);
           });
         });
@@ -209,6 +213,58 @@ class VehicleHandlersTest {
               b -> b.put(
                   BodyPublishers.ofString("{\"integrationLevel\":\"TO_BE_UTILIZED\"}")
               ).header("Content-Type", "application/json")
+          );
+
+          assertThat(response.code()).isEqualTo(404);
+          assertThat(response.body()).isNotNull();
+          JsonNode root = new ObjectMapper().readTree(response.body().string());
+          assertThat(root.get("code").asText()).isEqualTo("NOT_FOUND");
+          assertThat(root.get("message").asText()).contains("ghost");
+        }
+    );
+  }
+
+  @Test
+  void postRerouteRequestForwardsRegularRerouteToKernelByDefault() {
+    JavalinTest.test(
+        app, (server, client) -> {
+          var response = client.request(
+              "/api/v1/vehicles/alpha/rerouteRequest",
+              b -> b.post(BodyPublishers.noBody())
+          );
+
+          assertThat(response.code()).isEqualTo(200);
+          verify(kernelClient).rerouteVehicle(eq("alpha"), eq(ReroutingType.REGULAR));
+        }
+    );
+  }
+
+  @Test
+  void postRerouteRequestForwardsForcedRerouteToKernelWhenRequested() {
+    JavalinTest.test(
+        app, (server, client) -> {
+          var response = client.request(
+              "/api/v1/vehicles/alpha/rerouteRequest?forced=true",
+              b -> b.post(BodyPublishers.noBody())
+          );
+
+          assertThat(response.code()).isEqualTo(200);
+          verify(kernelClient).rerouteVehicle(eq("alpha"), eq(ReroutingType.FORCED));
+        }
+    );
+  }
+
+  @Test
+  void postRerouteRequestReturns404WhenVehicleAbsent() {
+    doThrow(new ObjectUnknownException("No vehicle named 'ghost' exists."))
+        .when(kernelClient)
+        .rerouteVehicle(eq("ghost"), eq(ReroutingType.REGULAR));
+
+    JavalinTest.test(
+        app, (server, client) -> {
+          var response = client.request(
+              "/api/v1/vehicles/ghost/rerouteRequest",
+              b -> b.post(BodyPublishers.noBody())
           );
 
           assertThat(response.code()).isEqualTo(404);
