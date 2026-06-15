@@ -95,8 +95,23 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 function onKeyDown(e: KeyboardEvent): void {
-  if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (isEditableTarget(e.target)) return;
+  const modifier = e.ctrlKey || e.metaKey;
+  if (modifier && !e.altKey) {
+    const key = e.key.toLowerCase();
+    if (key === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) store.redo();
+      else store.undo();
+      return;
+    }
+    if (key === 'y' && !e.shiftKey) {
+      e.preventDefault();
+      store.redo();
+      return;
+    }
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   // Tool switching (V/P/L)
   if (!e.repeat) {
     const meta = editorToolForHotkey(e.key);
@@ -191,6 +206,7 @@ function pointTypeBadge(): string {
       <p class="hint">
         <kbd>V</kbd> 选择 · <kbd>P</kbd> Point · <kbd>L</kbd> Path · <kbd>O</kbd> Location ·
         <kbd>B</kbd> Block · <kbd>K</kbd> Vehicle；<kbd>Delete</kbd> 删除选中 ·
+        <kbd>Ctrl+Z</kbd> 撤销 · <kbd>Ctrl+Y</kbd> 重做 ·
         <kbd>Esc</kbd> 取消半态。左侧资源树支持单击选中、<kbd>↑↓</kbd> 切换、<kbd>←→</kbd>
         折叠、<kbd>Enter</kbd>
         选中。工具栏底部可开关「网格吸附」与「缩略图」（右下角点击/拖动可重定位视口）。草稿自动落本机
@@ -282,6 +298,7 @@ function pointTypeBadge(): string {
               <kbd>{{ t.hotkey }}</kbd> {{ t.label }}
             </li>
             <li><kbd>Delete</kbd> 删除选中</li>
+            <li><kbd>Ctrl+Z</kbd> 撤销；<kbd>Ctrl+Y</kbd>/<kbd>Ctrl+Shift+Z</kbd> 重做</li>
             <li><kbd>Esc</kbd> 取消 Path 半态 / 取消选中</li>
             <li><kbd>空格</kbd> + 拖动 = 平移</li>
             <li>滚轮 = 缩放</li>

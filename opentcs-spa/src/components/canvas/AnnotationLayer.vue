@@ -394,12 +394,17 @@ function onPointDragStart(p: DraftPoint, e: KonvaEventObject<DragEvent>): void {
   }
   e.cancelBubble = true;
   store.select({ kind: 'point', name: p.name });
+  store.beginHistoryTransaction('移动 Point');
 }
 
 function onPointDragMove(p: DraftPoint, e: KonvaEventObject<DragEvent>): void {
   if (props.tool !== 'select') return;
   const node = e.target as Konva.Node;
   store.movePoint(p.name, { x: node.x(), y: node.y() });
+}
+
+function onPointDragEnd(): void {
+  store.commitHistoryTransaction();
 }
 
 function onPathClick(rp: RenderedPath, e: KonvaEventObject<MouseEvent>): void {
@@ -422,12 +427,17 @@ function onLocationDragStart(l: DraftLocation, e: KonvaEventObject<DragEvent>): 
   }
   e.cancelBubble = true;
   store.select({ kind: 'location', name: l.name });
+  store.beginHistoryTransaction('移动 Location');
 }
 
 function onLocationDragMove(l: DraftLocation, e: KonvaEventObject<DragEvent>): void {
   if (props.tool !== 'select') return;
   const node = e.target as Konva.Node;
   store.moveLocation(l.name, { x: node.x(), y: node.y() });
+}
+
+function onLocationDragEnd(): void {
+  store.commitHistoryTransaction();
 }
 
 /**
@@ -546,12 +556,17 @@ function onVehicleDragStart(v: DraftVehicle, e: KonvaEventObject<DragEvent>): vo
   }
   e.cancelBubble = true;
   store.select({ kind: 'vehicle', name: v.name });
+  store.beginHistoryTransaction('移动 Vehicle');
 }
 
 function onVehicleDragMove(v: DraftVehicle, e: KonvaEventObject<DragEvent>): void {
   if (props.tool !== 'select') return;
   const node = e.target as Konva.Node;
   store.moveVehicle(v.name, { x: node.x(), y: node.y() });
+}
+
+function onVehicleDragEnd(): void {
+  store.commitHistoryTransaction();
 }
 
 /* The Point / Location / Vehicle are `draggable` only under the select
@@ -737,6 +752,7 @@ function onPreciseMarkerClick(marker: PreciseMarker, e: KonvaEventObject<MouseEv
         @tap="(e: KonvaEventObject<MouseEvent>) => onLocationClick(l, e)"
         @dragstart="(e: KonvaEventObject<DragEvent>) => onLocationDragStart(l, e)"
         @dragmove="(e: KonvaEventObject<DragEvent>) => onLocationDragMove(l, e)"
+        @dragend="onLocationDragEnd"
       />
       <v-text
         :config="{
@@ -786,6 +802,7 @@ function onPreciseMarkerClick(marker: PreciseMarker, e: KonvaEventObject<MouseEv
         @tap="(e: KonvaEventObject<MouseEvent>) => onPointClick(p, e)"
         @dragstart="(e: KonvaEventObject<DragEvent>) => onPointDragStart(p, e)"
         @dragmove="(e: KonvaEventObject<DragEvent>) => onPointDragMove(p, e)"
+        @dragend="onPointDragEnd"
       />
       <v-text
         :config="{
@@ -821,6 +838,7 @@ function onPreciseMarkerClick(marker: PreciseMarker, e: KonvaEventObject<MouseEv
         @tap="(e: KonvaEventObject<MouseEvent>) => onVehicleClick(v, e)"
         @dragstart="(e: KonvaEventObject<DragEvent>) => onVehicleDragStart(v, e)"
         @dragmove="(e: KonvaEventObject<DragEvent>) => onVehicleDragMove(v, e)"
+        @dragend="onVehicleDragEnd"
       />
       <v-text
         :config="{

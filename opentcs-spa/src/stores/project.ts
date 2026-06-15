@@ -23,7 +23,7 @@
 // BFF `/api/v1/projects/{id}/draft` PUT, keeping the actions identical.
 
 import { defineStore } from 'pinia';
-import { ref, shallowRef, watch } from 'vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 
 import type { AffineMapping, WorldPoint } from '@/domain/geometry/affine';
 import { pixelToWorld, worldToPixel } from '@/domain/geometry/affine';
@@ -80,6 +80,7 @@ const VDA5050_UNIQUE_VEHICLE_PROPERTY_KEYS = [
   'vda5050:serialNumber',
 ] as const;
 const DEFAULT_BACKWARD_PATH_MAX_REVERSE_VELOCITY = 500;
+const HISTORY_LIMIT = 50;
 
 /* The background travels in its own localStorage key so the (potentially
    multi-MB) PNG data URL doesn't get rewritten on every Point/Path edit. */
@@ -186,6 +187,11 @@ function loadPersisted(): PersistedDraft | null {
 function withProperties<T extends { properties?: Record<string, string> }>(entity: T): T {
   if (entity.properties && typeof entity.properties === 'object') return entity;
   return { ...entity, properties: {} };
+}
+
+interface HistoryEntry {
+  label: string;
+  snapshot: PersistedDraft;
 }
 
 function ensureDefaultPathProperties(path: DraftPath): DraftPath {
@@ -342,6 +348,134 @@ export const useProjectStore = defineStore('project', () => {
   /** Transient first-click state for the Path tool. Not persisted. */
   const pathDraftSrc = ref<string | null>(null);
 
+  /* ----------------------------- History -------------------------------- */
+
+  const undoStack = ref<HistoryEntry[]>([]);
+  const redoStack = ref<HistoryEntry[]>([]);
+  const isRestoringHistory = ref(false);
+  let historyActionDepth = 0;
+  let historyTransaction: HistoryEntry | null = null;
+
+  const canUndo = computed(() => undoStack.value.length > 0);
+  const canRedo = computed(() => redoStack.value.length > 0);
+  const undoLabel = computed(() => undoStack.value.at(-1)?.label ?? '');
+  const redoLabel = computed(() => redoStack.value.at(-1)?.label ?? '');
+
+  function cloneDraft(snapshot: PersistedDraft): PersistedDraft {
+    return JSON.parse(JSON.stringify(snapshot, nanReplacer), nanReviver) as PersistedDraft;
+  }
+
+  function captureDraft(): PersistedDraft {
+    return cloneDraft({
+      v: STORAGE_VERSION,
+      points: points.value,
+      paths: paths.value,
+      locationTypes: locationTypes.value,
+      locations: locations.value,
+      blocks: blocks.value,
+      vehicles: vehicles.value,
+      selection: selection.value,
+    });
+  }
+
+  function snapshotKey(snapshot: PersistedDraft): string {
+    return JSON.stringify(snapshot, nanReplacer);
+  }
+
+  function restoreDraft(snapshot: PersistedDraft): void {
+    const next = cloneDraft(snapshot);
+    points.value = next.points.map(withProperties);
+    paths.value = uniqueDirectedPaths(
+      next.paths
+        .map(withProperties)
+        .map(ensureDefaultPathProperties)
+        .map(ensureReverseVelocityForBackwardPath),
+    );
+    locationTypes.value = next.locationTypes.map(withProperties);
+    locations.value = next.locations.map(withProperties);
+    blocks.value = next.blocks.map(withProperties);
+    vehicles.value = next.vehicles.map(withProperties);
+    selection.value = next.selection;
+    multiSelection.value = new Set();
+    pathDraftSrc.value = null;
+  }
+
+  function pushHistory(stack: HistoryEntry[], entry: HistoryEntry): void {
+    stack.push({ label: entry.label, snapshot: cloneDraft(entry.snapshot) });
+    if (stack.length > HISTORY_LIMIT) stack.shift();
+  }
+
+  function clearHistory(): void {
+    undoStack.value = [];
+    redoStack.value = [];
+    historyTransaction = null;
+  }
+
+  function recordHistory(label: string, before: PersistedDraft, beforeKey: string): void {
+    const after = captureDraft();
+    if (snapshotKey(after) === beforeKey) return;
+    pushHistory(undoStack.value, { label, snapshot: before });
+    redoStack.value = [];
+  }
+
+  function applyWithHistory<T>(label: string, mutate: () => T): T {
+    if (isRestoringHistory.value || historyTransaction || historyActionDepth > 0) {
+      return mutate();
+    }
+
+    const before = captureDraft();
+    const beforeKey = snapshotKey(before);
+    historyActionDepth += 1;
+    try {
+      return mutate();
+    } finally {
+      historyActionDepth -= 1;
+      recordHistory(label, before, beforeKey);
+    }
+  }
+
+  function beginHistoryTransaction(label: string): void {
+    if (isRestoringHistory.value || historyTransaction) return;
+    historyTransaction = { label, snapshot: captureDraft() };
+  }
+
+  function commitHistoryTransaction(): void {
+    if (!historyTransaction) return;
+    const entry = historyTransaction;
+    historyTransaction = null;
+    recordHistory(entry.label, entry.snapshot, snapshotKey(entry.snapshot));
+  }
+
+  function cancelHistoryTransaction(): void {
+    historyTransaction = null;
+  }
+
+  function undo(): boolean {
+    const entry = undoStack.value.pop();
+    if (!entry) return false;
+    pushHistory(redoStack.value, { label: entry.label, snapshot: captureDraft() });
+    isRestoringHistory.value = true;
+    try {
+      restoreDraft(entry.snapshot);
+    } finally {
+      isRestoringHistory.value = false;
+    }
+    return true;
+  }
+
+  function redo(): boolean {
+    const entry = redoStack.value.pop();
+    if (!entry) return false;
+    pushHistory(undoStack.value, { label: entry.label, snapshot: captureDraft() });
+    isRestoringHistory.value = true;
+    try {
+      restoreDraft(entry.snapshot);
+    } finally {
+      isRestoringHistory.value = false;
+    }
+    return true;
+  }
+
   /* ----------------------------- Persistence ---------------------------- */
 
   let persistTimer: ReturnType<typeof setTimeout> | null = null;
@@ -393,6 +527,7 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   function hydrateDraftPayload(payload: Record<string, unknown> | null): void {
+    clearHistory();
     isHydrating.value = true;
     try {
       if (!payload) {
@@ -581,9 +716,11 @@ export const useProjectStore = defineStore('project', () => {
       layout: { pixelX: pixel.x, pixelY: pixel.y },
       properties: {},
     };
-    points.value.push(created);
-    selection.value = { kind: 'point', name };
-    return created;
+    return applyWithHistory('新增 Point', () => {
+      points.value.push(created);
+      selection.value = { kind: 'point', name };
+      return created;
+    });
   }
 
   /** Move an existing Point to a new pixel coord; updates pose + length. */
@@ -591,11 +728,13 @@ export const useProjectStore = defineStore('project', () => {
     const pt = findPoint(name);
     const bg = background.value;
     if (!pt || !bg) return;
-    pt.layout.pixelX = pixel.x;
-    pt.layout.pixelY = pixel.y;
-    const world = pixelToWorld(bg.affine, pixel);
-    pt.pose.position = worldToMmTriple(world);
-    recomputeAttachedPathLengths(name);
+    applyWithHistory('移动 Point', () => {
+      pt.layout.pixelX = pixel.x;
+      pt.layout.pixelY = pixel.y;
+      const world = pixelToWorld(bg.affine, pixel);
+      pt.pose.position = worldToMmTriple(world);
+      recomputeAttachedPathLengths(name);
+    });
   }
 
   /** Rename a Point. Updates any attached Path's src/dest references. */
@@ -606,15 +745,17 @@ export const useProjectStore = defineStore('project', () => {
     if (nameTaken(newName)) return { ok: false, error: `名称 '${newName}' 已被占用` };
     const pt = findPoint(oldName);
     if (!pt) return { ok: false, error: `未找到 Point '${oldName}'` };
-    pt.name = newName;
-    paths.value.forEach((p) => {
-      if (p.srcPointName === oldName) p.srcPointName = newName;
-      if (p.destPointName === oldName) p.destPointName = newName;
+    return applyWithHistory('重命名 Point', () => {
+      pt.name = newName;
+      paths.value.forEach((p) => {
+        if (p.srcPointName === oldName) p.srcPointName = newName;
+        if (p.destPointName === oldName) p.destPointName = newName;
+      });
+      if (selection.value?.kind === 'point' && selection.value.name === oldName) {
+        selection.value = { kind: 'point', name: newName };
+      }
+      return { ok: true };
     });
-    if (selection.value?.kind === 'point' && selection.value.name === oldName) {
-      selection.value = { kind: 'point', name: newName };
-    }
-    return { ok: true };
   }
 
   /** Update one or more editable Point fields (besides name + layout/pose handled separately). */
@@ -624,12 +765,14 @@ export const useProjectStore = defineStore('project', () => {
   ): void {
     const pt = findPoint(name);
     if (!pt) return;
-    if (patch.type !== undefined) pt.type = patch.type;
-    if (patch.orientationAngle !== undefined) pt.pose.orientationAngle = patch.orientationAngle;
-    if (patch.z !== undefined) {
-      pt.pose.position = { ...pt.pose.position, z: Math.round(patch.z) };
-      recomputeAttachedPathLengths(name);
-    }
+    applyWithHistory('更新 Point', () => {
+      if (patch.type !== undefined) pt.type = patch.type;
+      if (patch.orientationAngle !== undefined) pt.pose.orientationAngle = patch.orientationAngle;
+      if (patch.z !== undefined) {
+        pt.pose.position = { ...pt.pose.position, z: Math.round(patch.z) };
+        recomputeAttachedPathLengths(name);
+      }
+    });
   }
 
   /**
@@ -641,15 +784,17 @@ export const useProjectStore = defineStore('project', () => {
     const pt = findPoint(name);
     const bg = background.value;
     if (!pt || !bg) return;
-    pt.pose.position = {
-      ...pt.pose.position,
-      x: Math.round(worldMeters.x * 1000),
-      y: Math.round(worldMeters.y * 1000),
-    };
-    const pixel = worldToPixel(bg.affine, worldMeters);
-    pt.layout.pixelX = pixel.x;
-    pt.layout.pixelY = pixel.y;
-    recomputeAttachedPathLengths(name);
+    applyWithHistory('移动 Point', () => {
+      pt.pose.position = {
+        ...pt.pose.position,
+        x: Math.round(worldMeters.x * 1000),
+        y: Math.round(worldMeters.y * 1000),
+      };
+      const pixel = worldToPixel(bg.affine, worldMeters);
+      pt.layout.pixelX = pixel.x;
+      pt.layout.pixelY = pixel.y;
+      recomputeAttachedPathLengths(name);
+    });
   }
 
   /** Path tool: first click records the source; second click creates. */
@@ -704,9 +849,11 @@ export const useProjectStore = defineStore('project', () => {
         [VDA5050_PATH_ORIENTATION_TYPE_FORWARD]: DEFAULT_VDA5050_PATH_ORIENTATION_TYPE_FORWARD,
       },
     };
-    paths.value.push(created);
-    selection.value = { kind: 'path', name };
-    return { path: created };
+    return applyWithHistory('新增 Path', () => {
+      paths.value.push(created);
+      selection.value = { kind: 'path', name };
+      return { path: created };
+    });
   }
 
   function renamePath(oldName: string, newName: string): { ok: boolean; error?: string } {
@@ -716,11 +863,13 @@ export const useProjectStore = defineStore('project', () => {
     if (nameTaken(newName)) return { ok: false, error: `名称 '${newName}' 已被占用` };
     const path = findPath(oldName);
     if (!path) return { ok: false, error: `未找到 Path '${oldName}'` };
-    path.name = newName;
-    if (selection.value?.kind === 'path' && selection.value.name === oldName) {
-      selection.value = { kind: 'path', name: newName };
-    }
-    return { ok: true };
+    return applyWithHistory('重命名 Path', () => {
+      path.name = newName;
+      if (selection.value?.kind === 'path' && selection.value.name === oldName) {
+        selection.value = { kind: 'path', name: newName };
+      }
+      return { ok: true };
+    });
   }
 
   function updatePathFields(
@@ -729,13 +878,16 @@ export const useProjectStore = defineStore('project', () => {
   ): void {
     const p = findPath(name);
     if (!p) return;
-    if (patch.length !== undefined) p.length = Math.max(0, Math.round(patch.length));
-    if (patch.maxVelocity !== undefined) p.maxVelocity = Math.max(0, Math.round(patch.maxVelocity));
-    if (patch.maxReverseVelocity !== undefined) {
-      p.maxReverseVelocity = Math.max(0, Math.round(patch.maxReverseVelocity));
-    }
-    if (patch.locked !== undefined) p.locked = patch.locked;
-    ensureReverseVelocityForBackwardPath(p);
+    applyWithHistory('更新 Path', () => {
+      if (patch.length !== undefined) p.length = Math.max(0, Math.round(patch.length));
+      if (patch.maxVelocity !== undefined)
+        p.maxVelocity = Math.max(0, Math.round(patch.maxVelocity));
+      if (patch.maxReverseVelocity !== undefined) {
+        p.maxReverseVelocity = Math.max(0, Math.round(patch.maxReverseVelocity));
+      }
+      if (patch.locked !== undefined) p.locked = patch.locked;
+      ensureReverseVelocityForBackwardPath(p);
+    });
   }
 
   /* ----------------------- LocationType actions ------------------------ */
@@ -745,7 +897,7 @@ export const useProjectStore = defineStore('project', () => {
    * type. Used both by the explicit "新建 LocationType" panel button and
    * by `addLocation` when the draft has no types yet (auto-bootstrap).
    */
-  function addLocationType(): DraftLocationType {
+  function createLocationTypeDraft(): DraftLocationType {
     const name = nextAutoName(
       'LocType',
       locationTypes.value.map((t) => t.name),
@@ -761,6 +913,10 @@ export const useProjectStore = defineStore('project', () => {
     return created;
   }
 
+  function addLocationType(): DraftLocationType {
+    return applyWithHistory('新增 LocationType', () => createLocationTypeDraft());
+  }
+
   function renameLocationType(oldName: string, newName: string): { ok: boolean; error?: string } {
     if (oldName === newName) return { ok: true };
     if (!isValidEntityName(newName))
@@ -768,15 +924,17 @@ export const useProjectStore = defineStore('project', () => {
     if (nameTaken(newName)) return { ok: false, error: `名称 '${newName}' 已被占用` };
     const t = findLocationType(oldName);
     if (!t) return { ok: false, error: `未找到 LocationType '${oldName}'` };
-    t.name = newName;
-    // Cascade: every Location referencing the old type must follow.
-    locations.value.forEach((l) => {
-      if (l.typeName === oldName) l.typeName = newName;
+    return applyWithHistory('重命名 LocationType', () => {
+      t.name = newName;
+      // Cascade: every Location referencing the old type must follow.
+      locations.value.forEach((l) => {
+        if (l.typeName === oldName) l.typeName = newName;
+      });
+      if (selection.value?.kind === 'locationType' && selection.value.name === oldName) {
+        selection.value = { kind: 'locationType', name: newName };
+      }
+      return { ok: true };
     });
-    if (selection.value?.kind === 'locationType' && selection.value.name === oldName) {
-      selection.value = { kind: 'locationType', name: newName };
-    }
-    return { ok: true };
   }
 
   function updateLocationTypeFields(
@@ -787,15 +945,17 @@ export const useProjectStore = defineStore('project', () => {
   ): void {
     const t = findLocationType(name);
     if (!t) return;
-    if (patch.allowedOperations !== undefined) {
-      t.allowedOperations = dedupeOrdered(patch.allowedOperations);
-    }
-    if (patch.allowedPeripheralOperations !== undefined) {
-      t.allowedPeripheralOperations = dedupeOrdered(patch.allowedPeripheralOperations);
-    }
-    if (patch.locationRepresentation !== undefined) {
-      t.layout.locationRepresentation = patch.locationRepresentation;
-    }
+    applyWithHistory('更新 LocationType', () => {
+      if (patch.allowedOperations !== undefined) {
+        t.allowedOperations = dedupeOrdered(patch.allowedOperations);
+      }
+      if (patch.allowedPeripheralOperations !== undefined) {
+        t.allowedPeripheralOperations = dedupeOrdered(patch.allowedPeripheralOperations);
+      }
+      if (patch.locationRepresentation !== undefined) {
+        t.layout.locationRepresentation = patch.locationRepresentation;
+      }
+    });
   }
 
   /* -------------------------- Location actions ------------------------- */
@@ -809,37 +969,41 @@ export const useProjectStore = defineStore('project', () => {
     const bg = background.value;
     if (!bg) return null;
     const world = pixelToWorld(bg.affine, pixel);
-    const type = locationTypes.value[0] ?? addLocationType();
     const name = nextAutoName(
       'Location',
       locations.value.map((l) => l.name),
     );
-    const created: DraftLocation = {
-      name,
-      typeName: type.name,
-      position: worldToMmTriple(world),
-      locked: false,
-      links: [],
-      layout: {
-        pixelX: pixel.x,
-        pixelY: pixel.y,
-        locationRepresentation: 'DEFAULT',
-      },
-      properties: {},
-    };
-    locations.value.push(created);
-    selection.value = { kind: 'location', name };
-    return created;
+    return applyWithHistory('新增 Location', () => {
+      const type = locationTypes.value[0] ?? createLocationTypeDraft();
+      const created: DraftLocation = {
+        name,
+        typeName: type.name,
+        position: worldToMmTriple(world),
+        locked: false,
+        links: [],
+        layout: {
+          pixelX: pixel.x,
+          pixelY: pixel.y,
+          locationRepresentation: 'DEFAULT',
+        },
+        properties: {},
+      };
+      locations.value.push(created);
+      selection.value = { kind: 'location', name };
+      return created;
+    });
   }
 
   function moveLocation(name: string, pixel: { x: number; y: number }): void {
     const l = findLocation(name);
     const bg = background.value;
     if (!l || !bg) return;
-    l.layout.pixelX = pixel.x;
-    l.layout.pixelY = pixel.y;
-    const world = pixelToWorld(bg.affine, pixel);
-    l.position = worldToMmTriple(world);
+    applyWithHistory('移动 Location', () => {
+      l.layout.pixelX = pixel.x;
+      l.layout.pixelY = pixel.y;
+      const world = pixelToWorld(bg.affine, pixel);
+      l.position = worldToMmTriple(world);
+    });
   }
 
   function renameLocation(oldName: string, newName: string): { ok: boolean; error?: string } {
@@ -849,14 +1013,16 @@ export const useProjectStore = defineStore('project', () => {
     if (nameTaken(newName)) return { ok: false, error: `名称 '${newName}' 已被占用` };
     const l = findLocation(oldName);
     if (!l) return { ok: false, error: `未找到 Location '${oldName}'` };
-    l.name = newName;
-    blocks.value.forEach((b) => {
-      b.memberNames = b.memberNames.map((n) => (n === oldName ? newName : n));
+    return applyWithHistory('重命名 Location', () => {
+      l.name = newName;
+      blocks.value.forEach((b) => {
+        b.memberNames = b.memberNames.map((n) => (n === oldName ? newName : n));
+      });
+      if (selection.value?.kind === 'location' && selection.value.name === oldName) {
+        selection.value = { kind: 'location', name: newName };
+      }
+      return { ok: true };
     });
-    if (selection.value?.kind === 'location' && selection.value.name === oldName) {
-      selection.value = { kind: 'location', name: newName };
-    }
-    return { ok: true };
   }
 
   function updateLocationFields(
@@ -870,37 +1036,43 @@ export const useProjectStore = defineStore('project', () => {
   ): void {
     const l = findLocation(name);
     if (!l) return;
-    if (patch.typeName !== undefined && findLocationType(patch.typeName)) {
-      l.typeName = patch.typeName;
-    }
-    if (patch.locked !== undefined) l.locked = patch.locked;
-    if (patch.z !== undefined) l.position = { ...l.position, z: Math.round(patch.z) };
-    if (patch.locationRepresentation !== undefined) {
-      l.layout.locationRepresentation = patch.locationRepresentation;
-    }
+    applyWithHistory('更新 Location', () => {
+      if (patch.typeName !== undefined && findLocationType(patch.typeName)) {
+        l.typeName = patch.typeName;
+      }
+      if (patch.locked !== undefined) l.locked = patch.locked;
+      if (patch.z !== undefined) l.position = { ...l.position, z: Math.round(patch.z) };
+      if (patch.locationRepresentation !== undefined) {
+        l.layout.locationRepresentation = patch.locationRepresentation;
+      }
+    });
   }
 
   function setLocationWorldMeters(name: string, worldMeters: { x: number; y: number }): void {
     const l = findLocation(name);
     const bg = background.value;
     if (!l || !bg) return;
-    l.position = {
-      ...l.position,
-      x: Math.round(worldMeters.x * 1000),
-      y: Math.round(worldMeters.y * 1000),
-    };
-    const pixel = worldToPixel(bg.affine, worldMeters);
-    l.layout.pixelX = pixel.x;
-    l.layout.pixelY = pixel.y;
+    applyWithHistory('移动 Location', () => {
+      l.position = {
+        ...l.position,
+        x: Math.round(worldMeters.x * 1000),
+        y: Math.round(worldMeters.y * 1000),
+      };
+      const pixel = worldToPixel(bg.affine, worldMeters);
+      l.layout.pixelX = pixel.x;
+      l.layout.pixelY = pixel.y;
+    });
   }
 
   /** Add or remove a Point ↔ Location link. */
   function toggleLocationLink(locName: string, pointName: string): void {
     const l = findLocation(locName);
     if (!l || !findPoint(pointName)) return;
-    const existing = l.links.findIndex((lk) => lk.pointName === pointName);
-    if (existing >= 0) l.links.splice(existing, 1);
-    else l.links.push({ pointName, allowedOperations: [] });
+    applyWithHistory('更新 Location 链接', () => {
+      const existing = l.links.findIndex((lk) => lk.pointName === pointName);
+      if (existing >= 0) l.links.splice(existing, 1);
+      else l.links.push({ pointName, allowedOperations: [] });
+    });
   }
 
   function setLocationLinkOperations(locName: string, pointName: string, ops: string[]): void {
@@ -908,7 +1080,9 @@ export const useProjectStore = defineStore('project', () => {
     if (!l) return;
     const link = l.links.find((lk) => lk.pointName === pointName);
     if (!link) return;
-    link.allowedOperations = dedupeOrdered(ops);
+    applyWithHistory('更新 Location 链接操作', () => {
+      link.allowedOperations = dedupeOrdered(ops);
+    });
   }
 
   /* ---------------------------- Block actions -------------------------- */
@@ -925,9 +1099,11 @@ export const useProjectStore = defineStore('project', () => {
       layout: { colorRgb: pickBlockColor(blocks.value.length) },
       properties: {},
     };
-    blocks.value.push(created);
-    selection.value = { kind: 'block', name };
-    return created;
+    return applyWithHistory('新增 Block', () => {
+      blocks.value.push(created);
+      selection.value = { kind: 'block', name };
+      return created;
+    });
   }
 
   function renameBlock(oldName: string, newName: string): { ok: boolean; error?: string } {
@@ -937,11 +1113,13 @@ export const useProjectStore = defineStore('project', () => {
     if (nameTaken(newName)) return { ok: false, error: `名称 '${newName}' 已被占用` };
     const b = findBlock(oldName);
     if (!b) return { ok: false, error: `未找到 Block '${oldName}'` };
-    b.name = newName;
-    if (selection.value?.kind === 'block' && selection.value.name === oldName) {
-      selection.value = { kind: 'block', name: newName };
-    }
-    return { ok: true };
+    return applyWithHistory('重命名 Block', () => {
+      b.name = newName;
+      if (selection.value?.kind === 'block' && selection.value.name === oldName) {
+        selection.value = { kind: 'block', name: newName };
+      }
+      return { ok: true };
+    });
   }
 
   function updateBlockFields(
@@ -950,10 +1128,12 @@ export const useProjectStore = defineStore('project', () => {
   ): void {
     const b = findBlock(name);
     if (!b) return;
-    if (patch.type !== undefined) b.type = patch.type;
-    if (patch.colorRgb !== undefined && /^#[0-9a-fA-F]{6}$/.test(patch.colorRgb)) {
-      b.layout.colorRgb = patch.colorRgb.toLowerCase();
-    }
+    applyWithHistory('更新 Block', () => {
+      if (patch.type !== undefined) b.type = patch.type;
+      if (patch.colorRgb !== undefined && /^#[0-9a-fA-F]{6}$/.test(patch.colorRgb)) {
+        b.layout.colorRgb = patch.colorRgb.toLowerCase();
+      }
+    });
   }
 
   /** Toggle a Point / Path / Location membership in a Block. */
@@ -963,9 +1143,11 @@ export const useProjectStore = defineStore('project', () => {
     if (!findPoint(memberName) && !findPath(memberName) && !findLocation(memberName)) {
       return;
     }
-    const idx = b.memberNames.indexOf(memberName);
-    if (idx >= 0) b.memberNames.splice(idx, 1);
-    else b.memberNames.push(memberName);
+    applyWithHistory('更新 Block 成员', () => {
+      const idx = b.memberNames.indexOf(memberName);
+      if (idx >= 0) b.memberNames.splice(idx, 1);
+      else b.memberNames.push(memberName);
+    });
   }
 
   /* --------------------------- Vehicle actions ------------------------- */
@@ -995,12 +1177,18 @@ export const useProjectStore = defineStore('project', () => {
       },
       properties: {},
     };
-    vehicles.value.push(created);
-    selection.value = { kind: 'vehicle', name };
-    return created;
+    return applyWithHistory('新增 Vehicle', () => {
+      vehicles.value.push(created);
+      selection.value = { kind: 'vehicle', name };
+      return created;
+    });
   }
 
-  function copyVehicle(sourceName: string): { ok: boolean; vehicle?: DraftVehicle; error?: string } {
+  function copyVehicle(sourceName: string): {
+    ok: boolean;
+    vehicle?: DraftVehicle;
+    error?: string;
+  } {
     const source = findVehicle(sourceName);
     if (!source) return { ok: false, error: `未找到 Vehicle '${sourceName}'` };
 
@@ -1027,16 +1215,20 @@ export const useProjectStore = defineStore('project', () => {
       },
       properties,
     };
-    vehicles.value.push(created);
-    selection.value = { kind: 'vehicle', name };
-    return { ok: true, vehicle: created };
+    return applyWithHistory('复制 Vehicle', () => {
+      vehicles.value.push(created);
+      selection.value = { kind: 'vehicle', name };
+      return { ok: true, vehicle: created };
+    });
   }
 
   function moveVehicle(name: string, pixel: { x: number; y: number }): void {
     const v = findVehicle(name);
     if (!v) return;
-    v.layout.pixelX = pixel.x;
-    v.layout.pixelY = pixel.y;
+    applyWithHistory('移动 Vehicle', () => {
+      v.layout.pixelX = pixel.x;
+      v.layout.pixelY = pixel.y;
+    });
   }
 
   function renameVehicle(oldName: string, newName: string): { ok: boolean; error?: string } {
@@ -1046,11 +1238,13 @@ export const useProjectStore = defineStore('project', () => {
     if (nameTaken(newName)) return { ok: false, error: `名称 '${newName}' 已被占用` };
     const v = findVehicle(oldName);
     if (!v) return { ok: false, error: `未找到 Vehicle '${oldName}'` };
-    v.name = newName;
-    if (selection.value?.kind === 'vehicle' && selection.value.name === oldName) {
-      selection.value = { kind: 'vehicle', name: newName };
-    }
-    return { ok: true };
+    return applyWithHistory('重命名 Vehicle', () => {
+      v.name = newName;
+      if (selection.value?.kind === 'vehicle' && selection.value.name === oldName) {
+        selection.value = { kind: 'vehicle', name: newName };
+      }
+      return { ok: true };
+    });
   }
 
   function updateVehicleFields(
@@ -1072,31 +1266,34 @@ export const useProjectStore = defineStore('project', () => {
   ): void {
     const v = findVehicle(name);
     if (!v) return;
-    if (patch.boundingBoxLength !== undefined)
-      v.boundingBox.length = Math.max(1, Math.round(patch.boundingBoxLength));
-    if (patch.boundingBoxWidth !== undefined)
-      v.boundingBox.width = Math.max(1, Math.round(patch.boundingBoxWidth));
-    if (patch.boundingBoxHeight !== undefined)
-      v.boundingBox.height = Math.max(1, Math.round(patch.boundingBoxHeight));
-    if (patch.maxVelocity !== undefined) v.maxVelocity = Math.max(0, Math.round(patch.maxVelocity));
-    if (patch.maxReverseVelocity !== undefined)
-      v.maxReverseVelocity = Math.max(0, Math.round(patch.maxReverseVelocity));
-    if (patch.envelopeKey !== undefined) v.envelopeKey = patch.envelopeKey;
-    if (patch.orientationDeg !== undefined) {
-      v.layout.orientationDeg = Number.isFinite(patch.orientationDeg) ? patch.orientationDeg : 0;
-    }
-    if (patch.routeColorRgb !== undefined && /^#[0-9a-fA-F]{6}$/.test(patch.routeColorRgb)) {
-      v.layout.routeColorRgb = patch.routeColorRgb.toLowerCase();
-    }
-    const e = v.energyLevelThresholdSet;
-    if (patch.energyLevelCritical !== undefined)
-      e.energyLevelCritical = clampPercent(patch.energyLevelCritical);
-    if (patch.energyLevelGood !== undefined)
-      e.energyLevelGood = clampPercent(patch.energyLevelGood);
-    if (patch.energyLevelSufficientlyRecharged !== undefined)
-      e.energyLevelSufficientlyRecharged = clampPercent(patch.energyLevelSufficientlyRecharged);
-    if (patch.energyLevelFullyRecharged !== undefined)
-      e.energyLevelFullyRecharged = clampPercent(patch.energyLevelFullyRecharged);
+    applyWithHistory('更新 Vehicle', () => {
+      if (patch.boundingBoxLength !== undefined)
+        v.boundingBox.length = Math.max(1, Math.round(patch.boundingBoxLength));
+      if (patch.boundingBoxWidth !== undefined)
+        v.boundingBox.width = Math.max(1, Math.round(patch.boundingBoxWidth));
+      if (patch.boundingBoxHeight !== undefined)
+        v.boundingBox.height = Math.max(1, Math.round(patch.boundingBoxHeight));
+      if (patch.maxVelocity !== undefined)
+        v.maxVelocity = Math.max(0, Math.round(patch.maxVelocity));
+      if (patch.maxReverseVelocity !== undefined)
+        v.maxReverseVelocity = Math.max(0, Math.round(patch.maxReverseVelocity));
+      if (patch.envelopeKey !== undefined) v.envelopeKey = patch.envelopeKey;
+      if (patch.orientationDeg !== undefined) {
+        v.layout.orientationDeg = Number.isFinite(patch.orientationDeg) ? patch.orientationDeg : 0;
+      }
+      if (patch.routeColorRgb !== undefined && /^#[0-9a-fA-F]{6}$/.test(patch.routeColorRgb)) {
+        v.layout.routeColorRgb = patch.routeColorRgb.toLowerCase();
+      }
+      const e = v.energyLevelThresholdSet;
+      if (patch.energyLevelCritical !== undefined)
+        e.energyLevelCritical = clampPercent(patch.energyLevelCritical);
+      if (patch.energyLevelGood !== undefined)
+        e.energyLevelGood = clampPercent(patch.energyLevelGood);
+      if (patch.energyLevelSufficientlyRecharged !== undefined)
+        e.energyLevelSufficientlyRecharged = clampPercent(patch.energyLevelSufficientlyRecharged);
+      if (patch.energyLevelFullyRecharged !== undefined)
+        e.energyLevelFullyRecharged = clampPercent(patch.energyLevelFullyRecharged);
+    });
   }
 
   /* ----------------------- Miscellaneous properties -------------------- */
@@ -1144,14 +1341,16 @@ export const useProjectStore = defineStore('project', () => {
     if (!k) return { ok: false, error: '键不能为空' };
     const target = findEntityWithProperties(kind, name);
     if (!target) return { ok: false, error: `未找到 ${kind} '${name}'` };
-    // Reassign the bag (not just mutate) so Pinia's deep watcher fires and
-    // the persistence layer schedules a save.
-    target.properties = { ...target.properties, [k]: value };
-    if (kind === 'path') {
-      const path = findPath(name);
-      if (path) ensureReverseVelocityForBackwardPath(path);
-    }
-    return { ok: true };
+    return applyWithHistory('更新属性', () => {
+      // Reassign the bag (not just mutate) so Pinia's deep watcher fires and
+      // the persistence layer schedules a save.
+      target.properties = { ...target.properties, [k]: value };
+      if (kind === 'path') {
+        const path = findPath(name);
+        if (path) ensureReverseVelocityForBackwardPath(path);
+      }
+      return { ok: true };
+    });
   }
 
   /**
@@ -1182,20 +1381,24 @@ export const useProjectStore = defineStore('project', () => {
       if (k === oldKey) next[nk] = v;
       else next[k] = v;
     }
-    target.properties = next;
-    if (kind === 'path') {
-      const path = findPath(name);
-      if (path) ensureReverseVelocityForBackwardPath(path);
-    }
-    return { ok: true };
+    return applyWithHistory('重命名属性', () => {
+      target.properties = next;
+      if (kind === 'path') {
+        const path = findPath(name);
+        if (path) ensureReverseVelocityForBackwardPath(path);
+      }
+      return { ok: true };
+    });
   }
 
   function deleteEntityProperty(kind: EntityKind, name: string, key: string): void {
     const target = findEntityWithProperties(kind, name);
     if (!target || !(key in target.properties)) return;
-    const next = { ...target.properties };
-    delete next[key];
-    target.properties = next;
+    applyWithHistory('删除属性', () => {
+      const next = { ...target.properties };
+      delete next[key];
+      target.properties = next;
+    });
   }
 
   /* ------------------------ Selection + deletion ----------------------- */
@@ -1207,66 +1410,68 @@ export const useProjectStore = defineStore('project', () => {
   function deleteSelected(): void {
     const sel = selection.value;
     if (!sel) return;
-    if (sel.kind === 'point') {
-      points.value = points.value.filter((p) => p.name !== sel.name);
-      // Cascade: drop any path that referenced this point.
-      paths.value = paths.value.filter(
-        (p) => p.srcPointName !== sel.name && p.destPointName !== sel.name,
-      );
-      // Cascade: drop the deleted point from any Location.links.
-      locations.value.forEach((l) => {
-        l.links = l.links.filter((lk) => lk.pointName !== sel.name);
-      });
-      // Cascade: drop the deleted point from any Block.memberNames.
-      blocks.value.forEach((b) => {
-        b.memberNames = b.memberNames.filter((n) => n !== sel.name);
-      });
-    } else if (sel.kind === 'path') {
-      paths.value = paths.value.filter((p) => p.name !== sel.name);
-      blocks.value.forEach((b) => {
-        b.memberNames = b.memberNames.filter((n) => n !== sel.name);
-      });
-    } else if (sel.kind === 'locationType') {
+    if (sel.kind === 'locationType' && locations.value.some((l) => l.typeName === sel.name)) {
       // Block deletion if any Location still references this type — the
       // user has to re-assign first.
-      const refs = locations.value.filter((l) => l.typeName === sel.name);
-      if (refs.length > 0) {
-        // Soft-fail: just leave selection in place; the property panel
-        // surfaces the count so the user can act.
-        return;
+      return;
+    }
+
+    applyWithHistory('删除选中实体', () => {
+      if (sel.kind === 'point') {
+        points.value = points.value.filter((p) => p.name !== sel.name);
+        // Cascade: drop any path that referenced this point.
+        paths.value = paths.value.filter(
+          (p) => p.srcPointName !== sel.name && p.destPointName !== sel.name,
+        );
+        // Cascade: drop the deleted point from any Location.links.
+        locations.value.forEach((l) => {
+          l.links = l.links.filter((lk) => lk.pointName !== sel.name);
+        });
+        // Cascade: drop the deleted point from any Block.memberNames.
+        blocks.value.forEach((b) => {
+          b.memberNames = b.memberNames.filter((n) => n !== sel.name);
+        });
+      } else if (sel.kind === 'path') {
+        paths.value = paths.value.filter((p) => p.name !== sel.name);
+        blocks.value.forEach((b) => {
+          b.memberNames = b.memberNames.filter((n) => n !== sel.name);
+        });
+      } else if (sel.kind === 'locationType') {
+        locationTypes.value = locationTypes.value.filter((t) => t.name !== sel.name);
+      } else if (sel.kind === 'location') {
+        locations.value = locations.value.filter((l) => l.name !== sel.name);
+        blocks.value.forEach((b) => {
+          b.memberNames = b.memberNames.filter((n) => n !== sel.name);
+        });
+      } else if (sel.kind === 'block') {
+        blocks.value = blocks.value.filter((b) => b.name !== sel.name);
+      } else if (sel.kind === 'vehicle') {
+        vehicles.value = vehicles.value.filter((v) => v.name !== sel.name);
       }
-      locationTypes.value = locationTypes.value.filter((t) => t.name !== sel.name);
-    } else if (sel.kind === 'location') {
-      locations.value = locations.value.filter((l) => l.name !== sel.name);
-      blocks.value.forEach((b) => {
-        b.memberNames = b.memberNames.filter((n) => n !== sel.name);
-      });
-    } else if (sel.kind === 'block') {
-      blocks.value = blocks.value.filter((b) => b.name !== sel.name);
-    } else if (sel.kind === 'vehicle') {
-      vehicles.value = vehicles.value.filter((v) => v.name !== sel.name);
-    }
-    // PR3: drop the deleted entity from the multi-selection set if present.
-    const delKey = `${sel.kind}:${sel.name}`;
-    if (multiSelection.value.has(delKey)) {
-      const next = new Set(multiSelection.value);
-      next.delete(delKey);
-      multiSelection.value = next;
-    }
-    selection.value = null;
+      // PR3: drop the deleted entity from the multi-selection set if present.
+      const delKey = `${sel.kind}:${sel.name}`;
+      if (multiSelection.value.has(delKey)) {
+        const next = new Set(multiSelection.value);
+        next.delete(delKey);
+        multiSelection.value = next;
+      }
+      selection.value = null;
+    });
   }
 
   /** Wipe everything (used by tests + "重置草稿" button if/when added). */
   function clearAll(): void {
-    points.value = [];
-    paths.value = [];
-    locationTypes.value = [];
-    locations.value = [];
-    blocks.value = [];
-    vehicles.value = [];
-    selection.value = null;
-    multiSelection.value = new Set();
-    pathDraftSrc.value = null;
+    applyWithHistory('清空草稿', () => {
+      points.value = [];
+      paths.value = [];
+      locationTypes.value = [];
+      locations.value = [];
+      blocks.value = [];
+      vehicles.value = [];
+      selection.value = null;
+      multiSelection.value = new Set();
+      pathDraftSrc.value = null;
+    });
   }
 
   /* ------------------------- PR3: multi-selection ----------------------- */
@@ -1346,17 +1551,19 @@ export const useProjectStore = defineStore('project', () => {
     }
     const moved = applyAlignAction(action, anchors);
     if (moved.length === 0) return 0;
-    let count = 0;
-    moved.forEach((next, i) => {
-      const orig = anchors[i];
-      if (next.x === orig.x && next.y === orig.y) return;
-      const pixel = { x: next.x, y: next.y };
-      if (orig.kind === 'point') movePoint(orig.name, pixel);
-      else if (orig.kind === 'location') moveLocation(orig.name, pixel);
-      else if (orig.kind === 'vehicle') moveVehicle(orig.name, pixel);
-      count += 1;
+    return applyWithHistory('对齐 / 分布', () => {
+      let count = 0;
+      moved.forEach((next, i) => {
+        const orig = anchors[i];
+        if (next.x === orig.x && next.y === orig.y) return;
+        const pixel = { x: next.x, y: next.y };
+        if (orig.kind === 'point') movePoint(orig.name, pixel);
+        else if (orig.kind === 'location') moveLocation(orig.name, pixel);
+        else if (orig.kind === 'vehicle') moveVehicle(orig.name, pixel);
+        count += 1;
+      });
+      return count;
     });
-    return count;
   }
   // ---------------------------------------------------------------
 
@@ -1372,6 +1579,16 @@ export const useProjectStore = defineStore('project', () => {
     selection,
     multiSelection,
     pathDraftSrc,
+    // undo / redo
+    canUndo,
+    canRedo,
+    undoLabel,
+    redoLabel,
+    undo,
+    redo,
+    beginHistoryTransaction,
+    commitHistoryTransaction,
+    cancelHistoryTransaction,
     // background actions
     setBackground,
     clearBackground,

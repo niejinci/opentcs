@@ -102,6 +102,18 @@ function onClearMultiSelection(): void {
   project.clearMultiSelection();
 }
 
+function undoTitle(): string {
+  return project.canUndo && project.undoLabel
+    ? `撤销：${project.undoLabel} (Ctrl+Z)`
+    : '撤销 (Ctrl+Z)';
+}
+
+function redoTitle(): string {
+  return project.canRedo && project.redoLabel
+    ? `重做：${project.redoLabel} (Ctrl+Y / Ctrl+Shift+Z)`
+    : '重做 (Ctrl+Y / Ctrl+Shift+Z)';
+}
+
 /* ----------------------------- Resize handle ---------------------------- */
 //
 // Pointer-driven drag on the right edge of the toolbar. We track the
@@ -163,6 +175,35 @@ function onResizeKeyDown(e: KeyboardEvent): void {
     aria-label="编辑器工具栏"
     :style="{ width: `${settings.toolbarWidthPx}px` }"
   >
+    <div class="history-actions" aria-label="撤销与重做">
+      <button
+        type="button"
+        class="history-btn"
+        :disabled="!project.canUndo"
+        :title="undoTitle()"
+        aria-label="撤销"
+        data-testid="editor-undo"
+        @click="project.undo()"
+      >
+        <span class="history-btn__glyph" aria-hidden="true">↶</span>
+        <span>撤销</span>
+      </button>
+      <button
+        type="button"
+        class="history-btn"
+        :disabled="!project.canRedo"
+        :title="redoTitle()"
+        aria-label="重做"
+        data-testid="editor-redo"
+        @click="project.redo()"
+      >
+        <span class="history-btn__glyph" aria-hidden="true">↷</span>
+        <span>重做</span>
+      </button>
+    </div>
+
+    <hr class="toolbar-sep" />
+
     <button
       v-for="t in EDITOR_TOOLS"
       :key="t.id"
@@ -359,6 +400,39 @@ function onResizeKeyDown(e: KeyboardEvent): void {
   border: none;
   border-top: 1px dashed #d0d7de;
   margin: 0.25rem 0;
+}
+
+.history-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+}
+.history-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 2rem;
+  padding: 0.3rem 0.35rem;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #1f2328;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+}
+.history-btn:hover:not(:disabled) {
+  background: #eaeef2;
+}
+.history-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.history-btn__glyph {
+  color: #0969da;
+  font-size: 1rem;
+  line-height: 1;
 }
 
 .toolbar-section {
