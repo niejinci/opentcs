@@ -80,6 +80,7 @@ describe('VehicleStatusPanel', () => {
       '运行',
       '集成级别',
       '当前点位',
+      '最后上报点位',
       '电量',
       '暂停',
       '重路由',
@@ -106,6 +107,20 @@ describe('VehicleStatusPanel', () => {
     };
     await wrapper.vm.$nextTick();
     expect(wrapper.findAll('tbody tr')[0].text()).toContain('Point-9');
+  });
+
+  it('does not present unavailable cached positions as current positions', async () => {
+    const store = useLiveStatusStore();
+    store.vehicles = {
+      'V-1': vehicle({ name: 'V-1', state: 'UNAVAILABLE', currentPosition: 'Point-34' }),
+    };
+
+    const wrapper = mount(VehicleStatusPanel);
+    await wrapper.vm.$nextTick();
+
+    const cells = wrapper.findAll('tbody tr')[0].findAll('td');
+    expect(cells[3].text()).toBe('—');
+    expect(cells[4].text()).toBe('Point-34');
   });
 
   it('requests regular and forced rerouting for a vehicle', async () => {

@@ -33,6 +33,7 @@ import { computed, type ComputedRef } from 'vue';
 import type { Vehicle, VehicleState } from '@/api/types/bff';
 import type { DraftVehicle } from '@/domain/model/types';
 import { worldToPixel } from '@/domain/geometry/affine';
+import { isVehicleRealtime } from '@/domain/vehicles/live';
 import { useLiveStatusStore } from '@/stores/liveStatus';
 import { useProjectStore } from '@/stores/project';
 
@@ -50,7 +51,7 @@ export interface OverlayVehicle {
   orientationDeg: number;
   /** Render fill colour. */
   fillRgb: string;
-  /** True when the kernel has reported a position for this vehicle. */
+  /** True when the kernel state says the reported pose is realtime-trustworthy. */
   isLive: boolean;
   /** Last-seen kernel state, if any. */
   kernelState: VehicleState | null;
@@ -101,13 +102,12 @@ export function useLiveVehicleOverlay(): LiveVehicleOverlay {
       const kernel: Vehicle | undefined = live.vehicles[draft.name];
       let pixelX = draft.layout.pixelX;
       let pixelY = draft.layout.pixelY;
-      let isLive = false;
-      if (kernel?.currentPosition) {
+      const isLive = isVehicleRealtime(kernel);
+      if (isLive && kernel?.currentPosition) {
         const pt = project.findPoint(kernel.currentPosition);
         if (pt) {
           pixelX = pt.layout.pixelX;
           pixelY = pt.layout.pixelY;
-          isLive = true;
         }
       }
       const stateColor = kernel ? STATE_COLOR[kernel.state] : null;
@@ -116,7 +116,7 @@ export function useLiveVehicleOverlay(): LiveVehicleOverlay {
       // project, so leave precisePixel null (the renderer skips the layer).
       let precisePixel: { x: number; y: number } | null = null;
       let precisePositionMm: { x: number; y: number; z: number } | null = null;
-      if (kernel?.precisePosition) {
+      if (isLive && kernel?.precisePosition) {
         precisePositionMm = {
           x: kernel.precisePosition.x,
           y: kernel.precisePosition.y,

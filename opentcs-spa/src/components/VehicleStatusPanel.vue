@@ -27,7 +27,8 @@
 import { computed, reactive } from 'vue';
 
 import { rerouteVehicle } from '@/api/endpoints/vehicles';
-import type { VehicleIntegrationLevel, VehicleState } from '@/api/types/bff';
+import type { Vehicle, VehicleIntegrationLevel, VehicleState } from '@/api/types/bff';
+import { isVehicleRealtime } from '@/domain/vehicles/live';
 import { useLiveStatusStore } from '@/stores/liveStatus';
 import { toastSuccess, toastWarning } from '@/ui/toast/toastBus';
 
@@ -55,6 +56,14 @@ const INTEGRATION_LEVEL_LABEL: Record<VehicleIntegrationLevel, string> = {
 function formatEnergy(level: number): string {
   if (!Number.isFinite(level)) return '—';
   return `${Math.round(level)}%`;
+}
+
+function currentPositionText(vehicle: Vehicle): string {
+  return isVehicleRealtime(vehicle) ? (vehicle.currentPosition ?? '—') : '—';
+}
+
+function lastReportedPositionText(vehicle: Vehicle): string {
+  return vehicle.currentPosition ?? '—';
 }
 
 function busyKey(name: string, forced: boolean): string {
@@ -104,6 +113,7 @@ async function requestReroute(name: string, forced: boolean): Promise<void> {
             <th scope="col">运行</th>
             <th scope="col">集成级别</th>
             <th scope="col">当前点位</th>
+            <th scope="col">最后上报点位</th>
             <th scope="col">电量</th>
             <th scope="col">暂停</th>
             <th scope="col">重路由</th>
@@ -117,7 +127,8 @@ async function requestReroute(name: string, forced: boolean): Promise<void> {
             </td>
             <td class="proc">{{ v.procState }}</td>
             <td class="ilevel">{{ INTEGRATION_LEVEL_LABEL[v.integrationLevel] }}</td>
-            <td class="pos">{{ v.currentPosition || '—' }}</td>
+            <td class="pos" :data-stale="!isVehicleRealtime(v)">{{ currentPositionText(v) }}</td>
+            <td class="pos last">{{ lastReportedPositionText(v) }}</td>
             <td class="energy">{{ formatEnergy(v.energyLevel) }}</td>
             <td class="paused" :data-on="v.paused">{{ v.paused ? '是' : '否' }}</td>
             <td class="actions">
@@ -252,6 +263,12 @@ async function requestReroute(name: string, forced: boolean): Promise<void> {
 }
 .energy {
   font-variant-numeric: tabular-nums;
+}
+.pos[data-stale='true'] {
+  color: #6e7781;
+}
+.pos.last {
+  color: #57606a;
 }
 .paused[data-on='true'] {
   color: #cf222e;
