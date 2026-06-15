@@ -73,11 +73,13 @@ const STORAGE_VERSION = 2;
 const STORAGE_VERSION_BG = 1;
 const PERSIST_DEBOUNCE_MS = 200;
 const VDA5050_PATH_VEHICLE_ORIENTATION = 'vda5050:vehicleOrientation';
+const VDA5050_PATH_ORIENTATION_TYPE_FORWARD = 'vda5050:orientationType.forward';
+const DEFAULT_VDA5050_PATH_ORIENTATION_TYPE_FORWARD = 'GLOBAL';
 const VDA5050_UNIQUE_VEHICLE_PROPERTY_KEYS = [
   'vda5050:topicPrefix',
   'vda5050:serialNumber',
 ] as const;
-const DEFAULT_BACKWARD_PATH_MAX_REVERSE_VELOCITY = 200;
+const DEFAULT_BACKWARD_PATH_MAX_REVERSE_VELOCITY = 500;
 
 /* The background travels in its own localStorage key so the (potentially
    multi-MB) PNG data URL doesn't get rewritten on every Point/Path edit. */
@@ -152,7 +154,10 @@ function loadPersisted(): PersistedDraft | null {
       v: STORAGE_VERSION,
       points: (parsed.points as DraftPoint[]).map(withProperties),
       paths: uniqueDirectedPaths(
-        (parsed.paths as DraftPath[]).map(withProperties).map(ensureReverseVelocityForBackwardPath),
+        (parsed.paths as DraftPath[])
+          .map(withProperties)
+          .map(ensureDefaultPathProperties)
+          .map(ensureReverseVelocityForBackwardPath),
       ),
       locationTypes: Array.isArray(parsed.locationTypes)
         ? (parsed.locationTypes as DraftLocationType[]).map(withProperties)
@@ -181,6 +186,16 @@ function loadPersisted(): PersistedDraft | null {
 function withProperties<T extends { properties?: Record<string, string> }>(entity: T): T {
   if (entity.properties && typeof entity.properties === 'object') return entity;
   return { ...entity, properties: {} };
+}
+
+function ensureDefaultPathProperties(path: DraftPath): DraftPath {
+  if (!(VDA5050_PATH_ORIENTATION_TYPE_FORWARD in path.properties)) {
+    path.properties = {
+      ...path.properties,
+      [VDA5050_PATH_ORIENTATION_TYPE_FORWARD]: DEFAULT_VDA5050_PATH_ORIENTATION_TYPE_FORWARD,
+    };
+  }
+  return path;
 }
 
 function hasBackwardVehicleOrientation(path: DraftPath): boolean {
@@ -394,9 +409,9 @@ export const useProjectStore = defineStore('project', () => {
       const revived = JSON.parse(JSON.stringify(payload), nanReviver) as Partial<PersistedDraft>;
       points.value = (revived.points ?? []).map(withProperties) as DraftPoint[];
       paths.value = uniqueDirectedPaths(
-        ((revived.paths ?? []).map(withProperties) as DraftPath[]).map(
-          ensureReverseVelocityForBackwardPath,
-        ),
+        ((revived.paths ?? []).map(withProperties) as DraftPath[])
+          .map(ensureDefaultPathProperties)
+          .map(ensureReverseVelocityForBackwardPath),
       );
       locationTypes.value = (revived.locationTypes ?? []).map(
         withProperties,
@@ -685,7 +700,9 @@ export const useProjectStore = defineStore('project', () => {
       maxVelocity: 1000, // 1 m/s default
       maxReverseVelocity: 0,
       locked: false,
-      properties: {},
+      properties: {
+        [VDA5050_PATH_ORIENTATION_TYPE_FORWARD]: DEFAULT_VDA5050_PATH_ORIENTATION_TYPE_FORWARD,
+      },
     };
     paths.value.push(created);
     selection.value = { kind: 'path', name };

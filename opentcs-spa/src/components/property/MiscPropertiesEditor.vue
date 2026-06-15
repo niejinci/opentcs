@@ -164,6 +164,7 @@ function addRow(): void {
           type="text"
           class="row__key"
           aria-label="property key"
+          :title="row.key"
           @change="commitKey(row)"
         />
         <input
@@ -173,6 +174,7 @@ function addRow(): void {
           :class="{ 'row__value--required-empty': isMissingVehicleUniqueProperty(row) }"
           :placeholder="isMissingVehicleUniqueProperty(row) ? '复制后需填写唯一值' : ''"
           aria-label="property value"
+          :title="row.value"
           @change="commitValue(row)"
         />
         <button
@@ -194,6 +196,7 @@ function addRow(): void {
         class="row__key"
         placeholder="键"
         aria-label="new property key"
+        :title="draftKey"
         @keydown.enter.prevent="addRow"
       />
       <input
@@ -202,6 +205,7 @@ function addRow(): void {
         class="row__value"
         placeholder="值"
         aria-label="new property value"
+        :title="draftValue"
         @keydown.enter.prevent="addRow"
       />
       <button type="button" class="row__add" @click="addRow">+ 添加</button>
