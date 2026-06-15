@@ -140,9 +140,11 @@ function formatTime(ts: number): string {
   background: #fff;
   border: 1px solid #d0d7de;
   border-radius: 6px;
-  width: 280px;
-  max-height: 480px;
+  width: 100%;
+  height: 100%;
   font-size: 0.85rem;
+  min-width: 0;
+  min-height: 0;
 }
 .hdr {
   display: flex;
@@ -218,6 +220,7 @@ function formatTime(ts: number): string {
   padding: 0;
   overflow-y: auto;
   flex: 1 1 auto;
+  min-height: 0;
 }
 .timeline .empty {
   padding: 1rem 0.75rem;

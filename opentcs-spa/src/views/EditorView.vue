@@ -32,7 +32,13 @@ import {
   getEditorTool,
   type EditorToolId,
 } from '@/domain/editor/tools';
-import { useEditorSettingsStore } from '@/stores/editorSettings';
+import {
+  MAX_SIDEBAR_WIDTH_PX,
+  MAX_STATUS_PANEL_HEIGHT_PX,
+  MIN_SIDEBAR_WIDTH_PX,
+  MIN_STATUS_PANEL_HEIGHT_PX,
+  useEditorSettingsStore,
+} from '@/stores/editorSettings';
 import { useProjectStore } from '@/stores/project';
 import { useProjectsStore } from '@/stores/projects';
 import { toastError, toastInfo } from '@/ui/toast/toastBus';
@@ -140,6 +146,100 @@ function onKeyDown(e: KeyboardEvent): void {
 onMounted(() => window.addEventListener('keydown', onKeyDown));
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown));
 
+/* --------------------------- Layout resizing --------------------------- */
+
+function setResizeCursor(cursor: string): void {
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = cursor;
+}
+
+function clearResizeCursor(): void {
+  document.body.style.userSelect = '';
+  document.body.style.cursor = '';
+}
+
+function onSidebarResizePointerDown(e: PointerEvent): void {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  const startX = e.clientX;
+  const startWidth = settings.sidebarWidthPx;
+  setResizeCursor('col-resize');
+
+  function onMove(ev: PointerEvent): void {
+    settings.setSidebarWidthPx(startWidth + (startX - ev.clientX));
+  }
+
+  function onUp(): void {
+    window.removeEventListener('pointermove', onMove);
+    clearResizeCursor();
+  }
+
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp, { once: true });
+  window.addEventListener('pointercancel', onUp, { once: true });
+}
+
+function onSidebarResizeKeyDown(e: KeyboardEvent): void {
+  const step = e.shiftKey ? 32 : 8;
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    settings.setSidebarWidthPx(settings.sidebarWidthPx + step);
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    settings.setSidebarWidthPx(settings.sidebarWidthPx - step);
+  } else if (e.key === 'Home') {
+    e.preventDefault();
+    settings.setSidebarWidthPx(MIN_SIDEBAR_WIDTH_PX);
+  } else if (e.key === 'End') {
+    e.preventDefault();
+    settings.setSidebarWidthPx(MAX_SIDEBAR_WIDTH_PX);
+  }
+}
+
+function onStatusPanelResizePointerDown(panel: 'vehicle' | 'order', e: PointerEvent): void {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  const startY = e.clientY;
+  const startHeight =
+    panel === 'vehicle' ? settings.vehiclePanelHeightPx : settings.orderPanelHeightPx;
+  setResizeCursor('row-resize');
+
+  function onMove(ev: PointerEvent): void {
+    const next = startHeight + (ev.clientY - startY);
+    if (panel === 'vehicle') settings.setVehiclePanelHeightPx(next);
+    else settings.setOrderPanelHeightPx(next);
+  }
+
+  function onUp(): void {
+    window.removeEventListener('pointermove', onMove);
+    clearResizeCursor();
+  }
+
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp, { once: true });
+  window.addEventListener('pointercancel', onUp, { once: true });
+}
+
+function onStatusPanelResizeKeyDown(panel: 'vehicle' | 'order', e: KeyboardEvent): void {
+  const current = panel === 'vehicle' ? settings.vehiclePanelHeightPx : settings.orderPanelHeightPx;
+  const setHeight =
+    panel === 'vehicle' ? settings.setVehiclePanelHeightPx : settings.setOrderPanelHeightPx;
+  const step = e.shiftKey ? 32 : 8;
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    setHeight(current - step);
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    setHeight(current + step);
+  } else if (e.key === 'Home') {
+    e.preventDefault();
+    setHeight(MIN_STATUS_PANEL_HEIGHT_PX);
+  } else if (e.key === 'End') {
+    e.preventDefault();
+    setHeight(MAX_STATUS_PANEL_HEIGHT_PX);
+  }
+}
+
 /* ------------------------- Stage event handlers ------------------------- */
 
 function onToolFire(payload: {
@@ -219,7 +319,16 @@ function pointTypeBadge(): string {
       <RouterLink to="/import" class="cta">前往「地图导入」上传三件套 →</RouterLink>
     </div>
 
-    <div v-else class="editor__workspace" :data-tree-collapsed="settings.treeCollapsed">
+    <div
+      v-else
+      class="editor__workspace"
+      :data-tree-collapsed="settings.treeCollapsed"
+      :style="{
+        '--sidebar-width': `${settings.sidebarWidthPx}px`,
+        '--vehicle-panel-height': `${settings.vehiclePanelHeightPx}px`,
+        '--order-panel-height': `${settings.orderPanelHeightPx}px`,
+      }"
+    >
       <ResourceTree />
       <EditorToolbar :active-tool="activeTool" @switch-tool="setTool" />
 
@@ -270,10 +379,68 @@ function pointTypeBadge(): string {
         </MapStage>
       </div>
 
+      <div
+        class="sidebar-resize"
+        role="separator"
+        tabindex="0"
+        aria-orientation="vertical"
+        :aria-valuemin="MIN_SIDEBAR_WIDTH_PX"
+        :aria-valuemax="MAX_SIDEBAR_WIDTH_PX"
+        :aria-valuenow="settings.sidebarWidthPx"
+        :aria-label="`右侧属性面板宽度（${settings.sidebarWidthPx} px，按住左右拖动或使用 ←/→ 键调整）`"
+        :title="`拖动调整右侧属性面板宽度（${settings.sidebarWidthPx} px）`"
+        data-testid="sidebar-resize"
+        @pointerdown="onSidebarResizePointerDown"
+        @keydown="onSidebarResizeKeyDown"
+      >
+        <span class="sidebar-resize__grip" aria-hidden="true"></span>
+      </div>
       <div class="editor__sidebar">
         <PropertyPanel />
-        <VehicleStatusPanel />
-        <OrderStatusSidebar />
+        <section
+          class="sidebar-panel sidebar-panel--vehicle"
+          :style="{ height: `${settings.vehiclePanelHeightPx}px` }"
+        >
+          <VehicleStatusPanel />
+          <div
+            class="panel-resize"
+            role="separator"
+            tabindex="0"
+            aria-orientation="horizontal"
+            :aria-valuemin="MIN_STATUS_PANEL_HEIGHT_PX"
+            :aria-valuemax="MAX_STATUS_PANEL_HEIGHT_PX"
+            :aria-valuenow="settings.vehiclePanelHeightPx"
+            :aria-label="`车辆实时状态面板高度（${settings.vehiclePanelHeightPx} px，按住上下拖动或使用 ↑/↓ 键调整）`"
+            :title="`拖动调整车辆实时状态面板高度（${settings.vehiclePanelHeightPx} px）`"
+            data-testid="vehicle-panel-resize"
+            @pointerdown="(e: PointerEvent) => onStatusPanelResizePointerDown('vehicle', e)"
+            @keydown="(e: KeyboardEvent) => onStatusPanelResizeKeyDown('vehicle', e)"
+          >
+            <span class="panel-resize__grip" aria-hidden="true"></span>
+          </div>
+        </section>
+        <section
+          class="sidebar-panel sidebar-panel--order"
+          :style="{ height: `${settings.orderPanelHeightPx}px` }"
+        >
+          <OrderStatusSidebar />
+          <div
+            class="panel-resize"
+            role="separator"
+            tabindex="0"
+            aria-orientation="horizontal"
+            :aria-valuemin="MIN_STATUS_PANEL_HEIGHT_PX"
+            :aria-valuemax="MAX_STATUS_PANEL_HEIGHT_PX"
+            :aria-valuenow="settings.orderPanelHeightPx"
+            :aria-label="`订单状态面板高度（${settings.orderPanelHeightPx} px，按住上下拖动或使用 ↑/↓ 键调整）`"
+            :title="`拖动调整订单状态面板高度（${settings.orderPanelHeightPx} px）`"
+            data-testid="order-panel-resize"
+            @pointerdown="(e: PointerEvent) => onStatusPanelResizePointerDown('order', e)"
+            @keydown="(e: KeyboardEvent) => onStatusPanelResizeKeyDown('order', e)"
+          >
+            <span class="panel-resize__grip" aria-hidden="true"></span>
+          </div>
+        </section>
         <RouterLink
           v-if="projects.currentId"
           :to="{ name: 'project-orders', params: { projectId: projects.currentId } }"
@@ -352,7 +519,7 @@ function pointTypeBadge(): string {
 
 .editor__workspace {
   display: grid;
-  grid-template-columns: 240px auto 1fr 280px;
+  grid-template-columns: 240px auto 1fr 8px var(--sidebar-width, 340px);
   /* Bound the row height to the viewport so the canvas area cannot
      grow with its own content (which would re-trigger ResizeObserver). */
   grid-template-rows: minmax(560px, calc(100vh - 220px));
@@ -362,7 +529,7 @@ function pointTypeBadge(): string {
 .editor__workspace[data-tree-collapsed='true'] {
   /* Shrink the resource-tree track to a thin strip so the canvas can
      reclaim the freed horizontal space. */
-  grid-template-columns: 32px auto 1fr 280px;
+  grid-template-columns: 32px auto 1fr 8px var(--sidebar-width, 340px);
 }
 
 .editor__stage {
@@ -417,19 +584,95 @@ function pointTypeBadge(): string {
   background: #eaeef2;
 }
 
+.sidebar-resize {
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  outline: none;
+  touch-action: none;
+  user-select: none;
+}
+.sidebar-resize__grip {
+  display: block;
+  width: 2px;
+  height: 56px;
+  border-radius: 1px;
+  background: #d0d7de;
+  transition:
+    background 0.12s ease,
+    height 0.12s ease;
+}
+.sidebar-resize:hover .sidebar-resize__grip,
+.sidebar-resize:focus-visible .sidebar-resize__grip,
+.sidebar-resize:active .sidebar-resize__grip {
+  background: #0969da;
+  height: 88px;
+}
+.sidebar-resize:focus-visible {
+  box-shadow: inset 2px 0 0 #0969da;
+}
+
 .editor__sidebar {
   /* Grid layout so PropertyPanel claims the remaining vertical space and
      scrolls internally; the order/vehicle status panels keep their
      content-bounded heights and never squeeze the property editor. */
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto auto auto auto;
+  grid-template-rows:
+    minmax(220px, 1fr)
+    var(--vehicle-panel-height, 220px)
+    var(--order-panel-height, 260px)
+    auto
+    auto;
   gap: 0.5rem;
   min-width: 0;
   min-height: 0;
+  width: var(--sidebar-width, 340px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.15rem;
 }
 /* Direct flex/grid children must not collapse below their content. */
 .editor__sidebar > * {
   min-height: 0;
+}
+.sidebar-panel {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 8px;
+  min-width: 0;
+  min-height: 0;
+}
+.sidebar-panel > :first-child {
+  min-height: 0;
+}
+.panel-resize {
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  touch-action: none;
+  user-select: none;
+}
+.panel-resize__grip {
+  display: block;
+  width: 48px;
+  height: 2px;
+  border-radius: 1px;
+  background: #d0d7de;
+  transition:
+    background 0.12s ease,
+    width 0.12s ease;
+}
+.panel-resize:hover .panel-resize__grip,
+.panel-resize:focus-visible .panel-resize__grip,
+.panel-resize:active .panel-resize__grip {
+  width: 88px;
+  background: #0969da;
+}
+.panel-resize:focus-visible {
+  box-shadow: inset 0 -2px 0 #0969da;
 }
 .orders-cta {
   display: block;

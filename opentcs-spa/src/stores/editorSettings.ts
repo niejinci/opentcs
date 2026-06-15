@@ -23,9 +23,30 @@ export const MIN_TOOLBAR_WIDTH_PX = 140;
 export const MAX_TOOLBAR_WIDTH_PX = 360;
 export const DEFAULT_TOOLBAR_WIDTH_PX = 200;
 
+/** Editor right sidebar width, in CSS pixels. */
+export const MIN_SIDEBAR_WIDTH_PX = 220;
+export const MAX_SIDEBAR_WIDTH_PX = 560;
+export const DEFAULT_SIDEBAR_WIDTH_PX = 340;
+
+/** Vehicle / order status panel heights in the right sidebar. */
+export const MIN_STATUS_PANEL_HEIGHT_PX = 140;
+export const MAX_STATUS_PANEL_HEIGHT_PX = 420;
+export const DEFAULT_VEHICLE_PANEL_HEIGHT_PX = 220;
+export const DEFAULT_ORDER_PANEL_HEIGHT_PX = 260;
+
 export function clampToolbarWidthPx(px: number): number {
   if (!Number.isFinite(px)) return DEFAULT_TOOLBAR_WIDTH_PX;
   return Math.min(MAX_TOOLBAR_WIDTH_PX, Math.max(MIN_TOOLBAR_WIDTH_PX, Math.round(px)));
+}
+
+export function clampSidebarWidthPx(px: number): number {
+  if (!Number.isFinite(px)) return DEFAULT_SIDEBAR_WIDTH_PX;
+  return Math.min(MAX_SIDEBAR_WIDTH_PX, Math.max(MIN_SIDEBAR_WIDTH_PX, Math.round(px)));
+}
+
+export function clampStatusPanelHeightPx(px: number): number {
+  if (!Number.isFinite(px)) return DEFAULT_VEHICLE_PANEL_HEIGHT_PX;
+  return Math.min(MAX_STATUS_PANEL_HEIGHT_PX, Math.max(MIN_STATUS_PANEL_HEIGHT_PX, Math.round(px)));
 }
 
 const STORAGE_KEY = 'opentcs-spa.editorSettings';
@@ -46,6 +67,10 @@ interface PersistedShape {
   // Width of the editor toolbar ("选择" panel) in pixels — user-resizable
   // via a drag handle on its right edge so the canvas can reclaim space.
   toolbarWidthPx: number;
+  // Right sidebar layout preferences.
+  sidebarWidthPx: number;
+  vehiclePanelHeightPx: number;
+  orderPanelHeightPx: number;
 }
 
 function loadFromStorage(): Partial<PersistedShape> | null {
@@ -109,9 +134,26 @@ export const useEditorSettingsStore = defineStore('editorSettings', () => {
   // payloads (older builds, hand-edited storage) cannot break the layout.
   const toolbarWidthPx = ref<number>(
     clampToolbarWidthPx(
-      typeof stored?.toolbarWidthPx === 'number'
-        ? stored.toolbarWidthPx
-        : DEFAULT_TOOLBAR_WIDTH_PX,
+      typeof stored?.toolbarWidthPx === 'number' ? stored.toolbarWidthPx : DEFAULT_TOOLBAR_WIDTH_PX,
+    ),
+  );
+  const sidebarWidthPx = ref<number>(
+    clampSidebarWidthPx(
+      typeof stored?.sidebarWidthPx === 'number' ? stored.sidebarWidthPx : DEFAULT_SIDEBAR_WIDTH_PX,
+    ),
+  );
+  const vehiclePanelHeightPx = ref<number>(
+    clampStatusPanelHeightPx(
+      typeof stored?.vehiclePanelHeightPx === 'number'
+        ? stored.vehiclePanelHeightPx
+        : DEFAULT_VEHICLE_PANEL_HEIGHT_PX,
+    ),
+  );
+  const orderPanelHeightPx = ref<number>(
+    clampStatusPanelHeightPx(
+      typeof stored?.orderPanelHeightPx === 'number'
+        ? stored.orderPanelHeightPx
+        : DEFAULT_ORDER_PANEL_HEIGHT_PX,
     ),
   );
 
@@ -127,8 +169,11 @@ export const useEditorSettingsStore = defineStore('editorSettings', () => {
       toleranceDefaultMm,
       treeCollapsed,
       toolbarWidthPx,
+      sidebarWidthPx,
+      vehiclePanelHeightPx,
+      orderPanelHeightPx,
     ],
-    ([snap, spacing, mini, tolShow, tolMm, treeC, toolbarW]) => {
+    ([snap, spacing, mini, tolShow, tolMm, treeC, toolbarW, sidebarW, vehicleH, orderH]) => {
       saveToStorage({
         v: STORAGE_VERSION,
         gridSnap: snap,
@@ -138,6 +183,9 @@ export const useEditorSettingsStore = defineStore('editorSettings', () => {
         toleranceDefaultMm: clampToleranceMm(tolMm),
         treeCollapsed: treeC,
         toolbarWidthPx: clampToolbarWidthPx(toolbarW),
+        sidebarWidthPx: clampSidebarWidthPx(sidebarW),
+        vehiclePanelHeightPx: clampStatusPanelHeightPx(vehicleH),
+        orderPanelHeightPx: clampStatusPanelHeightPx(orderH),
       });
     },
     { flush: 'post' },
@@ -171,6 +219,18 @@ export const useEditorSettingsStore = defineStore('editorSettings', () => {
     toolbarWidthPx.value = clampToolbarWidthPx(px);
   }
 
+  function setSidebarWidthPx(px: number): void {
+    sidebarWidthPx.value = clampSidebarWidthPx(px);
+  }
+
+  function setVehiclePanelHeightPx(px: number): void {
+    vehiclePanelHeightPx.value = clampStatusPanelHeightPx(px);
+  }
+
+  function setOrderPanelHeightPx(px: number): void {
+    orderPanelHeightPx.value = clampStatusPanelHeightPx(px);
+  }
+
   return {
     gridSnap,
     gridSpacingPx,
@@ -179,6 +239,9 @@ export const useEditorSettingsStore = defineStore('editorSettings', () => {
     toleranceDefaultMm,
     treeCollapsed,
     toolbarWidthPx,
+    sidebarWidthPx,
+    vehiclePanelHeightPx,
+    orderPanelHeightPx,
     toggleGridSnap,
     setGridSpacingPx,
     toggleMinimap,
@@ -186,5 +249,8 @@ export const useEditorSettingsStore = defineStore('editorSettings', () => {
     setToleranceDefaultMm,
     toggleTreeCollapsed,
     setToolbarWidthPx,
+    setSidebarWidthPx,
+    setVehiclePanelHeightPx,
+    setOrderPanelHeightPx,
   };
 });

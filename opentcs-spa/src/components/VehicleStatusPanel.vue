@@ -165,7 +165,9 @@ async function requestReroute(name: string, forced: boolean): Promise<void> {
   border: 1px solid #d0d7de;
   border-radius: 6px;
   font-size: 0.85rem;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
 }
 .hdr {
   display: flex;
@@ -183,13 +185,12 @@ async function requestReroute(name: string, forced: boolean): Promise<void> {
   font-variant-numeric: tabular-nums;
 }
 .body {
-  /* Bounded height so 40+ vehicles scroll instead of pushing the page —
-     covers acceptance 3.9. */
-  max-height: 360px;
-  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 .body[data-empty='true'] {
-  max-height: none;
+  min-height: 0;
 }
 .empty {
   margin: 0;
