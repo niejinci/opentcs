@@ -351,11 +351,11 @@ function pointTypeBadge(): string {
               <span
                 >缩放：<code>{{ (scale * 100).toFixed(0) }}%</code></span
               >
-              <span v-if="panning" class="pan-hint">↔ 平移中（释放空格退出）</span>
+              <span v-if="panning" class="pan-hint">↔ 平移中（释放鼠标退出）</span>
               <span v-else-if="store.pathDraftSrc" class="pan-hint">
                 Path 起点：<code>{{ store.pathDraftSrc }}</code> · 再点一个 Point 完成
               </span>
-              <span v-else class="pan-hint--muted">提示：按住空格 + 拖动 = 平移</span>
+              <span v-else class="pan-hint--muted">提示：拖动空白画布 = 平移</span>
               <span v-if="pixel">
                 像素：(<code>{{ pixel.x.toFixed(1) }}</code
                 >, <code>{{ pixel.y.toFixed(1) }}</code
@@ -467,7 +467,7 @@ function pointTypeBadge(): string {
             <li><kbd>Delete</kbd> 删除选中</li>
             <li><kbd>Ctrl+Z</kbd> 撤销；<kbd>Ctrl+Y</kbd>/<kbd>Ctrl+Shift+Z</kbd> 重做</li>
             <li><kbd>Esc</kbd> 取消 Path 半态 / 取消选中</li>
-            <li><kbd>空格</kbd> + 拖动 = 平移</li>
+            <li>拖动空白画布 = 平移</li>
             <li>滚轮 = 缩放</li>
           </ul>
         </details>

@@ -29,7 +29,7 @@
 //   Enter   : select focused leaf / toggle focused group
 //   Space   : same as Enter (per WAI-ARIA tree pattern)
 // All key handlers `stopPropagation()` so the EditorView's global hotkeys
-// (V/P/L/Delete/Esc/space-pan) don't fire when the tree is focused.
+// (V/P/L/Delete/Esc) don't fire when the tree is focused.
 
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
 
@@ -250,7 +250,7 @@ const HANDLED_KEYS = new Set([
 function onKeyDown(e: KeyboardEvent): void {
   if (!HANDLED_KEYS.has(e.key)) return;
   // Tree owns these keys; never let them bubble to the editor's global
-  // hotkey listener (which interprets Space / arrows for canvas pan).
+  // hotkey listener (which owns tool switching and delete/escape).
   e.preventDefault();
   e.stopPropagation();
 

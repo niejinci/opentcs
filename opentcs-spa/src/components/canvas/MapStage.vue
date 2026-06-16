@@ -14,7 +14,7 @@
 //
 // Interaction:
 //   - Wheel              → zoom toward cursor, clamped to [MIN_SCALE, MAX_SCALE]
-//   - Hold Space + drag  → pan (Konva's `draggable` flag is flipped while held)
+//   - Left-drag empty canvas → pan
 //   - Click (when tool ≠ select) → emits `tool-fire` with stage + world point
 //   - Reset View button  → fit the image to the container with 5% padding
 //   - Pointer move       → emits `pointer-move` for the parent status bar
@@ -74,7 +74,7 @@ const ZOOM_STEP = 1.1;
 const scale = ref(1);
 const stageX = ref(0);
 const stageY = ref(0);
-const isPanning = ref(false); // true while Space is held
+const isPanning = ref(false);
 const cursorStage = ref<{ x: number; y: number } | null>(null);
 
 const stageConfig = computed(() => ({
@@ -84,7 +84,6 @@ const stageConfig = computed(() => ({
   scaleY: scale.value,
   x: stageX.value,
   y: stageY.value,
-  draggable: isPanning.value,
 }));
 
 const cursorWorld = computed(() =>
@@ -93,7 +92,7 @@ const cursorWorld = computed(() =>
 
 const activeToolMeta = computed(() => getEditorTool(props.tool));
 const cursorCss = computed(() => {
-  if (isPanning.value) return 'grab';
+  if (isPanning.value) return 'grabbing';
   return activeToolMeta.value.cursor;
 });
 
@@ -159,7 +158,10 @@ function onPointerLeave(): void {
 function onStageClick(): void {
   // Konva differentiates click vs drag automatically; this handler only
   // fires for taps that did not move past the drag threshold.
-  if (isPanning.value) return;
+  if (isPanning.value || suppressNextStageClick) {
+    suppressNextStageClick = false;
+    return;
+  }
   // If the click landed on a Point or a Path (handled by AnnotationLayer),
   // suppress the stage-level "create / deselect" reaction.
   if (entityClickPending) {
@@ -195,6 +197,73 @@ function onEntityClick(): void {
   entityClickPending = true;
 }
 
+/* ------------------------------ Canvas pan ----------------------------- */
+
+const PAN_DRAG_THRESHOLD_PX = 3;
+
+let panStart:
+  | {
+      clientX: number;
+      clientY: number;
+      stageX: number;
+      stageY: number;
+    }
+  | null = null;
+let suppressNextStageClick = false;
+let clearSuppressedClickTimer: number | null = null;
+
+function onStagePointerDown(e: KonvaEventObject<PointerEvent>): void {
+  if (e.evt.button !== 0) return;
+  const stage = stageRef.value?.getStage();
+  if (!stage || e.target !== stage) return;
+
+  panStart = {
+    clientX: e.evt.clientX,
+    clientY: e.evt.clientY,
+    stageX: stageX.value,
+    stageY: stageY.value,
+  };
+  window.addEventListener('pointermove', onPanPointerMove);
+  window.addEventListener('pointerup', onPanPointerEnd, { once: true });
+  window.addEventListener('pointercancel', onPanPointerEnd, { once: true });
+}
+
+function onPanPointerMove(e: PointerEvent): void {
+  if (!panStart) return;
+  if ((e.buttons & 1) === 0) {
+    onPanPointerEnd();
+    return;
+  }
+
+  const dx = e.clientX - panStart.clientX;
+  const dy = e.clientY - panStart.clientY;
+  if (!isPanning.value && dx * dx + dy * dy < PAN_DRAG_THRESHOLD_PX ** 2) return;
+
+  isPanning.value = true;
+  suppressNextStageClick = true;
+  stageX.value = panStart.stageX + dx;
+  stageY.value = panStart.stageY + dy;
+  e.preventDefault();
+}
+
+function onPanPointerEnd(): void {
+  if (isPanning.value) {
+    suppressNextStageClick = true;
+    if (clearSuppressedClickTimer !== null) {
+      window.clearTimeout(clearSuppressedClickTimer);
+    }
+    clearSuppressedClickTimer = window.setTimeout(() => {
+      suppressNextStageClick = false;
+      clearSuppressedClickTimer = null;
+    }, 150);
+  }
+  isPanning.value = false;
+  panStart = null;
+  window.removeEventListener('pointermove', onPanPointerMove);
+  window.removeEventListener('pointerup', onPanPointerEnd);
+  window.removeEventListener('pointercancel', onPanPointerEnd);
+}
+
 /**
  * Recenter the main viewport on a stage-space point chosen via the
  * mini-map. The minimap component already converted the click into a
@@ -204,41 +273,6 @@ function onEntityClick(): void {
 function onMinimapRecenter(payload: { stageX: number; stageY: number }): void {
   stageX.value = payload.stageX;
   stageY.value = payload.stageY;
-}
-
-function onStageDragEnd(): void {
-  // Sync our refs from the Stage after a user drag, otherwise the next
-  // wheel zoom would jump back to the pre-drag position.
-  const stage = stageRef.value?.getStage();
-  if (!stage) return;
-  stageX.value = stage.x();
-  stageY.value = stage.y();
-}
-
-/* ----------------------------- Keyboard pan ----------------------------- */
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  const tag = target.tagName;
-  return target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-}
-
-function onKeyDown(e: KeyboardEvent): void {
-  if (isEditableTarget(e.target)) return;
-  if (e.code === 'Space' && !e.repeat) {
-    e.preventDefault();
-    isPanning.value = true;
-    return;
-  }
-  // Tool hotkeys are owned by EditorView (which also handles the bus toast);
-  // MapStage only handles space-pan to keep responsibilities local.
-}
-
-function onKeyUp(e: KeyboardEvent): void {
-  if (e.code === 'Space') {
-    e.preventDefault();
-    isPanning.value = false;
-  }
 }
 
 /* --------------------------- Lifecycle hooks ---------------------------- */
@@ -262,15 +296,18 @@ onMounted(() => {
     });
     resizeObserver.observe(hostRef.value);
   }
-  window.addEventListener('keydown', onKeyDown);
-  window.addEventListener('keyup', onKeyUp);
 });
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
   resizeObserver = null;
-  window.removeEventListener('keydown', onKeyDown);
-  window.removeEventListener('keyup', onKeyUp);
+  window.removeEventListener('pointermove', onPanPointerMove);
+  window.removeEventListener('pointerup', onPanPointerEnd);
+  window.removeEventListener('pointercancel', onPanPointerEnd);
+  if (clearSuppressedClickTimer !== null) {
+    window.clearTimeout(clearSuppressedClickTimer);
+    clearSuppressedClickTimer = null;
+  }
 });
 
 // Re-fit whenever the underlying image changes (user imports a different map).
@@ -311,11 +348,11 @@ defineSlots<{
         ref="stageRef"
         :config="stageConfig"
         @wheel="onWheel"
+        @pointerdown="onStagePointerDown"
         @pointermove="onPointerMove"
         @pointerleave="onPointerLeave"
         @click="onStageClick"
         @tap="onStageClick"
-        @dragend="onStageDragEnd"
       >
         <BackgroundLayer :image="image" :width="imageWidth" :height="imageHeight" />
         <GridLayer
