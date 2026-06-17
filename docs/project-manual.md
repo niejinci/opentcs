@@ -834,6 +834,116 @@ curl -s -X POST \
   http://localhost:8090/api/v1/plant-models/publish
 ```
 
+#### 4.5.3 SSE 介绍
+
+##### 4.5.3.1 名词解释
+
+SSE 是 Server-Sent Events 的缩写，中文通常称为服务端事件推送。它是一种基于 HTTP 的单向实时通信机制：浏览器或命令行客户端向服务端发起一次 HTTP 请求，服务端保持连接不关闭，并持续向客户端推送事件数据。
+
+在本项目中，SSE 用于 BFF 向 opentcs-spa 推送实时变化数据，典型数据包括：
+
+1. AGV 车辆状态变化，例如车辆位置、运行状态、能量状态、集成级别、是否在线等。
+2. 运输订单状态变化，例如订单创建、调度、执行中、完成、失败、撤销等。
+
+SSE 与普通 REST API 的区别如下：
+
+| 对比项 | 普通 REST API | SSE |
+| --- | --- | --- |
+| 通信方式 | 客户端请求一次，服务端响应一次 | 客户端请求一次，服务端持续推送 |
+| 连接生命周期 | 响应完成后立即关闭 | 长连接，通常保持打开 |
+| 数据方向 | 客户端主动拉取 | 服务端主动推送到客户端 |
+| 典型用途 | 查询、创建、修改、删除资源 | 实时状态刷新、事件通知 |
+| HTTP 响应类型 | 通常为 `application/json` | `text/event-stream` |
+
+##### 4.5.3.2 工作原理
+
+BFF 的 SSE 接口路径为：
+
+```text
+GET /api/v1/sse?vehicles=true&transportOrders=true
+```
+
+该接口的核心工作过程如下：
+
+1. 客户端携带 `X-Api-Access-Key` 调用 `/api/v1/sse`。
+2. 客户端通过 `Accept: text/event-stream` 声明自己希望建立 SSE 流式连接。
+3. BFF 校验访问密钥，通过后建立 SSE 长连接。
+4. BFF 根据查询参数决定订阅哪些事件类型：
+   - `vehicles=true`：订阅车辆状态变化。
+   - `transportOrders=true`：订阅运输订单状态变化。
+5. BFF 下游通过 RMI 或内部服务读取 kernel 侧状态，并在状态变化时组织为 SSE 事件。
+6. 服务端按 `text/event-stream` 格式持续写出事件，客户端收到后实时更新界面或打印到终端。
+
+SSE 数据在 HTTP 响应体中的典型格式如下：
+
+```text
+event: /events/vehicles
+data: {"currentObjectState":{"name":"Vehicle-1","state":"UNKNOWN","procState":"IDLE","integrationLevel":"TO_BE_RESPECTED","paused":false,"energyLevel":100,"currentPosition":null,"precisePosition":null,"orientationAngle":null},"previousObjectState":{"name":"Vehicle-1","state":"UNKNOWN","procState":"IDLE","integrationLevel":"TO_BE_RESPECTED","paused":false,"energyLevel":100,"currentPosition":null,"precisePosition":null,"orientationAngle":null}}
+
+event: /events/transportOrders
+data: {"currentObjectState":null,"previousObjectState":{"name":"spa-178166620206201KV9S9GHB1708PQGFESHGVK42","type":"-","state":"RAW","intendedVehicle":"Vehicle-1","processingVehicle":null,"destinations":[{"locationName":"Point-49","operation":"MOVE","properties":null},{"locationName":"Point-34","operation":"PARK","properties":null}]}}
+```
+
+其中：
+
+1. `event` 表示事件名称，客户端可按事件类型做不同处理。
+2. `data` 表示事件数据，通常为 JSON 字符串。
+3. 每个事件之间通过空行分隔。
+
+##### 4.5.3.3 测试注意事项
+
+测试 SSE 时需要注意以下几点：
+
+1. 必须使用支持流式输出的客户端。推荐使用 `curl.exe` 或 Linux/macOS 原生 `curl`。
+2. PowerShell 中的 `curl` 可能是 `Invoke-WebRequest` 的别名，不一定等价于真正的 curl；Windows 下建议显式使用 `curl.exe`。
+3. 建议增加请求头 `Accept: text/event-stream`，明确告诉 BFF 当前请求期望建立 SSE 流式连接。
+4. 建议增加 `-N` 参数。`-N` 是 curl 的 `--no-buffer` 简写，用于关闭 curl 输出缓冲，避免事件已经到达但终端暂时不打印。
+5. SSE 命令正常情况下不会像普通 REST 请求一样立即退出；只要连接未断开，它会持续挂起等待服务端推送事件。
+6. 如果命令立即退出，优先检查请求头、访问密钥、BFF 日志、接口路径、查询参数和服务端是否实际注册了 SSE 路由。
+7. 如果连接保持打开但没有输出，不一定代表接口异常，可能只是车辆和订单状态暂时没有变化。可以通过创建运输订单、切换车辆集成级别或触发车辆状态上报来制造事件。
+8. SSE 长连接经过代理、网关或负载均衡时，需要确认中间层没有强制缓冲响应或提前关闭空闲连接。
+
+推荐测试命令如下：
+
+```powershell
+curl.exe -N `
+  -H "X-Api-Access-Key: dev-key" `
+  -H "Accept: text/event-stream" `
+  "http://localhost:8090/api/v1/sse?vehicles=true&transportOrders=true"
+```
+
+```bash
+curl -N \
+  -H 'X-Api-Access-Key: dev-key' \
+  -H 'Accept: text/event-stream' \
+  'http://localhost:8090/api/v1/sse?vehicles=true&transportOrders=true'
+```
+
+##### 4.5.3.4 与 WebSocket、轮询的区别
+
+SSE、WebSocket 和轮询都可以用于前端实时刷新，但适用场景不同：
+
+| 方案 | 特点 | 适用场景 |
+| --- | --- | --- |
+| 轮询 | 前端定时请求服务端，简单但会产生大量重复请求 | 低频状态刷新、实现成本优先的页面 |
+| SSE | 基于 HTTP，服务端单向推送，浏览器原生支持自动重连 | 车辆状态、订单状态、告警通知等服务端主动事件 |
+| WebSocket | 双向长连接，客户端和服务端都可主动发送消息 | 即时通信、远程控制、高频双向交互 |
+
+本项目的车辆状态和订单状态主要是服务端向前端单向推送，前端只需要接收并渲染，不需要通过同一条连接反向发送控制指令，因此使用 SSE 比 WebSocket 更轻量，也更符合当前 BFF 的接口职责。
+
+##### 4.5.3.5 故障排查建议
+
+SSE 测试异常时可按以下顺序排查：
+
+1. 确认 BFF 已启动，并且 `/health` 返回正常。
+2. 确认请求中携带正确的 `X-Api-Access-Key`。
+3. 确认请求中携带 `Accept: text/event-stream`。
+4. 确认 curl 使用了 `-N`，避免输出被客户端缓冲。
+5. 确认查询参数至少打开一个订阅类型，例如 `vehicles=true` 或 `transportOrders=true`。
+6. 查看 BFF 日志，确认 SSE 连接是否建立、是否被鉴权拦截、是否发生异常断开。
+7. 查看 kernel 和通信适配器状态，确认下游是否有车辆或订单状态变化。
+8. 如果通过 Nginx、网关或代理访问，检查是否开启了响应缓冲或连接超时限制。
+
 ### 4.6 BFF 核心业务数据流
 
 #### 4.6.1 启动数据流
