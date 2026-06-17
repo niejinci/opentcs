@@ -611,6 +611,9 @@ $headers = @{ "X-Api-Access-Key" = "dev-key" }
 Invoke-RestMethod -Method Get `
   -Uri "http://localhost:8090/api/v1/vehicles" `
   -Headers $headers
+
+# 不带 api-Access-key
+Invoke-RestMethod -Method Get -Uri "http://localhost:8090/api/v1/vehicles"
 ```
 
 查询单车：
@@ -669,8 +672,15 @@ SSE 订阅建议使用 `curl.exe`，避免 PowerShell 的 `curl` 别名行为差
 ```powershell
 curl.exe -N `
   -H "X-Api-Access-Key: dev-key" `
+  -H "Accept: text/event-stream" `
   "http://localhost:8090/api/v1/sse?vehicles=true&transportOrders=true"
 ```
+
+说明：
+
+1. `Accept: text/event-stream` 明确告诉 BFF 客户端期望接收 SSE 流。BFF 的 `/api/v1/sse` 是 Javalin SSE 路由，带该请求头时服务端会按 SSE 长连接处理，响应 `Content-Type: text/event-stream`，连接保持打开并持续输出事件。
+2. 不带 `Accept: text/event-stream` 时，部分服务端框架、代理或路由匹配逻辑可能不会把请求识别为 SSE 协议请求，可能直接返回非流式响应或结束连接，表现为 curl 命令立即退出。
+3. `-N` 是 curl 的 `--no-buffer` 简写，表示关闭 curl 输出缓冲。SSE 是小块、持续到达的数据流；不加 `-N` 时，curl 可能攒够缓冲区后才打印，导致车辆或订单事件看起来没有实时输出。
 
 创建工程：
 
@@ -769,8 +779,14 @@ curl -s -X POST \
 ```bash
 curl -N \
   -H 'X-Api-Access-Key: dev-key' \
+  -H 'Accept: text/event-stream' \
   'http://localhost:8090/api/v1/sse?vehicles=true&transportOrders=true'
 ```
+
+说明：
+
+1. `Accept: text/event-stream` 用于声明客户端要建立 SSE 流式订阅。
+2. `-N` / `--no-buffer` 用于关闭 curl 输出缓冲，确保每条 SSE 事件到达后尽快显示。
 
 创建工程并上传资产：
 
