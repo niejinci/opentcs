@@ -1,0 +1,5182 @@
+root@byd-SYSTEM-PRODUCT-NAME:/home/byd/log/agv_task_manager/20260611# ros2 topic echo /agv_state_topic
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: ''
+order_update_id: 0
+zone_set_id: HZ27
+last_node_id: ''
+last_node_sequence_id: 0
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.40834999084473
+  y: -1.3434935808181794
+  z: 0.0
+  yaw: -1.482718706130982
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7908563017845154
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: ''
+order_update_id: 0
+zone_set_id: HZ27
+last_node_id: ''
+last_node_sequence_id: 0
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.78
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.408349990844728
+  y: -1.343493580818178
+  z: 0.0
+  yaw: -1.482717275619507
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.78704434633255
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: ''
+order_update_id: 0
+zone_set_id: HZ27
+last_node_id: ''
+last_node_sequence_id: 0
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.40834999084473
+  y: -1.3434935808181812
+  z: 0.0
+  yaw: -1.4827175140380864
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.792112410068512
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: ''
+order_update_id: 0
+zone_set_id: HZ27
+last_node_id: ''
+last_node_sequence_id: 0
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.78
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.40834999084473
+  y: -1.3434935808181812
+  z: 0.0
+  yaw: -1.4827175140380864
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7975510954856873
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: ''
+order_update_id: 0
+zone_set_id: HZ27
+last_node_id: ''
+last_node_sequence_id: 0
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.78
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.40834999084473
+  y: -1.3434935808181812
+  z: 0.0
+  yaw: -1.4827175140380864
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8127416372299194
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: ''
+order_update_id: 0
+zone_set_id: HZ27
+last_node_id: ''
+last_node_sequence_id: 0
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.40834999084473
+  y: -1.3434935808181812
+  z: 0.0
+  yaw: -1.4827175140380864
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.783064603805542
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: ''
+order_update_id: 0
+zone_set_id: HZ27
+last_node_id: ''
+last_node_sequence_id: 0
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.40834999084473
+  y: -1.3434935808181812
+  z: 0.0
+  yaw: -1.4827175140380864
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7790683507919312
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: ''
+order_update_id: 0
+zone_set_id: HZ27
+last_node_id: ''
+last_node_sequence_id: 0
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.408349990844725
+  y: -1.3434935808181763
+  z: 0.0
+  yaw: -1.4827023744583132
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7813161015510559
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 0
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-19
+  sequence_id: 0
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -1.15
+    theta: 1.612223388655438
+    allowed_deviation_x_y: 0.20316573195057142
+    allowed_deviation_theta: 3.141592653589793
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-11
+  sequence_id: 2
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-19 --- Point-11
+  sequence_id: 1
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.78
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.408349990844727
+  y: -1.3434935808181776
+  z: 0.0
+  yaw: -1.482706665992737
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7952873706817627
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 0
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-19
+  sequence_id: 0
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -1.15
+    theta: 1.612223388655438
+    allowed_deviation_x_y: 0.20316573195057142
+    allowed_deviation_theta: 3.141592653589793
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-11
+  sequence_id: 2
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-19 --- Point-11
+  sequence_id: 1
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.78
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.408349990844727
+  y: -1.3434935808181776
+  z: 0.0
+  yaw: -1.482706665992737
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7952873706817627
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 1
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-19
+  sequence_id: 0
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -1.15
+    theta: 1.612223388655438
+    allowed_deviation_x_y: 0.20316573195057142
+    allowed_deviation_theta: 3.141592653589793
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-11
+  sequence_id: 2
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-19 --- Point-11
+  sequence_id: 1
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.78
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.408349990844723
+  y: -1.3434935808181758
+  z: 0.0
+  yaw: -1.482706546783447
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7951680421829224
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 1
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-19
+  sequence_id: 0
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -1.15
+    theta: 1.612223388655438
+    allowed_deviation_x_y: 0.20316573195057142
+    allowed_deviation_theta: 3.141592653589793
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-11
+  sequence_id: 2
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-19 --- Point-11
+  sequence_id: 1
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.78
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.408349990844723
+  y: -1.3434935808181758
+  z: 0.0
+  yaw: -1.482706546783447
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7951680421829224
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-19
+  sequence_id: 0
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -1.15
+    theta: 1.612223388655438
+    allowed_deviation_x_y: 0.20316573195057142
+    allowed_deviation_theta: 3.141592653589793
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-11
+  sequence_id: 2
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-19 --- Point-11
+  sequence_id: 1
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.78
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.408349990844723
+  y: -1.3434935808181754
+  z: 0.0
+  yaw: -1.482706546783447
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7859476804733276
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-19
+  sequence_id: 0
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -1.15
+    theta: 1.612223388655438
+    allowed_deviation_x_y: 0.20316573195057142
+    allowed_deviation_theta: 3.141592653589793
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-11
+  sequence_id: 2
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-19 --- Point-11
+  sequence_id: 1
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.78
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.408349990844723
+  y: -1.3434935808181754
+  z: 0.0
+  yaw: -1.482706546783447
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7859476804733276
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-19
+  sequence_id: 0
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -1.15
+    theta: 1.612223388655438
+    allowed_deviation_x_y: 0.20316573195057142
+    allowed_deviation_theta: 3.141592653589793
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-11
+  sequence_id: 2
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-19 --- Point-11
+  sequence_id: 1
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.78
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.408349990844725
+  y: -1.3434935808181776
+  z: 0.0
+  yaw: -1.4827078580856323
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7851844429969788
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-19
+  sequence_id: 0
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -1.15
+    theta: 1.612223388655438
+    allowed_deviation_x_y: 0.20316573195057142
+    allowed_deviation_theta: 3.141592653589793
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-11
+  sequence_id: 2
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-19 --- Point-11
+  sequence_id: 1
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.408349990844725
+  y: -1.3434935808181763
+  z: 0.0
+  yaw: -1.5088911056518555
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8049504160881042
+  deviation_range: 0
+velocity:
+  vx: -0.00029452431127404387
+  vy: 0.0
+  omega: -0.07353224415700943
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-19
+  sequence_id: 0
+  node_description: rotate move is ok
+  released: true
+  node_position:
+    x: 9.4
+    y: -1.15
+    theta: 1.612223388655438
+    allowed_deviation_x_y: 0.20316573195057142
+    allowed_deviation_theta: 3.141592653589793
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-11
+  sequence_id: 2
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-19 --- Point-11
+  sequence_id: 1
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.408345624690972
+  y: -1.343390053374057
+  z: 0.0
+  yaw: -1.5598966790010615
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8056595325469971
+  deviation_range: 0
+velocity:
+  vx: 0.0008835729338221299
+  vy: 0.0
+  omega: -0.05139350398070551
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-11
+  sequence_id: 2
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-19 --- Point-11
+  sequence_id: 1
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.408345624690972
+  y: -1.343390053374057
+  z: 0.0
+  yaw: -1.5598966790010615
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8056595325469971
+  deviation_range: 0
+velocity:
+  vx: 0.0008835729338221299
+  vy: 0.0
+  omega: -0.05139350398070551
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-11
+  sequence_id: 2
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-19 --- Point-11
+  sequence_id: 1
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.408349990844727
+  y: -1.3434935808181772
+  z: 0.0
+  yaw: -1.5672670602798464
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8083442449569702
+  deviation_range: 0
+velocity:
+  vx: 0.0011780972450961724
+  vy: 0.0
+  omega: -0.003162677168043416
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-11
+  sequence_id: 2
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-19 --- Point-11
+  sequence_id: 1
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.78
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.40586430123978
+  y: -1.4178145173703998
+  z: 0.0
+  yaw: -1.5710717746792369
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8030427098274231
+  deviation_range: 0
+velocity:
+  vx: 0.2886338250485622
+  vy: 0.0
+  omega: -0.004744015752065127
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-11
+  sequence_id: 2
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-19 --- Point-11
+  sequence_id: 1
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.76
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.401618003845217
+  y: -1.87737119197846
+  z: 0.0
+  yaw: -1.5733511447906499
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.868159830570221
+  deviation_range: 0
+velocity:
+  vx: 0.7345436323174634
+  vy: 0.0
+  omega: 0.022138740176303875
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-11
+  sequence_id: 2
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-19 --- Point-11
+  sequence_id: 1
+  edge_description: edge is success
+  released: true
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.73
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399223327636715
+  y: -2.7701017856597883
+  z: 0.0
+  yaw: -1.5731276273727415
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8783044219017029
+  deviation_range: 0
+velocity:
+  vx: 0.9884235886356887
+  vy: 0.0
+  omega: -0.0015813385840216096
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-11
+  sequence_id: 2
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.73
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399223327636715
+  y: -2.7701017856597883
+  z: 0.0
+  yaw: -1.5731276273727415
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8783044219017029
+  deviation_range: 0
+velocity:
+  vx: 0.9884235886356887
+  vy: 0.0
+  omega: -0.0015813385840216096
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-19
+last_node_sequence_id: 0
+node_states:
+- node_id: Point-11
+  sequence_id: 2
+  node_description: node is success
+  released: true
+  node_position:
+    x: 9.4
+    y: -2.8
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.73
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399223327636715
+  y: -2.7701017856597883
+  z: 0.0
+  yaw: -1.5731276273727415
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8783044219017029
+  deviation_range: 0
+velocity:
+  vx: 0.9884235886356887
+  vy: 0.0
+  omega: -0.0015813385840216096
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-11
+last_node_sequence_id: 2
+node_states:
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: false
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.73
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399223327636715
+  y: -2.7701017856597883
+  z: 0.0
+  yaw: -1.5731276273727415
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8783044219017029
+  deviation_range: 0
+velocity:
+  vx: 0.9884235886356887
+  vy: 0.0
+  omega: -0.0015813385840216096
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-11
+last_node_sequence_id: 2
+node_states:
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.73
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399223327636715
+  y: -2.7701017856597883
+  z: 0.0
+  yaw: -1.5731276273727415
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8783044219017029
+  deviation_range: 0
+velocity:
+  vx: 0.9884235886356887
+  vy: 0.0
+  omega: -0.0015813385840216096
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-11
+last_node_sequence_id: 2
+node_states:
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.73
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399223327636715
+  y: -2.7701017856597883
+  z: 0.0
+  yaw: -1.5731276273727415
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8783044219017029
+  deviation_range: 0
+velocity:
+  vx: 0.9949031234837176
+  vy: 0.0
+  omega: -0.03004543309641252
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-11
+last_node_sequence_id: 2
+node_states:
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.72
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.400036694191186
+  y: -3.7698223563692146
+  z: 0.0
+  yaw: -1.5710460616063544
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7631758451461792
+  deviation_range: 0
+velocity:
+  vx: 1.0013826583317467
+  vy: 0.0
+  omega: 0.023720078760325784
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-11
+last_node_sequence_id: 2
+node_states:
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-11 --- Point-10
+  sequence_id: 3
+  edge_description: edge is success
+  released: true
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.72
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.398923153333133
+  y: -4.07081818729283
+  z: 0.0
+  yaw: -1.5706301724774947
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7868853211402893
+  deviation_range: 0
+velocity:
+  vx: 0.9604437790646545
+  vy: 0.0
+  omega: 0.018185393716249703
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-11
+last_node_sequence_id: 2
+node_states:
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.72
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.398923153333133
+  y: -4.07081818729283
+  z: 0.0
+  yaw: -1.5706301724774947
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7868853211402893
+  deviation_range: 0
+velocity:
+  vx: 0.9604437790646545
+  vy: 0.0
+  omega: 0.018185393716249703
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-11
+last_node_sequence_id: 2
+node_states:
+- node_id: Point-10
+  sequence_id: 4
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.72
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.398923153333133
+  y: -4.07081818729283
+  z: 0.0
+  yaw: -1.5706301724774947
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7868853211402893
+  deviation_range: 0
+velocity:
+  vx: 0.9604437790646545
+  vy: 0.0
+  omega: 0.018185393716249703
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-11
+last_node_sequence_id: 2
+node_states:
+- node_id: Point-10
+  sequence_id: 4
+  node_description: node is success
+  released: true
+  node_position:
+    x: 9.4
+    y: -4.1
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.72
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.398923153333133
+  y: -4.07081818729283
+  z: 0.0
+  yaw: -1.5706301724774947
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7868853211402893
+  deviation_range: 0
+velocity:
+  vx: 0.9604437790646545
+  vy: 0.0
+  omega: 0.018185393716249703
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-10
+last_node_sequence_id: 4
+node_states:
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.72
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.398923153333133
+  y: -4.07081818729283
+  z: 0.0
+  yaw: -1.5706301724774947
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.7868853211402893
+  deviation_range: 0
+velocity:
+  vx: 0.9604437790646545
+  vy: 0.0
+  omega: 0.018185393716249703
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-10
+last_node_sequence_id: 4
+node_states:
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.72
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.397999763488768
+  y: -4.679183006286627
+  z: 0.0
+  yaw: -1.5651431083679204
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8276746273040771
+  deviation_range: 0
+velocity:
+  vx: 0.7333655350723673
+  vy: 0.0
+  omega: -0.007906692920108494
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-10
+last_node_sequence_id: 4
+node_states:
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.76
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399767875671387
+  y: -5.294325351715088
+  z: 0.0
+  yaw: -1.5704097747802732
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8660634756088257
+  deviation_range: 0
+velocity:
+  vx: 0.42234786236697786
+  vy: 0.0
+  omega: -0.006325354336086811
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-10
+last_node_sequence_id: 4
+node_states:
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: ''
+  released: false
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.76
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399736834867856
+  y: -5.588053738581376
+  z: 0.0
+  yaw: -1.57122372666815
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.838144838809967
+  deviation_range: 0
+velocity:
+  vx: 0.07510369937488098
+  vy: 0.0
+  omega: -0.003953346460054266
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-10
+last_node_sequence_id: 4
+node_states:
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states:
+- edge_id: Point-10 --- Point-9
+  sequence_id: 5
+  edge_description: edge is success
+  released: true
+  trajectory:
+    degree: 0
+    knot_vector: []
+    control_points: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.76
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399731636047365
+  y: -5.597994327545162
+  z: 0.0
+  yaw: -1.5713341236114495
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8433851599693298
+  deviation_range: 0
+velocity:
+  vx: 0.033575771485240914
+  vy: 0.0
+  omega: 0.0031626771680434056
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-10
+last_node_sequence_id: 4
+node_states:
+- node_id: Point-9
+  sequence_id: 6
+  node_description: ''
+  released: false
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.76
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399731636047365
+  y: -5.597994327545162
+  z: 0.0
+  yaw: -1.5713341236114495
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8433851599693298
+  deviation_range: 0
+velocity:
+  vx: 0.033575771485240914
+  vy: 0.0
+  omega: 0.0031626771680434056
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-10
+last_node_sequence_id: 4
+node_states:
+- node_id: Point-9
+  sequence_id: 6
+  node_description: rotate move is ok
+  released: true
+  node_position:
+    x: 9.4
+    y: -5.6
+    theta: -1.5707963267948966
+    allowed_deviation_x_y: 0.0
+    allowed_deviation_theta: 0.0
+    map_id: HZ27
+    map_description: ''
+edge_states: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.76
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399729130852004
+  y: -5.6025124237042085
+  z: 0.0
+  yaw: -1.5712201051339525
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8312592506408691
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: true
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: true
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.76
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399729130852004
+  y: -5.6025124237042085
+  z: 0.0
+  yaw: -1.5712201051339525
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8312592506408691
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.76
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399729130852004
+  y: -5.6025124237042085
+  z: 0.0
+  yaw: -1.5712201051339525
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8312592506408691
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.76
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.39972972869873
+  y: -5.602391242980959
+  z: 0.0
+  yaw: -1.5712199211120608
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8449842929840088
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.76
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.39972972869873
+  y: -5.602410793304447
+  z: 0.0
+  yaw: -1.5712194442749026
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8358041048049927
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399729666718335
+  y: -5.6023983516151725
+  z: 0.0
+  yaw: -1.5712194537039905
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8529923558235168
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399729728698734
+  y: -5.602391242980963
+  z: 0.0
+  yaw: -1.5712195634841923
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8465674519538879
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399729728698732
+  y: -5.602392196655276
+  z: 0.0
+  yaw: -1.5712194442749026
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8428681492805481
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.39972972869873
+  y: -5.602397441864014
+  z: 0.0
+  yaw: -1.571203947067261
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8425516486167908
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.39972972869873
+  y: -5.6023974418640154
+  z: 0.0
+  yaw: -1.57120418548584
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8392736911773682
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.76
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.39972972869873
+  y: -5.602397441864014
+  z: 0.0
+  yaw: -1.5712357759475708
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8293507695198059
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399729728698729
+  y: -5.6023974418640154
+  z: 0.0
+  yaw: -1.5712361335754395
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8378883600234985
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399729728698732
+  y: -5.602397441864015
+  z: 0.0
+  yaw: -1.5712089538574219
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8314393162727356
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399729728698727
+  y: -5.602397441864012
+  z: 0.0
+  yaw: -1.571252107620239
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.821112334728241
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399729728698734
+  y: -5.602397441864015
+  z: 0.0
+  yaw: -1.5712358951568606
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8410419225692749
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399729728698732
+  y: -5.602397441864005
+  z: 0.0
+  yaw: -1.57126760482788
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8435196280479431
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.39972972869873
+  y: -5.602397441864017
+  z: 0.0
+  yaw: -1.5712674856185918
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8483251929283142
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.39972972869873
+  y: -5.602397441864017
+  z: 0.0
+  yaw: -1.5712674856185918
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8391995429992676
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.399729728698729
+  y: -5.602397441864012
+  z: 0.0
+  yaw: -1.5712833404541018
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8414396643638611
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+is_task_running: false
+data_origin: pc
+header_id: 0
+timestamp: ''
+version: ''
+manufacturer: ''
+serial_number: ''
+order_id: spa-178116631746401KTTWJ7XWTDQ518M5MMY8HT75-1
+order_update_id: 2
+zone_set_id: HZ27
+last_node_id: Point-9
+last_node_sequence_id: 6
+node_states: []
+edge_states: []
+driving: false
+waiting_for_interaction_zone_release: false
+paused: false
+fork_state:
+  lift_height: 0.0
+new_base_request: true
+distance_since_last_node: 0.0
+action_states: []
+battery_state:
+  battery_charge: 92.0
+  charging: false
+  battery_voltage: 49.77
+  battery_health: 100
+  reach: 0
+operating_mode: AUTOMATIC
+agv_position:
+  x: 9.39972972869873
+  y: -5.602397441864012
+  z: 0.0
+  yaw: -1.571314811706543
+  pitch: 0.0
+  roll: 0.0
+  map_id: HZ27
+  position_initialized: true
+  map_description: ''
+  localization_score: 0.8533543348312378
+  deviation_range: 0
+velocity:
+  vx: 0.0
+  vy: 0.0
+  omega: -0.0
+loads: []
+errors: []
+safety_state:
+  e_stop: NONE
+  field_violation: false
+upg_state:
+  upg_state: ''
+  error_description: ''
+  percent: 0
+jack_state:
+  jack_theta: 0.0
+files: []
+maps:
+- map_id: HZ27
+  map_version: '1780640170989'
+  map_status: ''
+- map_id: SS27
+  map_version: '1777274707671'
+  map_status: ''
+information: []
+---
+^Croot@byd-SYSTEM-PRODUCT-NAME:/home/byd/log/agv_task_manager/20260611#
