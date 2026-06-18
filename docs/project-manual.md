@@ -3855,7 +3855,433 @@ Connection回流链路观察点：
 | Kernel | `Vehicle.state` 是否从 `UNKNOWN` 变为 `IDLE`。 |
 | BFF/SPA | `/events/vehicles` 是否推送最新车辆状态。 |
 
-## 章节8：提示词
+## 章节8：OpenTCS 日志系统运维手册
+
+本章面向 openTCS V7.2.1 + VDA5050 v2.0 适配器的本地开发、联调和现场运维，重点说明 Kernel 日志系统如何配置、如何按包/类打开 DEBUG/FINE 日志，以及如何用日志定位 SPA 下发 VDA5050 instantActions 后 MQTT 无报文、请求阻塞、适配器未发布等问题。
+
+### 8.1 SLF4J 日志门面基础原理
+
+SLF4J，全称 Simple Logging Facade for Java，是 Java 日志领域常用的“日志门面”。它本身不负责最终写文件、打控制台、滚动切割日志，而是给业务代码提供统一的 `Logger` API。
+
+业务代码通常只依赖 SLF4J API：
+
+```java
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class ExampleService {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ExampleService.class);
+
+  public void execute(String vehicleName, String actionId) {
+    LOG.info("{}: sending instant action {}", vehicleName, actionId);
+    LOG.debug("{}: instant action payload prepared: {}", vehicleName, actionId);
+    LOG.warn("{}: vehicle state is not ideal for action dispatch", vehicleName);
+  }
+}
+```
+
+这种写法的好处是：业务代码不绑定具体日志实现。底层最终可以接 Logback、Log4j2、JDK 自带的 `java.util.logging`，业务代码不需要改。
+
+SLF4J 的核心分层如下：
+
+| 层级 | 作用 | openTCS 当前项目中的体现 |
+| :--- | :--- | :--- |
+| 业务代码 | 调用 `LOG.info()`、`LOG.debug()`、`LOG.warn()` | Kernel、BFF、VDA适配器 Java 代码大量使用 `org.slf4j.Logger` |
+| SLF4J API | 提供统一日志接口 | `gradle/java-project.gradle` 引入 `libs.slf4j.api` |
+| SLF4J Binding/Provider | 把 SLF4J 调用转给具体日志实现 | Kernel 运行时依赖 `libs.slf4j.jdk14` |
+| 底层日志实现 | 真正负责级别过滤、输出、文件滚动 | 当前 Kernel 使用 JDK JUL，即 `java.util.logging` |
+
+在当前 openTCS Kernel 中，`LOG.debug(...)` 不会读取 `DEBUG` 这个级别名，而是经由 `slf4j-jdk14` 映射到底层 JUL 的 `FINE` 级别。因此，要看 SLF4J debug 日志，应在 `logging.config` 中配置 `FINE`。
+
+### 8.2 OpenTCS 日志分层架构（SLF4J + 底层日志实现）
+
+openTCS Kernel 的日志链路可以理解为：
+
+```text
+Java业务代码
+  -> org.slf4j.Logger / LoggerFactory
+  -> slf4j-jdk14
+  -> java.util.logging.Logger
+  -> logging.config
+  -> ConsoleHandler / FileHandler
+  -> 控制台 / log/opentcs-kernel.%g.log
+```
+
+以 VDA5050 v2.0 适配器的 `MessageResponseMatcher` 为例：
+
+```java
+private static final Logger LOG = LoggerFactory.getLogger(MessageResponseMatcher.class);
+
+LOG.debug("{}: Not sending enqueued request yet, due to unacknowledged previous request.",
+          vehicleName);
+```
+
+该日志的实际 logger 名称来自 Java 类的全限定名：
+
+```text
+org.opentcs.commadapter.vehicle.vda5050.v2_0.MessageResponseMatcher
+```
+
+由于 Kernel 运行时使用 `slf4j-jdk14`，这条 `LOG.debug(...)` 最终等价于 JUL 的 `FINE` 日志。要让它输出，需要同时满足两个条件：
+
+1. 对应 logger 自身允许 `FINE`。
+2. 输出 handler，例如 `ConsoleHandler` 或 `FileHandler`，也允许 `FINE`。
+
+如果只配置：
+
+```properties
+java.util.logging.ConsoleHandler.level = FINE
+```
+
+仍然可能看不到 debug 日志，因为这只是“控制台允许打印 FINE”。如果全局 logger 仍然是：
+
+```properties
+.level = INFO
+```
+
+则类 logger 默认只产生 `INFO` 及以上日志，`LOG.debug(...)` 对应的 `FINE` 在 logger 层就被过滤掉了。正确做法是给目标包或目标类单独打开 `FINE`。
+
+### 8.3 logging.config 配置文件完整语法、路径、加载规则
+
+`logging.config` 属于 JDK JUL，即 `java.util.logging` 的配置文件，不是 Logback 的 `logback.xml`，也不是 Log4j2 的 `log4j2.xml`。
+
+Kernel 发布包中的典型路径为：
+
+```text
+D:\byd_agv_njc\opentcs\opentcs-kernel\build\install\opentcs-kernel\config\logging.config
+```
+
+Kernel 启动脚本通过 JVM 参数加载该文件：
+
+```text
+-Djava.util.logging.config.file="%OPENTCS_CONFIGDIR%\logging.config"
+```
+
+因此，实际生效的是“正在运行的 Kernel 进程启动时指定的那个配置文件”。如果修改源码模板：
+
+```text
+opentcs-kernel/src/dist/config/logging.config
+```
+
+但当前 Kernel 是从 `build/install/opentcs-kernel` 目录启动的，则运行中的 Kernel 不会自动使用源码模板里的修改。
+
+常用配置项如下：
+
+```properties
+# 全局默认日志级别。没有单独配置的 logger 会继承它。
+.level = INFO
+
+# 启用控制台和文件输出。
+handlers = java.util.logging.FileHandler, java.util.logging.ConsoleHandler
+
+# Kernel日志文件路径，通常相对于Kernel运行目录。
+java.util.logging.FileHandler.pattern = ./log/opentcs-kernel.%g.log
+
+# 单个日志文件最大字节数。
+java.util.logging.FileHandler.limit = 500000
+
+# 滚动文件数量。
+java.util.logging.FileHandler.count = 10
+
+# 追加写入，而不是每次启动覆盖。
+java.util.logging.FileHandler.append = true
+
+# 文件handler允许输出的最低级别。
+java.util.logging.FileHandler.level = FINE
+
+# 控制台handler允许输出的最低级别。
+java.util.logging.ConsoleHandler.level = FINE
+
+# openTCS单行日志格式化器，便于现场检索。
+java.util.logging.FileHandler.formatter = org.opentcs.util.logging.SingleLineFormatter
+java.util.logging.ConsoleHandler.formatter = org.opentcs.util.logging.SingleLineFormatter
+```
+
+配置加载规则：
+
+| 规则 | 说明 |
+| :--- | :--- |
+| 加载时机 | JVM 启动时读取 `java.util.logging.config.file` 指向的文件 |
+| 是否热加载 | 默认不热加载，修改后需要重启 Kernel |
+| key 语法 | `loggerName.level = LEVEL` |
+| loggerName 来源 | Java 包名或类全限定名 |
+| handler level | 控制输出目标是否允许该级别 |
+| logger level | 控制该 logger 是否产生日志事件 |
+
+### 8.4 按包/类自定义日志级别配置方法
+
+JUL 的 logger 名称通常来自 Java 类全限定名，也就是：
+
+```text
+包名.类名
+```
+
+例如 Java 类：
+
+```java
+package org.opentcs.commadapter.vehicle.vda5050.v2_0;
+
+public class MessageResponseMatcher {
+}
+```
+
+对应的 logger 配置 key 为：
+
+```properties
+org.opentcs.commadapter.vehicle.vda5050.v2_0.MessageResponseMatcher.level = FINE
+```
+
+字段拆解如下：
+
+| 片段 | 含义 |
+| :--- | :--- |
+| `org` | 顶级包名 |
+| `opentcs` | openTCS 项目包 |
+| `commadapter` | 通信适配器相关模块 |
+| `vehicle` | 车辆通信适配器域 |
+| `vda5050` | VDA5050协议适配器 |
+| `v2_0` | VDA5050 v2.0实现包 |
+| `MessageResponseMatcher` | 具体 Java 类名 |
+| `.level` | JUL 固定配置后缀，表示设置该 logger 的级别 |
+| `FINE` | JUL 日志级别，对应 SLF4J debug |
+
+本次 VDA5050 instantActions 请求阻塞排障的实战配置：
+
+```properties
+# 只打开 VDA5050 v2.0 请求应答匹配器的 debug/FINE 日志。
+org.opentcs.commadapter.vehicle.vda5050.v2_0.MessageResponseMatcher.level = FINE
+```
+
+如果现场不确定适配器版本，可同时配置 v1.1 和 v2.0：
+
+```properties
+org.opentcs.commadapter.vehicle.vda5050.v1_1.MessageResponseMatcher.level = FINE
+org.opentcs.commadapter.vehicle.vda5050.v2_0.MessageResponseMatcher.level = FINE
+```
+
+按包打开日志的示例：
+
+```properties
+# 打开整个 VDA5050 适配器包的 FINE 日志，日志量会明显增加。
+org.opentcs.commadapter.vehicle.vda5050.level = FINE
+
+# 打开 Kernel 车辆控制器包的 FINE 日志，用于排查调度/命令下发。
+org.opentcs.kernel.vehicles.level = FINE
+
+# 打开具体 Kernel 类的 FINE 日志。
+org.opentcs.kernel.vehicles.DefaultVehicleController.level = FINE
+```
+
+通用模板：
+
+```properties
+# 按具体类配置，推荐用于精准排障。
+完整包名.类名.level = FINE
+
+# 按包配置，推荐用于短时间联调，不建议长期在线上打开。
+完整包名.level = FINE
+```
+
+### 8.5 各级日志级别适用场景、线上运维推荐级别
+
+JUL 常用级别从高到低如下：
+
+| JUL级别 | 常见含义 | SLF4J常见对应 | 适用场景 |
+| :--- | :--- | :--- | :--- |
+| `SEVERE` | 严重错误 | `error` | Kernel无法启动、适配器关键线程崩溃、不可恢复异常 |
+| `WARNING` | 警告 | `warn` | 车辆状态异常、连接失败、报文解析失败、业务可继续但存在风险 |
+| `INFO` | 常规运行信息 | `info` | 启停、状态切换、订单创建、关键业务动作 |
+| `CONFIG` | 配置相关信息 | 较少直接使用 | 启动配置、模块参数、现场配置核对 |
+| `FINE` | 调试信息 | `debug` | 请求队列、状态机细节、MQTT收发链路、调度判断分支 |
+| `FINER`/`FINEST` | 更细粒度调试 | `trace` | 极细粒度排障，一般只在开发环境短时间打开 |
+
+推荐策略：
+
+| 环境 | 推荐全局级别 | 建议 |
+| :--- | :--- | :--- |
+| 生产/现场稳定运行 | `.level = INFO` | 保留 `INFO`、`WARNING`、`SEVERE`，避免长期全局 `FINE` |
+| 现场问题复现 | `.level = INFO` + 单类 `FINE` | 对疑似类精准打开，例如 `MessageResponseMatcher.level = FINE` |
+| 开发联调 | 可短时打开包级 `FINE` | 调试完成后恢复，避免日志淹没核心信息 |
+| 深度源码调试 | 单类/小包 `FINER` 或 `FINEST` | 仅限短时间使用，注意磁盘和性能影响 |
+
+不建议长期配置：
+
+```properties
+.level = FINE
+```
+
+因为这会打开整个 Kernel 和相关依赖的 debug 级别日志，现场日志量会快速膨胀，反而降低排障效率。
+
+### 8.6 日志排障实操：即时动作、MQTT报文收发、适配器请求阻塞类问题调试方案
+
+#### 8.6.1 SPA下发instantActions后MQTT无报文的核心链路
+
+即时动作下发链路：
+
+```text
+SPA
+  -> POST /api/v1/vehicles/{name}/instant-actions
+  -> BFF instant-actions接口
+  -> Kernel VehicleService.sendCommAdapterMessage(...)
+  -> VDA5050适配器 processMessage(...)
+  -> MessageResponseMatcher.enqueueAction(...)
+  -> MessageResponseMatcher.enqueueRequest(...)
+  -> MQTT publish {topicPrefix}/instantActions
+  -> AGV state.actionStates 回报执行状态
+  -> MessageResponseMatcher 确认请求完成，释放后续请求
+```
+
+当 Kernel 日志出现：
+
+```text
+Vehicle-1: Not sending enqueued request yet, due to unacknowledged previous request.
+```
+
+含义是：当前 instantActions 已进入适配器请求队列，但前一个请求还没有被车辆状态报文确认完成。`MessageResponseMatcher` 为避免请求乱序或重复发送，会阻止后续请求继续发布 MQTT。
+
+此时需要重点检查：
+
+| 检查点 | 说明 |
+| :--- | :--- |
+| MQTT state topic | AGV 是否持续上报 `{topicPrefix}/state` |
+| `actionStates` | state 报文里是否包含前一个即时动作的 `actionId` |
+| 执行状态 | 前一个动作是否从 `WAITING`/`INITIALIZING`/`RUNNING` 走到终态 |
+| actionId | AGV 回报的 `actionId` 是否与下发报文完全一致 |
+| topicPrefix | 订阅的 topic 是否与适配器发布的 topic 一致 |
+| adapter连接状态 | connection 是否为 `ONLINE`，state 是否被适配器接受 |
+
+建议打开的精准日志：
+
+```properties
+org.opentcs.commadapter.vehicle.vda5050.v2_0.MessageResponseMatcher.level = FINE
+```
+
+可选打开 VDA5050 包级日志：
+
+```properties
+org.opentcs.commadapter.vehicle.vda5050.level = FINE
+```
+
+可选打开 Kernel 车辆控制器日志：
+
+```properties
+org.opentcs.kernel.vehicles.DefaultVehicleController.level = FINE
+```
+
+#### 8.6.2 关键日志检索命令
+
+Windows PowerShell 示例：
+
+```powershell
+Select-String -Path .\log\opentcs-kernel.*.log `
+  -Pattern "MessageResponseMatcher|Enqueuing instant action|Not sending enqueued request yet|Sending order to comm adapter|Vehicle acknowledged instant actions|Cannot send next order"
+```
+
+针对即时动作排障，重点搜索：
+
+```text
+Enqueuing instant action
+Not sending enqueued request yet
+Cannot send next order
+Sending order to comm adapter
+Vehicle acknowledged instant actions
+```
+
+如果前端返回成功，但 MQTTX 订阅不到 `{topicPrefix}/instantActions`，按以下顺序判断：
+
+1. BFF 是否返回 2xx：确认请求已进入 BFF。
+2. Kernel 是否有 commAdapterMessage 处理日志：确认请求已进 Kernel。
+3. `MessageResponseMatcher` 是否打印 `Enqueuing instant action`：确认请求已进入 VDA 适配器队列。
+4. 是否出现 `Not sending enqueued request yet`：确认是否被未确认的前序请求阻塞。
+5. 是否出现 MQTT 发布日志或 `Sending order to comm adapter` 类日志：确认是否真正进入发布阶段。
+6. MQTTX 订阅 topic 是否与适配器配置一致：确认不是订阅错 topic。
+7. AGV state 是否回报前序 `actionId` 终态：确认请求队列是否能释放。
+
+#### 8.6.3 MQTT报文收发排障建议
+
+VDA5050 v2.0 典型 topic：
+
+```text
+{topicPrefix}/instantActions
+{topicPrefix}/state
+{topicPrefix}/connection
+{topicPrefix}/order
+```
+
+例如：
+
+```text
+VDA/V2.0.0/BYD_11/DP0055/instantActions
+```
+
+排障时 MQTTX 至少同时订阅：
+
+```text
+VDA/V2.0.0/BYD_11/DP0055/instantActions
+VDA/V2.0.0/BYD_11/DP0055/state
+VDA/V2.0.0/BYD_11/DP0055/connection
+```
+
+如果只订阅 `instantActions`，只能看到是否发布，无法判断为什么后续动作被阻塞。`state.actionStates` 是判断前序动作是否被 AGV 确认的关键依据。
+
+### 8.7 日志持久化、滚动分割、日志过滤运维技巧
+
+Kernel 默认日志文件配置示例：
+
+```properties
+java.util.logging.FileHandler.pattern = ./log/opentcs-kernel.%g.log
+java.util.logging.FileHandler.limit = 500000
+java.util.logging.FileHandler.count = 10
+java.util.logging.FileHandler.append = true
+java.util.logging.FileHandler.formatter = org.opentcs.util.logging.SingleLineFormatter
+```
+
+字段含义：
+
+| 配置项 | 说明 |
+| :--- | :--- |
+| `pattern` | 日志文件路径和命名模式，`%g` 是滚动序号 |
+| `limit` | 单个日志文件最大字节数 |
+| `count` | 最多保留的滚动文件数量 |
+| `append` | 是否追加写入旧日志 |
+| `formatter` | 日志格式化器，openTCS 默认使用单行格式，便于 grep/Select-String |
+
+现场运维建议：
+
+1. 稳定运行时保持 `.level = INFO`。
+2. 排障时优先打开具体类，例如 `MessageResponseMatcher.level = FINE`。
+3. 问题复现后及时恢复日志级别，避免日志滚动过快覆盖现场证据。
+4. 排障前可适当增大 `FileHandler.limit` 和 `FileHandler.count`，防止高频 state/MQTT 日志覆盖关键片段。
+5. 每次修改 `logging.config` 后重启 Kernel，并确认启动脚本加载的是当前修改的配置文件。
+
+常用过滤命令：
+
+```powershell
+# 搜索指定车辆。
+Select-String -Path .\log\opentcs-kernel.*.log -Pattern "Vehicle-1"
+
+# 搜索指定即时动作ID。
+Select-String -Path .\log\opentcs-kernel.*.log -Pattern "173fe7c7-6fae-4176-830c-6002eb60c374"
+
+# 搜索VDA5050请求阻塞。
+Select-String -Path .\log\opentcs-kernel.*.log -Pattern "unacknowledged previous request"
+
+# 搜索适配器请求匹配器相关日志。
+Select-String -Path .\log\opentcs-kernel.*.log -Pattern "MessageResponseMatcher"
+```
+
+最终定位原则：
+
+| 现象 | 优先判断 |
+| :--- | :--- |
+| 前端返回成功，但 MQTT 无 instantActions | 看 `MessageResponseMatcher` 是否已入队、是否被前序未确认请求阻塞 |
+| 第一条能发，第二条不能发 | 看前一条 actionId 是否在 state.actionStates 中回报终态 |
+| Kernel 无任何相关日志 | 看 BFF 是否真的调用 Kernel、Kernel 是否加载了新适配器 JAR、logger配置是否生效 |
+| MQTTX 收不到但日志显示已发布 | 看 topicPrefix、broker地址、client订阅topic、QoS/retain配置 |
+| state 有上报但队列不释放 | 看 actionId 是否一致、actionStatus 是否终态、适配器解析版本是否匹配 |
+
+# 章节：提示词
 
 ```
 # 全局前置上下文：dd-opentcs 自研AGV调度系统完整背景与约束
