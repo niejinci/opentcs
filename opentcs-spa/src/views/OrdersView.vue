@@ -22,16 +22,14 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { createTransportOrder } from '@/api/endpoints/transportOrders';
-import { sendInstantActions, updateVehicleIntegrationLevel } from '@/api/endpoints/vehicles';
+import { updateVehicleIntegrationLevel } from '@/api/endpoints/vehicles';
+import InstantActionPanel from '@/components/InstantActionPanel.vue';
 import VehicleStatusPanel from '@/components/VehicleStatusPanel.vue';
 import { HttpError } from '@/api/errors';
 import { getDraft, getProject } from '@/api/endpoints/projects';
 import {
   type Destination,
-  type InstantActionParameter,
-  type InstantActionParameterValue,
   type TransportOrderRequest,
-  type Vda5050BlockingType,
   type Vehicle,
   type VehicleIntegrationLevel,
 } from '@/api/types/bff';
@@ -59,15 +57,6 @@ interface RecentOrderSnapshot {
   createdAt: string;
   intendedVehicle: string | null;
   destinations: Destination[];
-}
-
-type InstantActionParameterKind = 'string' | 'number' | 'boolean' | 'array';
-
-interface InstantActionParameterRow {
-  id: number;
-  key: string;
-  kind: InstantActionParameterKind;
-  valueText: string;
 }
 
 const route = useRoute();
@@ -157,13 +146,6 @@ const integrationLevelBusy = ref(false);
  * current value (e.g. TO_BE_RESPECTED), which is exactly defect 3-A.
  */
 const integrationLevelDirty = ref(false);
-const instantActionType = ref('');
-const instantActionId = ref(makeActionId());
-const instantActionDescription = ref('');
-const instantActionBlockingType = ref<Vda5050BlockingType>('NONE');
-const instantActionParameterRows = ref<InstantActionParameterRow[]>([]);
-const instantActionBusy = ref(false);
-let nextInstantActionParameterRowId = 1;
 
 // Sync the draft only when the user switches the *selected vehicle*
 // (i.e. picks a different name in the upper dropdown) or when the
@@ -221,21 +203,6 @@ async function applyIntegrationLevel(): Promise<void> {
     integrationLevelBusy.value = false;
   }
 }
-
-const canSendInstantAction = computed(() => {
-  if (instantActionBusy.value) return false;
-  if (!selectedVehicle.value) return false;
-  if (!instantActionType.value.trim() || !instantActionId.value.trim()) return false;
-  return instantActionParameterRows.value.every((row) => {
-    if (!row.key.trim()) return false;
-    try {
-      parseInstantActionParameterValue(row);
-      return true;
-    } catch {
-      return false;
-    }
-  });
-});
 
 const canSubmit = computed(() => {
   if (submitting.value) return false;
@@ -456,112 +423,6 @@ function addDestination(): void {
   destRows.value.push({ id: nextRowId++, targetName: '', operation: 'MOVE', customMode: false });
 }
 
-function makeActionId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `spa-action-${Date.now()}`;
-}
-
-function addInstantActionParameter(): void {
-  instantActionParameterRows.value.push({
-    id: nextInstantActionParameterRowId++,
-    key: '',
-    kind: 'string',
-    valueText: '',
-  });
-}
-
-function removeInstantActionParameter(id: number): void {
-  instantActionParameterRows.value = instantActionParameterRows.value.filter((row) => row.id !== id);
-}
-
-function onInstantActionParameterKindChanged(row: InstantActionParameterRow): void {
-  if (row.kind === 'boolean' && !['true', 'false'].includes(row.valueText)) {
-    row.valueText = 'true';
-  } else if (row.kind === 'array' && row.valueText.trim() === '') {
-    row.valueText = '[]';
-  }
-}
-
-function parseInstantActionParameterValue(
-  row: InstantActionParameterRow,
-): InstantActionParameterValue {
-  const value = row.valueText.trim();
-  if (row.kind === 'string') return row.valueText;
-  if (row.kind === 'number') {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) {
-      throw new Error(`参数「${row.key || '未命名'}」不是有效 number`);
-    }
-    return parsed;
-  }
-  if (row.kind === 'boolean') {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    throw new Error(`参数「${row.key || '未命名'}」不是有效 boolean`);
-  }
-
-  const parsed = JSON.parse(value) as unknown;
-  if (
-    !Array.isArray(parsed) ||
-    !parsed.every(
-      (item) =>
-        typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean',
-    )
-  ) {
-    throw new Error(`参数「${row.key || '未命名'}」必须是 string/number/boolean 数组`);
-  }
-  return parsed;
-}
-
-async function submitInstantAction(): Promise<void> {
-  const veh = selectedVehicle.value;
-  if (!veh || !canSendInstantAction.value) return;
-
-  let parameters: InstantActionParameter[];
-  try {
-    parameters = instantActionParameterRows.value.map((row) => ({
-      key: row.key.trim(),
-      value: parseInstantActionParameterValue(row),
-    }));
-  } catch (err) {
-    toastError((err as Error).message, '即时动作参数错误');
-    return;
-  }
-
-  instantActionBusy.value = true;
-  try {
-    await sendInstantActions(
-      veh.name,
-      {
-        actions: [
-          {
-            actionType: instantActionType.value.trim(),
-            actionId: instantActionId.value.trim(),
-            actionDescription: instantActionDescription.value.trim() || null,
-            blockingType: instantActionBlockingType.value,
-            actionParameters: parameters.length > 0 ? parameters : null,
-          },
-        ],
-      },
-      { toastOnError: false },
-    );
-    toastSuccess(`已下发即时动作 ${instantActionType.value.trim()}`, 'VDA5050');
-    instantActionId.value = makeActionId();
-  } catch (err) {
-    if (err instanceof HttpError) {
-      const code = err.payload?.code ?? `HTTP_${err.status}`;
-      const msg = err.payload?.message ?? err.statusText;
-      toastError(`${code}: ${msg}`, '即时动作下发失败');
-    } else {
-      toastError('即时动作下发失败，请检查网络');
-    }
-  } finally {
-    instantActionBusy.value = false;
-  }
-}
-
 /**
  * Called whenever a row's target name changes. If the currently chosen
  * operation is invalid for the new target's kind, snap to the first
@@ -766,88 +627,7 @@ watch(
         </span>
       </div>
 
-      <section class="instant-actions" aria-labelledby="instant-actions-title">
-        <div class="instant-actions-hdr">
-          <div>
-            <h3 id="instant-actions-title">VDA5050 即时动作</h3>
-            <p>目标车辆：{{ selectedVehicle?.name || '请选择车辆' }}</p>
-          </div>
-          <button type="button" @click="addInstantActionParameter">+ 参数</button>
-        </div>
-
-        <div class="instant-grid">
-          <label>
-            Action Type
-            <input
-              v-model="instantActionType"
-              placeholder="stateRequest / cancelOrder / ..."
-              spellcheck="false"
-            />
-          </label>
-          <label>
-            Action ID
-            <input v-model="instantActionId" spellcheck="false" />
-          </label>
-          <label>
-            Blocking Type
-            <select v-model="instantActionBlockingType">
-              <option value="NONE">NONE</option>
-              <option value="SOFT">SOFT</option>
-              <option value="HARD">HARD</option>
-            </select>
-          </label>
-          <label>
-            Description
-            <input v-model="instantActionDescription" spellcheck="false" />
-          </label>
-        </div>
-
-        <div v-if="instantActionParameterRows.length > 0" class="instant-param-list">
-          <div
-            v-for="row in instantActionParameterRows"
-            :key="row.id"
-            class="instant-param-row"
-          >
-            <input v-model="row.key" placeholder="key" spellcheck="false" />
-            <select v-model="row.kind" @change="onInstantActionParameterKindChanged(row)">
-              <option value="string">string</option>
-              <option value="number">number</option>
-              <option value="boolean">boolean</option>
-              <option value="array">array</option>
-            </select>
-            <select
-              v-if="row.kind === 'boolean'"
-              v-model="row.valueText"
-              class="instant-param-value"
-            >
-              <option value="true">true</option>
-              <option value="false">false</option>
-            </select>
-            <input
-              v-else
-              v-model="row.valueText"
-              class="instant-param-value"
-              :placeholder="row.kind === 'array' ? '[&quot;a&quot;, 1, true]' : 'value'"
-              spellcheck="false"
-            />
-            <button type="button" @click="removeInstantActionParameter(row.id)">×</button>
-          </div>
-        </div>
-
-        <div class="instant-actions-footer">
-          <span class="hint">
-            array 仅支持 string / number / boolean 元素，提交前会由 BFF 进行严格 JSON Schema 校验。
-          </span>
-          <button
-            type="button"
-            class="instant-submit"
-            :disabled="!canSendInstantAction"
-            @click="submitInstantAction"
-          >
-            {{ instantActionBusy ? '下发中…' : '下发即时动作' }}
-          </button>
-        </div>
-      </section>
+      <InstantActionPanel :vehicle="selectedVehicle" />
 
       <section class="recent-orders" aria-labelledby="recent-orders-title">
         <div class="recent-orders-hdr">
@@ -1074,98 +854,6 @@ watch(
 .vehicle-integration button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
-}
-.instant-actions {
-  background: #fff;
-  border: 1px solid #d0d7de;
-  border-radius: 6px;
-  padding: 0.6rem 0.85rem 0.85rem;
-}
-.instant-actions-hdr {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.6rem;
-}
-.instant-actions-hdr h3 {
-  margin: 0;
-  font-size: 1rem;
-}
-.instant-actions-hdr p {
-  margin: 0.15rem 0 0;
-  color: #6e7781;
-  font-size: 0.8rem;
-}
-.instant-actions-hdr button,
-.instant-param-row button {
-  border: 1px solid #d0d7de;
-  background: #f6f8fa;
-  padding: 0.2rem 0.55rem;
-  font-size: 0.85rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.instant-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem 0.75rem;
-}
-.instant-grid label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #57606a;
-}
-.instant-grid input,
-.instant-grid select,
-.instant-param-row input,
-.instant-param-row select {
-  min-width: 0;
-  border: 1px solid #d0d7de;
-  border-radius: 4px;
-  padding: 0.3rem 0.45rem;
-  font-size: 0.88rem;
-}
-.instant-grid input,
-.instant-param-row input {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-.instant-param-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-top: 0.65rem;
-}
-.instant-param-row {
-  display: grid;
-  grid-template-columns: minmax(7rem, 0.7fr) 7rem minmax(0, 1fr) auto;
-  gap: 0.35rem;
-  align-items: center;
-}
-.instant-actions-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-top: 0.65rem;
-}
-.instant-submit {
-  flex: 0 0 auto;
-  background: #0969da;
-  color: #fff;
-  border: 1px solid #0969da;
-  padding: 0.35rem 0.9rem;
-  border-radius: 6px;
-  font-size: 0.88rem;
-  cursor: pointer;
-}
-.instant-submit:disabled {
-  background: #8cbded;
-  border-color: #8cbded;
-  cursor: not-allowed;
 }
 .hint {
   font-size: 0.8rem;
@@ -1458,14 +1146,6 @@ watch(
   }
   .recent-route {
     flex-wrap: wrap;
-  }
-  .instant-grid,
-  .instant-param-row {
-    grid-template-columns: 1fr;
-  }
-  .instant-actions-footer {
-    align-items: stretch;
-    flex-direction: column;
   }
 }
 </style>
