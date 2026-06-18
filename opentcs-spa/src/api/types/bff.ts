@@ -81,6 +81,31 @@ export interface Vehicle {
   orientationAngle?: number | null;
 }
 
+export type Vda5050BlockingType = 'NONE' | 'SOFT' | 'HARD';
+
+export type InstantActionParameterValue =
+  | string
+  | number
+  | boolean
+  | Array<string | number | boolean>;
+
+export interface InstantActionParameter {
+  key: string;
+  value: InstantActionParameterValue;
+}
+
+export interface InstantAction {
+  actionType: string;
+  actionId: string;
+  actionDescription?: string | null;
+  blockingType: Vda5050BlockingType;
+  actionParameters?: InstantActionParameter[] | null;
+}
+
+export interface InstantActionsRequest {
+  actions: InstantAction[];
+}
+
 /* ------------------------------------------------------------------ */
 /* Transport orders                                                    */
 /* ------------------------------------------------------------------ */

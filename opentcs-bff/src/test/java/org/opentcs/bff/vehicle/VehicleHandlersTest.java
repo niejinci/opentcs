@@ -3,6 +3,7 @@
 package org.opentcs.bff.vehicle;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -45,6 +46,7 @@ class VehicleHandlersTest {
     UpdateVehicleIntegrationLevelHandler updateLevelHandler
         = new UpdateVehicleIntegrationLevelHandler(kernelClient);
     RerouteVehicleHandler rerouteHandler = new RerouteVehicleHandler(kernelClient);
+    PostInstantActionHandler instantActionHandler = new PostInstantActionHandler(kernelClient);
     app = Javalin.create(cfg -> {
       cfg.startup.showJavalinBanner = false;
       cfg.routes.apiBuilder(() -> {
@@ -53,6 +55,7 @@ class VehicleHandlersTest {
           ApiBuilder.path("/{" + GetVehicleHandler.NAME_PARAM + "}", () -> {
             ApiBuilder.get(getHandler);
             ApiBuilder.post("/rerouteRequest", rerouteHandler);
+            ApiBuilder.post("/instant-actions", instantActionHandler);
             ApiBuilder.put("/integrationLevel", updateLevelHandler);
           });
         });
@@ -272,6 +275,141 @@ class VehicleHandlersTest {
           JsonNode root = new ObjectMapper().readTree(response.body().string());
           assertThat(root.get("code").asText()).isEqualTo("NOT_FOUND");
           assertThat(root.get("message").asText()).contains("ghost");
+        }
+    );
+  }
+
+  @Test
+  void postInstantActionsForwardsTypedActionsToKernel() {
+    JavalinTest.test(
+        app, (server, client) -> {
+          var response = client.request(
+              "/api/v1/vehicles/alpha/instant-actions",
+              b -> b.post(
+                  BodyPublishers.ofString(
+                      """
+                      {
+                        "actions": [
+                          {
+                            "actionType": "typed-action",
+                            "actionId": "action-1",
+                            "blockingType": "HARD",
+                            "actionParameters": [
+                              {"key": "speed", "value": 0.5},
+                              {"key": "enabled", "value": true},
+                              {"key": "modes", "value": ["a", 1, false]}
+                            ]
+                          }
+                        ]
+                      }
+                      """
+                  )
+              ).header("Content-Type", "application/json")
+          );
+
+          assertThat(response.code()).isEqualTo(202);
+          verify(kernelClient).sendVehicleCommAdapterMessage(
+              eq("alpha"),
+              argThat(message -> {
+                String actionsJson = message.getParameters().get("actions");
+                return message.getType().equals("vda5050:sendInstantActions")
+                    && actionsJson.contains("\"key\":\"speed\",\"value\":0.5")
+                    && actionsJson.contains("\"key\":\"enabled\",\"value\":true")
+                    && actionsJson.contains("\"key\":\"modes\",\"value\":[\"a\",1,false]");
+              })
+          );
+        }
+    );
+  }
+
+  @Test
+  void postInstantActionsRejectsInvalidBlockingType() {
+    JavalinTest.test(
+        app, (server, client) -> {
+          var response = client.request(
+              "/api/v1/vehicles/alpha/instant-actions",
+              b -> b.post(
+                  BodyPublishers.ofString(
+                      """
+                      {
+                        "actions": [
+                          {
+                            "actionType": "stateRequest",
+                            "actionId": "action-1",
+                            "blockingType": "INVALID"
+                          }
+                        ]
+                      }
+                      """
+                  )
+              ).header("Content-Type", "application/json")
+          );
+
+          assertThat(response.code()).isEqualTo(400);
+          assertThat(response.body()).isNotNull();
+          JsonNode root = new ObjectMapper().readTree(response.body().string());
+          assertThat(root.get("message").asText()).contains("blockingType");
+        }
+    );
+  }
+
+  @Test
+  void postInstantActionsRejectsUnknownFields() {
+    JavalinTest.test(
+        app, (server, client) -> {
+          var response = client.request(
+              "/api/v1/vehicles/alpha/instant-actions",
+              b -> b.post(
+                  BodyPublishers.ofString(
+                      """
+                      {
+                        "actions": [
+                          {
+                            "actionType": "stateRequest",
+                            "actionId": "action-1",
+                            "blockingType": "NONE",
+                            "headerId": 5
+                          }
+                        ]
+                      }
+                      """
+                  )
+              ).header("Content-Type", "application/json")
+          );
+
+          assertThat(response.code()).isEqualTo(400);
+        }
+    );
+  }
+
+  @Test
+  void postInstantActionsReturns404WhenVehicleAbsent() {
+    doThrow(new ObjectUnknownException("No vehicle named 'ghost' exists."))
+        .when(kernelClient)
+        .sendVehicleCommAdapterMessage(eq("ghost"), org.mockito.ArgumentMatchers.any());
+
+    JavalinTest.test(
+        app, (server, client) -> {
+          var response = client.request(
+              "/api/v1/vehicles/ghost/instant-actions",
+              b -> b.post(
+                  BodyPublishers.ofString(
+                      """
+                      {
+                        "actions": [
+                          {
+                            "actionType": "stateRequest",
+                            "actionId": "action-1",
+                            "blockingType": "NONE"
+                          }
+                        ]
+                      }
+                      """
+                  )
+              ).header("Content-Type", "application/json")
+          );
+
+          assertThat(response.code()).isEqualTo(404);
         }
     );
   }

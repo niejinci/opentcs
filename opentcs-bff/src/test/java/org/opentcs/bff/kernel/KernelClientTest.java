@@ -27,6 +27,7 @@ import org.opentcs.data.ObjectUnknownException;
 import org.opentcs.data.model.PlantModel;
 import org.opentcs.data.model.Vehicle;
 import org.opentcs.data.order.ReroutingType;
+import org.opentcs.drivers.vehicle.VehicleCommAdapterMessage;
 
 /**
  * Tests for {@link KernelClient}.
@@ -179,6 +180,38 @@ class KernelClientTest {
         .hasMessageContaining("ghost");
 
     verify(dispatcherService, never()).reroute(
+        org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.any()
+    );
+  }
+
+  @Test
+  void sendVehicleCommAdapterMessageDelegatesToVehicleService() {
+    Vehicle vehicle = new Vehicle("alpha");
+    VehicleCommAdapterMessage message = new VehicleCommAdapterMessage(
+        "vda5050:sendInstantActions",
+        java.util.Map.of("actions", "[]")
+    );
+    when(vehicleService.fetch(Vehicle.class, "alpha")).thenReturn(Optional.of(vehicle));
+
+    kernelClient.sendVehicleCommAdapterMessage("alpha", message);
+
+    verify(vehicleService, times(1)).sendCommAdapterMessage(vehicle.getReference(), message);
+  }
+
+  @Test
+  void sendVehicleCommAdapterMessageFailsForUnknownVehicle() {
+    VehicleCommAdapterMessage message = new VehicleCommAdapterMessage(
+        "vda5050:sendInstantActions",
+        java.util.Map.of("actions", "[]")
+    );
+    when(vehicleService.fetch(Vehicle.class, "ghost")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> kernelClient.sendVehicleCommAdapterMessage("ghost", message))
+        .isInstanceOf(ObjectUnknownException.class)
+        .hasMessageContaining("ghost");
+
+    verify(vehicleService, never()).sendCommAdapterMessage(
         org.mockito.ArgumentMatchers.any(),
         org.mockito.ArgumentMatchers.any()
     );

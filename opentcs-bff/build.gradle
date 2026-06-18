@@ -108,6 +108,7 @@ dependencies {
 
   api libs.jackson.databind
   api libs.jackson.datatype.jsr310
+  api libs.everit.json.schema
 
   runtimeOnly libs.slf4j.jdk14
   runtimeOnly 'org.opentcs.commadapter.vehicle.vda5050:openTCS-CommAdapter-VDA5050'

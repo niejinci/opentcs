@@ -152,6 +152,45 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/KernelUnavailable'
+  /api/v1/vehicles/{name}/instant-actions:
+    post:
+      tags:
+        - Vehicles
+      summary: Send VDA5050 instant actions to a vehicle.
+      description: >-
+        Validates the request body strictly against the SPA instant-action schema and forwards the
+        actions to the vehicle's communication adapter via `VehicleCommAdapterMessage`. The BFF
+        preserves native JSON action-parameter value types (string, number, boolean and array) by
+        forwarding the complete `actions` array to the VDA5050 adapter.
+      operationId: postVehicleInstantActions
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: The name of the vehicle.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InstantActionsRequest'
+      responses:
+        '202':
+          description: The instant actions were accepted for delivery to the vehicle adapter.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No vehicle with the given name exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/KernelUnavailable'
   /api/v1/transport-orders:
     post:
       tags:
@@ -614,6 +653,54 @@ components:
       properties:
         integrationLevel:
           $ref: '#/components/schemas/VehicleIntegrationLevel'
+    InstantActionsRequest:
+      type: object
+      additionalProperties: false
+      required: [actions]
+      properties:
+        actions:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/InstantAction'
+    InstantAction:
+      type: object
+      additionalProperties: false
+      required: [actionType, actionId, blockingType]
+      properties:
+        actionType:
+          type: string
+          minLength: 1
+        actionId:
+          type: string
+          minLength: 1
+        actionDescription:
+          type: string
+          nullable: true
+        blockingType:
+          type: string
+          enum: [NONE, SOFT, HARD]
+        actionParameters:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/InstantActionParameter'
+    InstantActionParameter:
+      type: object
+      additionalProperties: false
+      required: [key, value]
+      properties:
+        key:
+          type: string
+          minLength: 1
+        value:
+          type: object
+          description: >-
+            VDA5050 action parameter value. This OpenAPI field is intentionally
+            documented as a generator-compatible JSON value placeholder. Runtime
+            validation is performed with `json-schema/instant-actions-request.schema.json`
+            and permits exactly string, number, boolean or an array of string/number/boolean
+            values.
     ErrorResponse:
       type: object
       description: An error returned by the BFF.

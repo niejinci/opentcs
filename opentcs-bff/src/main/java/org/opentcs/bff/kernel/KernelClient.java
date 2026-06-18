@@ -18,6 +18,7 @@ import org.opentcs.data.model.PlantModel;
 import org.opentcs.data.model.Vehicle;
 import org.opentcs.data.order.ReroutingType;
 import org.opentcs.data.order.TransportOrder;
+import org.opentcs.drivers.vehicle.VehicleCommAdapterMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,6 +151,33 @@ public class KernelClient {
               )
           );
       portal.getDispatcherService().reroute(current.getReference(), reroutingType);
+      return null;
+    });
+  }
+
+  /**
+   * Sends a message to a vehicle's communication adapter.
+   *
+   * @param name The name of the vehicle.
+   * @param message The message to send.
+   * @throws org.opentcs.data.ObjectUnknownException If no such vehicle exists.
+   * @throws KernelRuntimeException If the Kernel cannot be reached or the request fails.
+   */
+  public void sendVehicleCommAdapterMessage(
+      String name,
+      VehicleCommAdapterMessage message
+  ) {
+    requireNonNull(name, "name");
+    requireNonNull(message, "message");
+    executeWithReconnect(() -> {
+      var service = ensureConnected().getVehicleService();
+      Vehicle current = service.fetch(Vehicle.class, name)
+          .orElseThrow(
+              () -> new org.opentcs.data.ObjectUnknownException(
+                  "No vehicle named '" + name + "' exists."
+              )
+          );
+      service.sendCommAdapterMessage(current.getReference(), message);
       return null;
     });
   }

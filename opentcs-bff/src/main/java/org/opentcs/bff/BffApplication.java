@@ -42,6 +42,7 @@ import org.opentcs.bff.swagger.OpenApiSpecHandler;
 import org.opentcs.bff.transportorder.CreateTransportOrderHandler;
 import org.opentcs.bff.vehicle.GetVehicleHandler;
 import org.opentcs.bff.vehicle.ListVehiclesHandler;
+import org.opentcs.bff.vehicle.PostInstantActionHandler;
 import org.opentcs.bff.vehicle.RerouteVehicleHandler;
 import org.opentcs.bff.vehicle.UpdateVehicleIntegrationLevelHandler;
 import org.opentcs.data.ObjectExistsException;
@@ -107,6 +108,8 @@ public class BffApplication {
    * {@code PUT /api/v1/vehicles/{name}/integrationLevel}.
    * @param rerouteVehicleHandler The handler serving
    * {@code POST /api/v1/vehicles/{name}/rerouteRequest}.
+   * @param postInstantActionHandler The handler serving
+   * {@code POST /api/v1/vehicles/{name}/instant-actions}.
    * @param createTransportOrderHandler The handler serving
    * {@code POST /api/v1/transport-orders}.
    * @param projectsHandler The handler bundle serving {@code /api/v1/projects} CRUD endpoints.
@@ -128,6 +131,7 @@ public class BffApplication {
       GetVehicleHandler getVehicleHandler,
       UpdateVehicleIntegrationLevelHandler updateVehicleIntegrationLevelHandler,
       RerouteVehicleHandler rerouteVehicleHandler,
+      PostInstantActionHandler postInstantActionHandler,
       CreateTransportOrderHandler createTransportOrderHandler,
       ProjectsHandler projectsHandler,
       ProjectAssetsHandler projectAssetsHandler,
@@ -148,6 +152,7 @@ public class BffApplication {
         updateVehicleIntegrationLevelHandler, "updateVehicleIntegrationLevelHandler"
     );
     requireNonNull(rerouteVehicleHandler, "rerouteVehicleHandler");
+    requireNonNull(postInstantActionHandler, "postInstantActionHandler");
     requireNonNull(createTransportOrderHandler, "createTransportOrderHandler");
     requireNonNull(projectsHandler, "projectsHandler");
     requireNonNull(projectAssetsHandler, "projectAssetsHandler");
@@ -194,6 +199,7 @@ public class BffApplication {
             path("/{" + GetVehicleHandler.NAME_PARAM + "}", () -> {
               get(getVehicleHandler);
               post("/rerouteRequest", rerouteVehicleHandler);
+              post("/instant-actions", postInstantActionHandler);
               put("/integrationLevel", updateVehicleIntegrationLevelHandler);
             });
           });

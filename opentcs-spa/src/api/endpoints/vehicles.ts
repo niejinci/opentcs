@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The openTCS Authors
 // SPDX-License-Identifier: MIT
 import { apiClient, type RequestOptions } from '../client';
-import type { Vehicle, VehicleIntegrationLevel } from '../types/bff';
+import type { InstantActionsRequest, Vehicle, VehicleIntegrationLevel } from '../types/bff';
 
 /** `GET /api/v1/vehicles` — list all vehicles known to the kernel. */
 export function listVehicles(options?: RequestOptions): Promise<Vehicle[]> {
@@ -47,6 +47,19 @@ export function rerouteVehicle(
   return apiClient.post<void>(
     `/api/v1/vehicles/${encodeURIComponent(name)}/rerouteRequest${query}`,
     undefined,
+    options,
+  );
+}
+
+/** `POST /api/v1/vehicles/{name}/instant-actions` — send VDA5050 instant actions. */
+export function sendInstantActions(
+  name: string,
+  request: InstantActionsRequest,
+  options?: RequestOptions,
+): Promise<void> {
+  return apiClient.post<void>(
+    `/api/v1/vehicles/${encodeURIComponent(name)}/instant-actions`,
+    request,
     options,
   );
 }

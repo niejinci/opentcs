@@ -13,3 +13,6 @@
 **/.approval_tests_temp/
 *Test*.received.txt
 **/bin/
+
+opentcs-spa/_tmp*
+docs/min-frontend-knowledge/

@@ -53,6 +53,7 @@ class ProjectsHandlerTest {
         new GetVehicleHandler(kernelClient),
         new org.opentcs.bff.vehicle.UpdateVehicleIntegrationLevelHandler(kernelClient),
         new RerouteVehicleHandler(kernelClient),
+        new org.opentcs.bff.vehicle.PostInstantActionHandler(kernelClient),
         new CreateTransportOrderHandler(kernelClient),
         new ProjectsHandler(store),
         new ProjectAssetsHandler(store),
