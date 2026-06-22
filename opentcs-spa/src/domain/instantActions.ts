@@ -127,11 +127,21 @@ export const INSTANT_ACTION_TEMPLATES: readonly InstantActionTemplate[] = Object
     ],
   },
   {
-    templateId: 'pickDrop',
-    actionType: 'pick/drop',
-    actionDescription: '托盘顶升/下降',
+    templateId: 'pick',
+    actionType: 'pick',
+    actionDescription: '托盘顶升',
     blockingType: 'NONE',
-    parameters: [{ key: 'height', description: '升降高度，单位 m', defaultValue: 0.06 }],
+    parameters: [{ key: 'height?', description: '顶升高度，单位 m', defaultValue: 0.06 },
+      { key: 'loadType', description: '负载类型，对应货架参数里面的 Name', defaultValue: '' },
+      { key: 'type?', description: '扫码类型:依赖载具类型|进出站台纠偏|站台内原地旋转纠偏', defaultValue: '' },
+    ],
+  },
+  {
+    templateId: 'drop',
+    actionType: 'drop',
+    actionDescription: '托盘下降',
+    blockingType: 'NONE',
+    parameters: [{ key: 'height?', description: '下降高度，单位 m', defaultValue: 0.06 }],
   },
   {
     templateId: 'cancelOrder',
@@ -311,12 +321,28 @@ export function createBlankParameter(id: number): InstantActionParameterFormRow 
 export function formStateToInstantActionsRequest(
   form: InstantActionFormState,
 ): InstantActionsRequest {
-  const actionParameters: InstantActionParameter[] = form.parameters
-    .filter((row) => row.key.trim().length > 0)
-    .map((row) => ({
-      key: row.key.trim(),
+  const seenKeys = new Set<string>();
+  const actionParameters: InstantActionParameter[] = [];
+
+  for (const row of form.parameters) {
+    const key = row.key.trim();
+    const valueText = String(row.valueText ?? '');
+    const isBlank = key.length === 0 && valueText.trim().length === 0;
+
+    if (isBlank) continue;
+    if (!key) {
+      throw new Error('参数 key 不能为空');
+    }
+    if (seenKeys.has(key)) {
+      throw new Error(`参数 key 重复：${key}`);
+    }
+
+    seenKeys.add(key);
+    actionParameters.push({
+      key,
       value: parseParameterValue(row.kind, row.valueText),
-    }));
+    });
+  }
 
   const action: InstantAction = {
     actionType: form.actionType.trim(),
@@ -331,6 +357,14 @@ export function formStateToInstantActionsRequest(
 
 export function findInstantActionTemplate(templateId: string): InstantActionTemplate | null {
   return INSTANT_ACTION_TEMPLATES.find((template) => template.templateId === templateId) ?? null;
+}
+
+export function findInstantActionTemplatesByActionType(
+  actionType: string,
+): readonly InstantActionTemplate[] {
+  const trimmed = actionType.trim();
+  if (!trimmed) return [];
+  return INSTANT_ACTION_TEMPLATES.filter((template) => template.actionType === trimmed);
 }
 
 export function filterInstantActionTemplates(keyword: string): readonly InstantActionTemplate[] {

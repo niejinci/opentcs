@@ -8,8 +8,10 @@ import { HttpError } from '@/api/errors';
 import type { Vehicle } from '@/api/types/bff';
 import {
   createBlankInstantActionFormState,
+  createBlankParameter,
   filterInstantActionTemplates,
   findInstantActionTemplate,
+  findInstantActionTemplatesByActionType,
   formStateToInstantActionsRequest,
   INSTANT_ACTION_TEMPLATES,
   resolveInstantActionStatusRows,
@@ -52,13 +54,21 @@ const visibleTemplates = computed(() =>
 const instantActionStatusRows = computed(() =>
   resolveInstantActionStatusRows(trackedInstantActions.value, props.vehicle, statusClock.value),
 );
+const matchedActionTypeTemplates = computed(() =>
+  findInstantActionTemplatesByActionType(instantActionForm.value.actionType),
+);
+const hasSingleActionTypeTemplate = computed(() => matchedActionTypeTemplates.value.length === 1);
 
 const canSendInstantAction = computed(() => {
   if (instantActionBusy.value) return false;
   if (!props.vehicle) return false;
   if (!instantActionForm.value.actionType.trim()) return false;
   if (!instantActionForm.value.actionId.trim()) return false;
-  return instantActionForm.value.parameters.every((row) => row.key.trim());
+  return instantActionForm.value.parameters.every((row) => {
+    const hasKey = row.key.trim().length > 0;
+    const hasValue = String(row.valueText ?? '').trim().length > 0;
+    return hasKey || !hasValue;
+  });
 });
 
 function selectTemplate(templateId: string): void {
@@ -78,6 +88,10 @@ function removeParameter(rowId: number): void {
   );
 }
 
+function addParameter(): void {
+  instantActionForm.value.parameters.push(createBlankParameter(nextInstantActionRowId()));
+}
+
 function onParameterKindChanged(row: InstantActionParameterFormRow, kind: InstantActionParamKind): void {
   row.kind = kind;
   const text = String(row.valueText ?? '');
@@ -90,15 +104,13 @@ function onParameterKindChanged(row: InstantActionParameterFormRow, kind: Instan
 }
 
 function onTemplateInput(): void {
-  templateListOpen.value = true;
-  const template = findInstantActionTemplate(instantActionForm.value.actionType);
+  selectedTemplateId.value = '';
+}
+
+function applyMatchedActionTypeTemplate(): void {
+  const template = matchedActionTypeTemplates.value[0];
   if (!template) return;
-  if (template.templateId !== selectedTemplateId.value) {
-    selectedTemplateId.value = template.templateId;
-    instantActionForm.value.actionDescription = template.actionDescription;
-    instantActionForm.value.blockingType = template.blockingType;
-    instantActionForm.value.parameters = templateToFormState(template, nextInstantActionRowId).parameters;
-  }
+  selectTemplate(template.templateId);
 }
 
 function openTemplateList(): void {
@@ -215,11 +227,11 @@ async function submitInstantAction(): Promise<void> {
     </div>
 
     <label class="template-search">
-      Action Type 搜索
+      常用模板
       <div ref="templateCombobox" class="template-combobox">
         <input
           v-model="instantActionSearch"
-          placeholder="输入 actionType 搜索"
+          placeholder="筛选常用 actionType 模板"
           spellcheck="false"
           @focus="openTemplateList"
           @input="onTemplateSearchInput"
@@ -249,10 +261,18 @@ async function submitInstantAction(): Promise<void> {
         Action Type
         <input
           v-model="instantActionForm.actionType"
-          placeholder="stateRequest / cancelOrder / ..."
+          placeholder="手动输入或套用模板"
           spellcheck="false"
           @input="onTemplateInput"
         />
+        <button
+          v-if="hasSingleActionTypeTemplate && !selectedTemplateId"
+          type="button"
+          class="apply-template-inline"
+          @click="applyMatchedActionTypeTemplate"
+        >
+          套用该模板
+        </button>
       </label>
       <label>
         Action ID
@@ -272,12 +292,17 @@ async function submitInstantAction(): Promise<void> {
       </label>
     </div>
 
+    <div class="instant-param-toolbar">
+      <span>Action Parameters</span>
+      <button type="button" @click="addParameter">新增参数</button>
+    </div>
+
     <div class="instant-param-list">
-        <div
-          v-for="row in instantActionForm.parameters"
-          :key="row.id"
-          class="instant-param-row"
-        >
+      <div
+        v-for="row in instantActionForm.parameters"
+        :key="row.id"
+        class="instant-param-row"
+      >
         <div class="param-key-cell">
           <input v-model="row.key" placeholder="key" spellcheck="false" />
         </div>
@@ -306,7 +331,8 @@ async function submitInstantAction(): Promise<void> {
         />
 
         <p class="param-description">
-          {{ row.optional ? '可选参数' : '必填参数' }} · {{ row.description || '自定义参数' }}
+          {{ row.optional ? '可选参数' : row.description ? '必填参数' : '自定义参数' }} ·
+          {{ row.description || '手动新增' }}
         </p>
 
         <button type="button" @click="removeParameter(row.id)">
@@ -481,6 +507,7 @@ async function submitInstantAction(): Promise<void> {
   gap: 0.55rem 0.75rem;
 }
 .instant-grid label {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
@@ -488,11 +515,46 @@ async function submitInstantAction(): Promise<void> {
   font-weight: 600;
   color: #57606a;
 }
+.apply-template-inline {
+  align-self: flex-start;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  background: #f6f8fa;
+  color: #24292f;
+  cursor: pointer;
+  font-size: 0.76rem;
+  padding: 0.18rem 0.45rem;
+}
+.apply-template-inline:hover {
+  background: #ddf4ff;
+}
+.instant-param-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.65rem;
+  color: #57606a;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.instant-param-toolbar button {
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  background: #f6f8fa;
+  color: #24292f;
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 0.25rem 0.55rem;
+}
+.instant-param-toolbar button:hover {
+  background: #ddf4ff;
+}
 .instant-param-list {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  margin-top: 0.65rem;
+  margin-top: 0.35rem;
 }
 .instant-param-row {
   display: grid;
