@@ -598,6 +598,12 @@ components:
             reported by the comm-adapter. `null` if the adapter has not reported an
             orientation yet (kernel uses `Double.NaN` internally; the BFF normalises
             that to `null`).
+        properties:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+          description: Optional key/value properties attached to the vehicle.
     Triple:
       type: object
       description: |

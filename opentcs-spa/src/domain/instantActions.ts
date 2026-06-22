@@ -7,6 +7,7 @@ import type {
   InstantActionParameterValue,
   InstantActionsRequest,
   Vda5050BlockingType,
+  Vehicle,
 } from '@/api/types/bff';
 
 export type InstantActionParamKind = 'string' | 'number' | 'boolean' | 'array';
@@ -49,6 +50,35 @@ export interface InstantActionFormState {
   blockingType: Vda5050BlockingType;
   parameters: InstantActionParameterFormRow[];
 }
+
+export type Vda5050ActionStatus = 'WAITING' | 'INITIALIZING' | 'RUNNING' | 'FINISHED' | 'FAILED';
+
+export type InstantActionLifecycleStatus = 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'TIMEOUT';
+
+export interface Vda5050ActionState {
+  actionId: string;
+  actionType?: string | null;
+  actionDescription?: string | null;
+  actionStatus: Vda5050ActionStatus;
+  resultDescription?: string | null;
+}
+
+export interface TrackedInstantAction {
+  actionId: string;
+  actionType: string;
+  actionDescription?: string | null;
+  sentAt: string;
+}
+
+export interface InstantActionStatusRow extends TrackedInstantAction {
+  status: InstantActionLifecycleStatus;
+  vehicleActionStatus?: Vda5050ActionStatus | null;
+  resultDescription?: string | null;
+}
+
+export const VDA5050_ACTION_STATES_PROPERTY = 'vda5050:actionStates';
+export const INSTANT_ACTION_ACK_TIMEOUT_MS = 30_000;
+export const INSTANT_ACTION_TERMINAL_TIMEOUT_MS = 120_000;
 
 export const INSTANT_ACTION_TEMPLATES: readonly InstantActionTemplate[] = Object.freeze([
   {
@@ -314,4 +344,73 @@ export function filterInstantActionTemplates(keyword: string): readonly InstantA
       template.actionDescription.toLowerCase().includes(trimmed)
     );
   });
+}
+
+export function parseVehicleActionStates(vehicle: Vehicle | null): Vda5050ActionState[] {
+  const raw = vehicle?.properties?.[VDA5050_ACTION_STATES_PROPERTY];
+  if (!raw) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter(isVda5050ActionState);
+}
+
+export function resolveInstantActionStatusRows(
+  trackedActions: readonly TrackedInstantAction[],
+  vehicle: Vehicle | null,
+  nowMs: number = Date.now(),
+): InstantActionStatusRow[] {
+  const actionStates = parseVehicleActionStates(vehicle);
+
+  return trackedActions.slice(0, 5).map((tracked) => {
+    const actionState = actionStates.find((item) => item.actionId === tracked.actionId);
+    return {
+      ...tracked,
+      status: resolveInstantActionStatus(tracked, actionState, nowMs),
+      vehicleActionStatus: actionState?.actionStatus ?? null,
+      resultDescription: actionState?.resultDescription ?? null,
+    };
+  });
+}
+
+function resolveInstantActionStatus(
+  tracked: TrackedInstantAction,
+  actionState: Vda5050ActionState | undefined,
+  nowMs: number,
+): InstantActionLifecycleStatus {
+  const elapsedMs = nowMs - new Date(tracked.sentAt).getTime();
+
+  if (!actionState) {
+    return elapsedMs > INSTANT_ACTION_ACK_TIMEOUT_MS ? 'TIMEOUT' : 'PENDING';
+  }
+
+  if (actionState.actionStatus === 'FINISHED') return 'SUCCESS';
+  if (actionState.actionStatus === 'FAILED') return 'FAILED';
+  return elapsedMs > INSTANT_ACTION_TERMINAL_TIMEOUT_MS ? 'TIMEOUT' : 'RUNNING';
+}
+
+function isVda5050ActionState(value: unknown): value is Vda5050ActionState {
+  const candidate = value as Vda5050ActionState;
+  return (
+    typeof candidate === 'object' &&
+    candidate !== null &&
+    typeof candidate.actionId === 'string' &&
+    isVda5050ActionStatus(candidate.actionStatus)
+  );
+}
+
+function isVda5050ActionStatus(value: unknown): value is Vda5050ActionStatus {
+  return (
+    value === 'WAITING' ||
+    value === 'INITIALIZING' ||
+    value === 'RUNNING' ||
+    value === 'FINISHED' ||
+    value === 'FAILED'
+  );
 }

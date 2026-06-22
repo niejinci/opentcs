@@ -79,6 +79,8 @@ export interface Vehicle {
    * (kernel `Double.NaN` is normalised to `null` by the BFF).
    */
   orientationAngle?: number | null;
+  /** Optional key/value properties attached to the vehicle. */
+  properties?: Record<string, string> | null;
 }
 
 export type Vda5050BlockingType = 'NONE' | 'SOFT' | 'HARD';

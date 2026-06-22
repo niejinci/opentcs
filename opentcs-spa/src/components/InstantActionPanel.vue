@@ -12,9 +12,12 @@ import {
   findInstantActionTemplate,
   formStateToInstantActionsRequest,
   INSTANT_ACTION_TEMPLATES,
+  resolveInstantActionStatusRows,
   type InstantActionFormState,
   type InstantActionParamKind,
   type InstantActionParameterFormRow,
+  type InstantActionLifecycleStatus,
+  type TrackedInstantAction,
   templateToFormState,
 } from '@/domain/instantActions';
 import { toastError, toastSuccess } from '@/ui/toast/toastBus';
@@ -29,7 +32,10 @@ const selectedTemplateId = ref('');
 const templateListOpen = ref(false);
 const templateSearchDirty = ref(false);
 const templateCombobox = ref<HTMLElement | null>(null);
+const trackedInstantActions = ref<TrackedInstantAction[]>([]);
+const statusClock = ref(Date.now());
 let nextInstantParamRowId = 1;
+let statusClockInterval: number | null = null;
 
 function nextInstantActionRowId(): number {
   return nextInstantParamRowId++;
@@ -42,6 +48,9 @@ const instantActionForm = ref<InstantActionFormState>(
 const filteredTemplates = computed(() => filterInstantActionTemplates(instantActionSearch.value));
 const visibleTemplates = computed(() =>
   templateSearchDirty.value ? filteredTemplates.value : INSTANT_ACTION_TEMPLATES,
+);
+const instantActionStatusRows = computed(() =>
+  resolveInstantActionStatusRows(trackedInstantActions.value, props.vehicle, statusClock.value),
 );
 
 const canSendInstantAction = computed(() => {
@@ -110,11 +119,60 @@ function closeTemplateList(event: MouseEvent): void {
 
 onMounted(() => {
   window.addEventListener('mousedown', closeTemplateList);
+  statusClockInterval = window.setInterval(() => {
+    statusClock.value = Date.now();
+  }, 1000);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('mousedown', closeTemplateList);
+  if (statusClockInterval !== null) {
+    window.clearInterval(statusClockInterval);
+  }
 });
+
+function rememberTrackedInstantAction(request: ReturnType<typeof formStateToInstantActionsRequest>): void {
+  const sentAt = new Date().toISOString();
+  const next = request.actions.map((action) => ({
+    actionId: action.actionId,
+    actionType: action.actionType,
+    actionDescription: action.actionDescription,
+    sentAt,
+  }));
+
+  trackedInstantActions.value = [
+    ...next,
+    ...trackedInstantActions.value.filter(
+      (tracked) => !next.some((action) => action.actionId === tracked.actionId),
+    ),
+  ].slice(0, 5);
+  statusClock.value = Date.now();
+}
+
+function instantActionStatusLabel(status: InstantActionLifecycleStatus): string {
+  switch (status) {
+    case 'PENDING':
+      return '待应答';
+    case 'RUNNING':
+      return '执行中';
+    case 'SUCCESS':
+      return '成功';
+    case 'FAILED':
+      return '失败';
+    case 'TIMEOUT':
+      return '超时';
+    default:
+      return status;
+  }
+}
+
+function formatTrackedActionTime(value: string): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(new Date(value));
+}
 
 async function submitInstantAction(): Promise<void> {
   if (!props.vehicle || !canSendInstantAction.value) return;
@@ -130,6 +188,7 @@ async function submitInstantAction(): Promise<void> {
   instantActionBusy.value = true;
   try {
     await sendInstantActions(props.vehicle.name, request, { toastOnError: false });
+    rememberTrackedInstantAction(request);
     toastSuccess(`已下发即时动作 ${request.actions[0].actionType}`, 'VDA5050');
     instantActionForm.value.actionId = crypto.randomUUID();
   } catch (err) {
@@ -269,6 +328,36 @@ async function submitInstantAction(): Promise<void> {
         {{ instantActionBusy ? '下发中…' : '下发即时动作' }}
       </button>
     </div>
+
+    <section class="instant-status-panel" aria-labelledby="instant-status-title">
+      <div class="instant-status-hdr">
+        <div>
+          <h4 id="instant-status-title">最近5条即时动作</h4>
+          <p>状态来自车辆 state.actionStates，超时按本地提交时间计算。</p>
+        </div>
+        <span>{{ instantActionStatusRows.length }}/5</span>
+      </div>
+
+      <p v-if="instantActionStatusRows.length === 0" class="instant-status-empty">
+        暂无即时动作下发记录。
+      </p>
+      <ol v-else class="instant-status-list">
+        <li v-for="action in instantActionStatusRows" :key="action.actionId" class="instant-status-item">
+          <span class="instant-status-main">
+            <strong>{{ action.actionType }}</strong>
+            <code>{{ action.actionId }}</code>
+          </span>
+          <span class="instant-status-meta">
+            {{ formatTrackedActionTime(action.sentAt) }}
+            <template v-if="action.vehicleActionStatus"> · {{ action.vehicleActionStatus }}</template>
+          </span>
+          <span class="instant-status-pill" :data-status="action.status">
+            {{ instantActionStatusLabel(action.status) }}
+          </span>
+          <small v-if="action.resultDescription">{{ action.resultDescription }}</small>
+        </li>
+      </ol>
+    </section>
   </section>
 </template>
 
@@ -456,9 +545,107 @@ async function submitInstantAction(): Promise<void> {
   font-size: 0.8rem;
   color: #6e7781;
 }
+.instant-status-panel {
+  margin-top: 0.75rem;
+  border-top: 1px solid #d8dee4;
+  padding-top: 0.65rem;
+}
+.instant-status-hdr {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.instant-status-hdr h4 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.instant-status-hdr p {
+  margin: 0.15rem 0 0;
+  color: #6e7781;
+  font-size: 0.76rem;
+}
+.instant-status-hdr span,
+.instant-status-empty,
+.instant-status-meta,
+.instant-status-item small {
+  color: #6e7781;
+  font-size: 0.76rem;
+}
+.instant-status-empty {
+  margin: 0.45rem 0 0;
+}
+.instant-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0.55rem 0 0;
+  padding: 0;
+}
+.instant-status-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.45rem 0.65rem;
+  align-items: center;
+  border: 1px solid #d8dee4;
+  border-radius: 6px;
+  padding: 0.45rem 0.55rem;
+  background: #f6f8fa;
+}
+.instant-status-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+.instant-status-main strong {
+  font-size: 0.84rem;
+}
+.instant-status-main code {
+  overflow: hidden;
+  color: #57606a;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.instant-status-pill {
+  border: 1px solid #d0d7de;
+  border-radius: 999px;
+  padding: 0.12rem 0.45rem;
+  background: #fff;
+  color: #57606a;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.instant-status-pill[data-status='RUNNING'] {
+  border-color: #54aeff;
+  background: #ddf4ff;
+  color: #0969da;
+}
+.instant-status-pill[data-status='SUCCESS'] {
+  border-color: #2da44e;
+  background: #dafbe1;
+  color: #1a7f37;
+}
+.instant-status-pill[data-status='FAILED'] {
+  border-color: #cf222e;
+  background: #ffebe9;
+  color: #cf222e;
+}
+.instant-status-pill[data-status='TIMEOUT'] {
+  border-color: #fb8c00;
+  background: #fff8c5;
+  color: #9a6700;
+}
+.instant-status-item small {
+  grid-column: 1 / -1;
+}
 @media (max-width: 760px) {
   .instant-grid,
-  .instant-param-row {
+  .instant-param-row,
+  .instant-status-item {
     grid-template-columns: 1fr;
   }
   .instant-actions-footer {

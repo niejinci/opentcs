@@ -40,6 +40,7 @@ public final class VehicleConverter {
     dto.setCurrentPosition(
         vehicle.getCurrentPosition() == null ? null : vehicle.getCurrentPosition().getName()
     );
+    dto.setProperties(vehicle.getProperties());
     Pose pose = vehicle.getPose();
     if (pose != null) {
       org.opentcs.data.model.Triple kp = pose.getPosition();
