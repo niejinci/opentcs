@@ -7,6 +7,7 @@ import static java.util.Objects.requireNonNull;
 import org.opentcs.bff.api.v1.model.Triple;
 import org.opentcs.bff.api.v1.model.Vehicle;
 import org.opentcs.bff.api.v1.model.VehicleIntegrationLevel;
+import org.opentcs.bff.api.v1.model.VehicleOperatingMode;
 import org.opentcs.bff.api.v1.model.VehicleProcState;
 import org.opentcs.bff.api.v1.model.VehicleState;
 import org.opentcs.data.model.Pose;
@@ -16,6 +17,9 @@ import org.opentcs.data.model.Pose;
  * the BFF API's generated {@link Vehicle} DTO.
  */
 public final class VehicleConverter {
+
+  private static final String PROPKEY_VDA5050_OPERATING_MODE = "vda5050:operatingMode";
+  private static final String PROPKEY_VDA5050_LAST_STATE_AT = "vda5050:lastStateAt";
 
   private VehicleConverter() {
   }
@@ -35,6 +39,14 @@ public final class VehicleConverter {
     dto.setIntegrationLevel(
         VehicleIntegrationLevel.valueOf(vehicle.getIntegrationLevel().name())
     );
+    String operatingMode = vehicle.getProperty(PROPKEY_VDA5050_OPERATING_MODE);
+    if (operatingMode != null) {
+      dto.setOperatingMode(VehicleOperatingMode.valueOf(operatingMode));
+    }
+    String lastStateAt = vehicle.getProperty(PROPKEY_VDA5050_LAST_STATE_AT);
+    if (lastStateAt != null) {
+      dto.setLastStateAt(lastStateAt);
+    }
     dto.setPaused(vehicle.isPaused());
     dto.setEnergyLevel(vehicle.getEnergyLevel());
     dto.setCurrentPosition(

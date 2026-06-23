@@ -77,10 +77,26 @@ export interface InstantActionStatusRow extends TrackedInstantAction {
 }
 
 export const VDA5050_ACTION_STATES_PROPERTY = 'vda5050:actionStates';
+export const VDA5050_OPERATING_MODE_PROPERTY = 'vda5050:operatingMode';
+export const VDA5050_LAST_STATE_AT_PROPERTY = 'vda5050:lastStateAt';
+export const OPERATING_MODE_STALE_AFTER_MS = 10_000;
 export const INSTANT_ACTION_ACK_TIMEOUT_MS = 30_000;
 export const INSTANT_ACTION_TERMINAL_TIMEOUT_MS = 120_000;
 
 export const INSTANT_ACTION_TEMPLATES: readonly InstantActionTemplate[] = Object.freeze([
+  {
+    templateId: 'controlMode',
+    actionType: 'controlMode',
+    actionDescription: '设置小车操作模式',
+    blockingType: 'HARD',
+    parameters: [
+      {
+        key: 'mode',
+        description: 'AUTOMATIC / SEMIAUTOMATIC / MANUAL / SERVICE / TEACHIN',
+        defaultValue: 'MANUAL',
+      },
+    ],
+  },
   {
     templateId: 'initPosition',
     actionType: 'initPosition',
@@ -393,6 +409,32 @@ export function parseVehicleActionStates(vehicle: Vehicle | null): Vda5050Action
 
   if (!Array.isArray(parsed)) return [];
   return parsed.filter(isVda5050ActionState);
+}
+
+export function vehicleOperatingMode(vehicle: Vehicle | null): string | null {
+  return vehicle?.operatingMode ?? vehicle?.properties?.[VDA5050_OPERATING_MODE_PROPERTY] ?? null;
+}
+
+export function vehicleLastStateAt(vehicle: Vehicle | null): string | null {
+  return vehicle?.lastStateAt ?? vehicle?.properties?.[VDA5050_LAST_STATE_AT_PROPERTY] ?? null;
+}
+
+export function vehicleStateAgeMs(vehicle: Vehicle | null, nowMs: number = Date.now()): number | null {
+  const raw = vehicleLastStateAt(vehicle);
+  if (!raw) return null;
+
+  const ts = new Date(raw).getTime();
+  if (!Number.isFinite(ts)) return null;
+  return Math.max(0, nowMs - ts);
+}
+
+export function isVehicleStateStale(
+  vehicle: Vehicle | null,
+  nowMs: number = Date.now(),
+  staleAfterMs: number = OPERATING_MODE_STALE_AFTER_MS,
+): boolean {
+  const ageMs = vehicleStateAgeMs(vehicle, nowMs);
+  return ageMs === null || ageMs > staleAfterMs;
 }
 
 export function resolveInstantActionStatusRows(

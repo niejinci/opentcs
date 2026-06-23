@@ -24,16 +24,28 @@
 // this panel to the canvas selection store and is best done in a
 // follow-up PR.
 
-import { computed, reactive } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
 import { rerouteVehicle } from '@/api/endpoints/vehicles';
-import type { Vehicle, VehicleIntegrationLevel, VehicleState } from '@/api/types/bff';
+import type {
+  Vehicle,
+  VehicleIntegrationLevel,
+  VehicleOperatingMode,
+  VehicleState,
+} from '@/api/types/bff';
 import { isVehicleRealtime } from '@/domain/vehicles/live';
+import {
+  isVehicleStateStale,
+  vehicleOperatingMode,
+  vehicleStateAgeMs,
+} from '@/domain/instantActions';
 import { useLiveStatusStore } from '@/stores/liveStatus';
 import { toastSuccess, toastWarning } from '@/ui/toast/toastBus';
 
 const live = useLiveStatusStore();
 const rerouteBusyByKey = reactive<Record<string, boolean>>({});
+const statusClock = ref(Date.now());
+let statusClockInterval: number | null = null;
 
 const vehicles = computed(() => live.vehicleList);
 
@@ -53,6 +65,14 @@ const INTEGRATION_LEVEL_LABEL: Record<VehicleIntegrationLevel, string> = {
   TO_BE_UTILIZED: '使用',
 };
 
+const OPERATING_MODE_LABEL: Record<VehicleOperatingMode, string> = {
+  AUTOMATIC: '自动',
+  SEMIAUTOMATIC: '半自动',
+  MANUAL: '手动',
+  SERVICE: '服务',
+  TEACHIN: '示教',
+};
+
 function formatEnergy(level: number): string {
   if (!Number.isFinite(level)) return '—';
   return `${Math.round(level)}%`;
@@ -64,6 +84,23 @@ function currentPositionText(vehicle: Vehicle): string {
 
 function lastReportedPositionText(vehicle: Vehicle): string {
   return vehicle.currentPosition ?? '—';
+}
+
+function operatingModeText(vehicle: Vehicle): string {
+  const mode = vehicleOperatingMode(vehicle);
+  return mode && mode in OPERATING_MODE_LABEL
+    ? OPERATING_MODE_LABEL[mode as VehicleOperatingMode]
+    : '—';
+}
+
+function operatingModeAgeText(vehicle: Vehicle): string {
+  const ageMs = vehicleStateAgeMs(vehicle, statusClock.value);
+  if (ageMs === null) return '未收到';
+
+  const seconds = Math.floor(ageMs / 1000);
+  return isVehicleStateStale(vehicle, statusClock.value)
+    ? `已超时 ${seconds < 60 ? `${seconds}秒` : `${Math.floor(seconds / 60)}分钟`}`
+    : seconds < 60 ? `${seconds}秒前` : `${Math.floor(seconds / 60)}分钟前`;
 }
 
 function busyKey(name: string, forced: boolean): string {
@@ -95,6 +132,18 @@ async function requestReroute(name: string, forced: boolean): Promise<void> {
     rerouteBusyByKey[key] = false;
   }
 }
+
+onMounted(() => {
+  statusClockInterval = window.setInterval(() => {
+    statusClock.value = Date.now();
+  }, 1000);
+});
+
+onBeforeUnmount(() => {
+  if (statusClockInterval !== null) {
+    window.clearInterval(statusClockInterval);
+  }
+});
 </script>
 
 <template>
@@ -110,6 +159,7 @@ async function requestReroute(name: string, forced: boolean): Promise<void> {
           <tr>
             <th scope="col">名称</th>
             <th scope="col">状态</th>
+            <th scope="col">操作模式</th>
             <th scope="col">运行</th>
             <th scope="col">集成级别</th>
             <th scope="col">当前点位</th>
@@ -124,6 +174,10 @@ async function requestReroute(name: string, forced: boolean): Promise<void> {
             <th scope="row" class="name">{{ v.name }}</th>
             <td>
               <span class="badge" :data-tone="STATE_TONE[v.state]">{{ v.state }}</span>
+            </td>
+            <td class="omode" :data-stale="isVehicleStateStale(v, statusClock)">
+              <strong>{{ operatingModeText(v) }}</strong>
+              <small>{{ operatingModeAgeText(v) }}</small>
             </td>
             <td class="proc">{{ v.procState }}</td>
             <td class="ilevel">{{ INTEGRATION_LEVEL_LABEL[v.integrationLevel] }}</td>
@@ -270,6 +324,18 @@ async function requestReroute(name: string, forced: boolean): Promise<void> {
 }
 .pos.last {
   color: #57606a;
+}
+.omode strong {
+  color: #9a6700;
+}
+.omode small {
+  display: block;
+  color: #57606a;
+  font-size: 0.72rem;
+}
+.omode[data-stale='true'] strong,
+.omode[data-stale='true'] small {
+  color: #cf222e;
 }
 .paused[data-on='true'] {
   color: #cf222e;

@@ -567,6 +567,15 @@ components:
           $ref: '#/components/schemas/VehicleProcState'
         integrationLevel:
           $ref: '#/components/schemas/VehicleIntegrationLevel'
+        operatingMode:
+          $ref: '#/components/schemas/VehicleOperatingMode'
+          nullable: true
+        lastStateAt:
+          type: string
+          nullable: true
+          description: |
+            ISO-8601 server-side timestamp when the VDA5050 adapter last received a state
+            message from this vehicle. `null` for vehicles that do not expose VDA5050 state data.
         paused:
           type: boolean
           description: Whether the vehicle is currently paused.
@@ -651,6 +660,19 @@ components:
         - TO_BE_NOTICED
         - TO_BE_RESPECTED
         - TO_BE_UTILIZED
+    VehicleOperatingMode:
+      type: string
+      nullable: true
+      description: |
+        The VDA5050 operating mode last reported by the vehicle via the state
+        message's `operatingMode` field. `null` for vehicles that do not expose
+        VDA5050 operating mode data.
+      enum:
+        - AUTOMATIC
+        - SEMIAUTOMATIC
+        - MANUAL
+        - SERVICE
+        - TEACHIN
     VehicleIntegrationLevelUpdate:
       type: object
       description: Request body for `PUT /api/v1/vehicles/{name}/integrationLevel`.

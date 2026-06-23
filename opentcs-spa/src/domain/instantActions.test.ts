@@ -66,10 +66,11 @@ describe('instant actions', () => {
   });
 
   it('finds templates by action type without relying on template id', () => {
-    const templates = findInstantActionTemplatesByActionType('cmd_vel');
+    const templates = findInstantActionTemplatesByActionType('controlMode');
 
     expect(templates).toHaveLength(1);
-    expect(templates[0].templateId).toBe('cmd_vel');
+    expect(templates[0].templateId).toBe('controlMode');
+    expect(templates[0].blockingType).toBe('HARD');
   });
 
   it('keeps template parameters editable after template conversion', () => {

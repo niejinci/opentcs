@@ -51,6 +51,13 @@ export type VehicleIntegrationLevel =
   | 'TO_BE_RESPECTED'
   | 'TO_BE_UTILIZED';
 
+export type VehicleOperatingMode =
+  | 'AUTOMATIC'
+  | 'SEMIAUTOMATIC'
+  | 'MANUAL'
+  | 'SERVICE'
+  | 'TEACHIN';
+
 /** Mirrors `components.schemas.Triple`. Units = millimetres, integer. */
 export interface BffTriple {
   x: number;
@@ -64,6 +71,9 @@ export interface Vehicle {
   state: VehicleState;
   procState: VehicleProcState;
   integrationLevel: VehicleIntegrationLevel;
+  operatingMode?: VehicleOperatingMode | null;
+  /** ISO-8601 timestamp when the VDA5050 adapter last received a state message. */
+  lastStateAt?: string | null;
   paused: boolean;
   energyLevel: number;
   currentPosition?: string | null;

@@ -102,7 +102,11 @@ class VehicleHandlersTest {
 
   @Test
   void getByNameReturnsVehicleWhenPresent() {
-    when(kernelClient.findVehicle("alpha")).thenReturn(Optional.of(new Vehicle("alpha")));
+    when(kernelClient.findVehicle("alpha")).thenReturn(Optional.of(
+        new Vehicle("alpha")
+            .withProperty("vda5050:operatingMode", "MANUAL")
+            .withProperty("vda5050:lastStateAt", "2026-06-23T01:00:00Z")
+    ));
 
     JavalinTest.test(
         app, (server, client) -> {
@@ -112,6 +116,8 @@ class VehicleHandlersTest {
           assertThat(response.body()).isNotNull();
           JsonNode root = new ObjectMapper().readTree(response.body().string());
           assertThat(root.get("name").asText()).isEqualTo("alpha");
+          assertThat(root.get("operatingMode").asText()).isEqualTo("MANUAL");
+          assertThat(root.get("lastStateAt").asText()).isEqualTo("2026-06-23T01:00:00Z");
           assertThat(root.has("currentPosition")).isTrue();
           assertThat(root.get("currentPosition").isNull()).isTrue();
         }

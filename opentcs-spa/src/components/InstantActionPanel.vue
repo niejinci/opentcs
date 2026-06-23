@@ -14,7 +14,10 @@ import {
   findInstantActionTemplatesByActionType,
   formStateToInstantActionsRequest,
   INSTANT_ACTION_TEMPLATES,
+  isVehicleStateStale,
   resolveInstantActionStatusRows,
+  vehicleStateAgeMs,
+  vehicleOperatingMode,
   type InstantActionFormState,
   type InstantActionParamKind,
   type InstantActionParameterFormRow,
@@ -58,6 +61,35 @@ const matchedActionTypeTemplates = computed(() =>
   findInstantActionTemplatesByActionType(instantActionForm.value.actionType),
 );
 const hasSingleActionTypeTemplate = computed(() => matchedActionTypeTemplates.value.length === 1);
+const currentOperatingMode = computed(() => vehicleOperatingMode(props.vehicle));
+
+const OPERATING_MODE_LABEL: Record<string, string> = {
+  AUTOMATIC: '自动',
+  SEMIAUTOMATIC: '半自动',
+  MANUAL: '手动',
+  SERVICE: '服务',
+  TEACHIN: '示教',
+};
+
+const currentOperatingModeText = computed(() => {
+  if (!props.vehicle) return '-';
+
+  const mode = currentOperatingMode.value;
+  return mode ? (OPERATING_MODE_LABEL[mode] ?? mode) : '—';
+});
+const currentOperatingModeStale = computed(() =>
+  props.vehicle ? isVehicleStateStale(props.vehicle, statusClock.value) : false,
+);
+const currentOperatingModeAgeText = computed(() => {
+  if (!props.vehicle) return '';
+
+  const ageMs = vehicleStateAgeMs(props.vehicle, statusClock.value);
+  if (ageMs === null) return '未收到 state';
+
+  const seconds = Math.floor(ageMs / 1000);
+  const text = seconds < 60 ? `${seconds}秒前` : `${Math.floor(seconds / 60)}分钟前`;
+  return currentOperatingModeStale.value ? `已超时 ${text}` : text;
+});
 
 const canSendInstantAction = computed(() => {
   if (instantActionBusy.value) return false;
@@ -222,7 +254,20 @@ async function submitInstantAction(): Promise<void> {
     <div class="instant-actions-hdr">
       <div>
         <h3 id="instant-actions-title">VDA5050 即时动作</h3>
-        <p>目标车辆：{{ vehicle?.name || '请选择车辆' }}</p>
+        <p>
+          目标车辆：<strong class="vehicle-name">{{ vehicle?.name || '请选择车辆' }}</strong>
+          · 当前操作模式：<strong
+            class="operating-mode"
+            :data-stale="currentOperatingModeStale"
+          >{{ currentOperatingModeText }}</strong>
+          <span
+            v-if="currentOperatingModeAgeText"
+            class="state-age"
+            :data-stale="currentOperatingModeStale"
+          >
+            {{ currentOperatingModeAgeText }}
+          </span>
+        </p>
       </div>
     </div>
 
@@ -409,6 +454,25 @@ async function submitInstantAction(): Promise<void> {
   margin: 0.15rem 0 0;
   color: #6e7781;
   font-size: 0.8rem;
+}
+.vehicle-name,
+.operating-mode {
+  font-weight: 700;
+}
+.vehicle-name {
+  color: #0969da;
+}
+.operating-mode {
+  color: #9a6700;
+}
+.operating-mode[data-stale='true'],
+.state-age[data-stale='true'] {
+  color: #cf222e;
+}
+.state-age {
+  margin-left: 0.25rem;
+  color: #57606a;
+  font-weight: 600;
 }
 .instant-actions-hdr button {
   border: 1px solid #d0d7de;
