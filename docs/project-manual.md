@@ -1329,6 +1329,584 @@ POST /api/v1/plant-models/publish
 | 发布返回 `502 KERNEL_UNREACHABLE` | Kernel 不可达，或 Kernel 拒绝 `createPlantModel` | 检查 Kernel 是否处于可写入模型的运行状态，并用 dry-run 先排除 BFF 侧校验问题。 |
 | SSE 无事件 | 未加 `vehicles=true` 或 `transportOrders=true`，或 Kernel 无对象变化事件 | 先调用 `/api/v1/sse/ping`，再用 `curl -N` 观察原始 SSE 流。 |
 
+### 4.9 openTCS-BFF 配置加载机制源码全解析
+
+#### 4.9.1 本节先给结论
+
+`opentcs-bff` 的配置不是 Spring Boot 的 `application.yml`，也不是代码里手写 `Properties.load()` 后到处传 `Map`。它沿用 openTCS 主仓库的 Gestalt 配置体系：
+
+```text
+.properties 配置文件
+  -> GestaltConfigurationBindingProvider
+  -> 按 prefix 绑定成 Java 配置接口代理对象
+  -> RunBff 把配置对象交给 Guice
+  -> 业务类通过构造函数注入配置对象
+  -> 启动期或首次使用时读取字段
+```
+
+从 C++ 视角看，它更像“启动时读取多份 ini/properties 文件，合并成一个强类型配置对象，然后把这个对象注册到全局对象工厂里”。业务代码不用关心文件 IO，只调用 `configuration.bindPort()`、`configuration.host()` 这类强类型函数。
+
+当前 BFF 涉及四组配置接口：
+
+| 配置接口 | 源码位置 | prefix | 主要字段 | 使用场景 |
+| :--- | :--- | :--- | :--- | :--- |
+| `BffConfiguration` | `opentcs-bff/src/main/java/org/opentcs/bff/BffConfiguration.java` | `bff` | `bindAddress`、`bindPort` | Javalin HTTP 服务监听地址和端口 |
+| `BffKernelConfiguration` | `opentcs-bff/src/main/java/org/opentcs/bff/kernel/BffKernelConfiguration.java` | `bff.kernel` | `host`、`port`、`userName`、`password` | BFF 通过 RMI 登录 Kernel |
+| `BffSecurityConfiguration` | `opentcs-bff/src/main/java/org/opentcs/bff/security/BffSecurityConfiguration.java` | `bff.security` | `accessKey` | `/api/*` 静态访问密钥鉴权 |
+| `BffWorkspaceConfiguration` | `opentcs-bff/src/main/java/org/opentcs/bff/project/BffWorkspaceConfiguration.java` | `bff.workspace` | `dir`、`assetMaxBytes` | SPA 工程草稿和资产文件存储 |
+
+#### 4.9.2 配置文件内容规范、默认位置与自定义路径规则
+
+BFF 使用 Java `.properties` 格式，规则接近 C++ 项目常见的 `key=value` 配置文件：
+
+```properties
+bff.bindAddress = 0.0.0.0
+bff.bindPort = 8090
+bff.security.accessKey =
+bff.kernel.host = localhost
+bff.kernel.port = 1099
+bff.kernel.userName = Alice
+bff.kernel.password = xyz
+bff.workspace.dir = ./data/bff-workspace
+bff.workspace.assetMaxBytes = 52428800
+```
+
+默认配置模板在源码中：
+
+```text
+opentcs-bff/src/main/resources/org/opentcs/bff/distribution/config/opentcs-bff-defaults-baseline.properties
+```
+
+`opentcs-bff/build.gradle` 的 `distributions.main.contents` 会把 `src/main/resources/org/opentcs/bff/distribution` 复制进安装包。所以执行 `:opentcs-bff:installDist` 后，运行目录中会出现：
+
+```text
+opentcs-bff/build/install/opentcs-bff/config/opentcs-bff-defaults-baseline.properties
+```
+
+BFF 启动入口 `RunBff#gestaltConfigurationBindingProvider()` 固定组织三份文件：
+
+```java
+new GestaltConfigurationBindingProvider(
+    Paths.get(System.getProperty("opentcs.base", "."), "config", "opentcs-bff-defaults-baseline.properties"),
+    Paths.get(System.getProperty("opentcs.base", "."), "config", "opentcs-bff-defaults-custom.properties"),
+    Paths.get(System.getProperty("opentcs.home", "."), "config", "opentcs-bff.properties")
+);
+```
+
+对应实际规则如下：
+
+| 文件 | 是否必须存在 | 默认路径表达式 | 作用 |
+| :--- | :--- | :--- | :--- |
+| `opentcs-bff-defaults-baseline.properties` | 必须 | `${opentcs.base}/config/opentcs-bff-defaults-baseline.properties` | BFF 发布包自带默认值，不建议现场修改 |
+| `opentcs-bff-defaults-custom.properties` | 可选 | `${opentcs.base}/config/opentcs-bff-defaults-custom.properties` | 默认值层面的定制覆盖，可用于厂商或项目级打包定制 |
+| `opentcs-bff.properties` | 可选 | `${opentcs.home}/config/opentcs-bff.properties` | 现场运行配置覆盖，最适合部署环境修改 |
+
+`opentcs.base` 和 `opentcs.home` 是 JVM system property，不是 properties 文件里的普通 key。Gradle `run` 任务在 `opentcs-bff/build.gradle` 中设置了：
+
+```groovy
+run {
+  systemProperties([
+    'opentcs.base': '.',
+    'opentcs.home': '.',
+    'opentcs.configuration.reload.interval': '10000',
+    'opentcs.configuration.provider': 'gestalt'
+  ])
+}
+```
+
+同时 `gradle/guice-application.gradle` 会让 `run` 的工作目录变成：
+
+```text
+opentcs-bff/build/install/opentcs-bff
+```
+
+所以开发态执行 `.\gradlew.bat :opentcs-bff:run` 时，`.` 实际指向 BFF 安装目录，配置文件默认从该目录的 `config/` 下读。
+
+自定义路径有两种常用方式：
+
+1. 保持启动参数不变，直接在安装目录下创建或修改：
+
+```text
+build/install/opentcs-bff/config/opentcs-bff.properties
+```
+
+2. 启动 Java 进程时改 JVM 参数：
+
+```powershell
+-Dopentcs.base=D:\byd_agv_njc\opentcs\opentcs-bff\build\install\opentcs-bff
+-Dopentcs.home=D:\deploy\opentcs-bff-site-a
+```
+
+这样 baseline 仍可来自程序安装目录，而现场覆盖文件可来自独立的 home 目录：
+
+```text
+D:\deploy\opentcs-bff-site-a\config\opentcs-bff.properties
+```
+
+配置 key 的命名规则来自接口 prefix 加方法名：
+
+```text
+BffKernelConfiguration.PREFIX = "bff.kernel"
+方法 host()      -> bff.kernel.host
+方法 port()      -> bff.kernel.port
+方法 userName()  -> bff.kernel.userName
+方法 password()  -> bff.kernel.password
+```
+
+注意这里使用 camelCase，所以用户名 key 是 `bff.kernel.userName`，不是 `bff.kernel.username`，也不是 `bff.kernel.user`。
+
+#### 4.9.3 加载时机、底层加载流程、解析方式与核心工具
+
+配置加载发生在 BFF 进程启动早期，入口是：
+
+```text
+org.opentcs.bff.RunBff#main
+```
+
+源码流程如下：
+
+```text
+RunBff#main
+  -> configurationBindingProvider()
+  -> gestaltConfigurationBindingProvider()
+  -> new GestaltConfigurationBindingProvider(三份配置文件路径)
+  -> GestaltConfigurationBindingProvider 构造函数 buildGestalt()
+  -> buildSources() 组装配置源
+  -> GestaltBuilder.addSources(...).build()
+  -> provider.loadConfigs()
+  -> bindingProvider.get(prefix, Interface.class)
+  -> Guice.createInjector(new BffModule(...))
+  -> BffApplication#start()
+```
+
+核心工具链如下：
+
+| 工具 / 类 | 所属模块 | 作用 |
+| :--- | :--- | :--- |
+| `RunBff` | `opentcs-bff` | BFF 进程入口，决定配置 provider，读取四组配置接口 |
+| `ConfigurationBindingProvider` | `opentcs-api-base` | openTCS 自定义的配置读取抽象，只有一个 `get(prefix, type)` 方法 |
+| `GestaltConfigurationBindingProvider` | `opentcs-impl-configuration-gestalt` | 对 Gestalt 的项目级封装，负责加载文件、系统属性和插件配置源 |
+| `Gestalt` / `GestaltBuilder` | 第三方库 | 真正执行配置源合并、类型转换、接口代理绑定 |
+| `FileConfigSourceBuilder` | Gestalt | 从 `.properties` 文件读取配置 |
+| `SystemPropertiesConfigSourceBuilder` | Gestalt | 从 JVM `-Dkey=value` 读取覆盖值 |
+| `TimedConfigReloadStrategy` | Gestalt | 定时重新加载配置源，BFF 当前业务对象不依赖它实现热更新 |
+| Guice | `com.google.inject` | 把配置对象绑定到依赖注入容器，供业务类构造函数注入 |
+
+`GestaltConfigurationBindingProvider#buildGestalt()` 里有两个关键配置：
+
+```java
+gestaltConfig.setTreatMissingValuesAsErrors(true);
+gestaltConfig.setProxyDecoderMode(ProxyDecoderMode.PASSTHROUGH);
+```
+
+含义可以这样理解：
+
+1. `setTreatMissingValuesAsErrors(true)`：配置接口声明了字段，但最终合并结果里没有对应 key，启动读取时会报错。这类似 C++ 程序启动校验必填配置，避免服务跑起来后才发现端口、密码、目录不存在。
+2. `ProxyDecoderMode.PASSTHROUGH`：Gestalt 给接口生成代理对象。业务代码调用 `configuration.bindPort()` 时，看起来像普通 Java 方法，底层由 Gestalt 代理返回配置值。
+
+`buildSources()` 会先检查 baseline 文件：
+
+```java
+checkState(defaultsPath.toFile().isFile(), "Required default configuration file {} does not exist.", ...);
+```
+
+所以 `opentcs-bff-defaults-baseline.properties` 缺失会导致 BFF 启动失败。两个 supplementary 文件不存在只会打印 warning 并跳过。
+
+解析方式是 properties 文件的扁平 key。Gestalt 按 prefix 截取子树，再按接口方法名取值并转换类型：
+
+```text
+bff.bindPort = 8090
+get("bff", BffConfiguration.class)
+BffConfiguration#bindPort() -> int 8090
+```
+
+当前 BFF 字段类型只用到了 `String`、`int`、`long`。Gestalt 封装模块的测试 `SampleConfigurationTest` 还验证了 boolean、integer、enum、list、map、对象列表、classpath 等类型，但 BFF 当前没有用这些复杂类型。
+
+#### 4.9.4 业务代码读取、绑定、使用配置字段的完整实现方式
+
+BFF 不是在业务类里直接读取文件，而是分三步：定义接口、启动读取、Guice 注入。
+
+第一步，定义配置接口。例如 `BffConfiguration`：
+
+```java
+@ConfigurationPrefix(BffConfiguration.PREFIX)
+public interface BffConfiguration {
+  String PREFIX = "bff";
+
+  @ConfigurationEntry(... changesApplied = ON_APPLICATION_START ...)
+  String bindAddress();
+
+  @ConfigurationEntry(... changesApplied = ON_APPLICATION_START ...)
+  int bindPort();
+}
+```
+
+这里的 `@ConfigurationPrefix` 和 `@ConfigurationEntry` 在运行绑定中不是最核心的读取逻辑，真正读取靠 `bindingProvider.get(prefix, type)`。这些注解更多用于 openTCS 配置文档生成、元数据描述和说明“修改何时生效”。但它们仍然是项目约定：新增配置接口或字段时应保持这种写法。
+
+第二步，`RunBff#main` 启动时读取：
+
+```java
+BffConfiguration bffConfig
+    = bindingProvider.get(BffConfiguration.PREFIX, BffConfiguration.class);
+BffKernelConfiguration kernelConfig
+    = bindingProvider.get(BffKernelConfiguration.PREFIX, BffKernelConfiguration.class);
+BffSecurityConfiguration securityConfig
+    = bindingProvider.get(BffSecurityConfiguration.PREFIX, BffSecurityConfiguration.class);
+BffWorkspaceConfiguration workspaceConfig
+    = bindingProvider.get(BffWorkspaceConfiguration.PREFIX, BffWorkspaceConfiguration.class);
+```
+
+第三步，`BffModule` 把这些配置对象绑定为 Guice 单例实例：
+
+```java
+bind(BffConfiguration.class).toInstance(configuration);
+bind(BffKernelConfiguration.class).toInstance(kernelConfiguration);
+bind(BffSecurityConfiguration.class).toInstance(securityConfiguration);
+bind(BffWorkspaceConfiguration.class).toInstance(workspaceConfiguration);
+```
+
+之后业务类通过构造函数拿配置。
+
+`BffApplication` 使用 `BffConfiguration` 设置 HTTP 监听地址和端口：
+
+```java
+cfg.jetty.host = configuration.bindAddress();
+cfg.jetty.port = configuration.bindPort();
+```
+
+这一步发生在 `BffApplication` 构造函数中，也就是 Javalin 对象创建时。服务启动后再改 `bff.bindPort`，已经创建好的 Jetty/Javalin 不会自动换端口。
+
+`KernelClient` 使用 `BffKernelConfiguration` 连接 Kernel：
+
+```java
+KernelServicePortal newPortal
+    = portalFactory.create(configuration.userName(), configuration.password());
+newPortal.login(configuration.host(), configuration.port());
+```
+
+这里还有一个重要细节：`KernelClient` 是 `@Singleton`，并且 portal 是懒连接。BFF 启动时会读取 kernel 配置对象，但不一定立刻连接 Kernel；第一次调用车辆、模型、订单、SSE 轮询等接口时，`ensureConnected()` 才会使用 `host/port/userName/password` 登录。
+
+`AccessKeyAuthenticator` 使用 `BffSecurityConfiguration` 做鉴权：
+
+```java
+public boolean isEnabled() {
+  String configured = configuration.accessKey();
+  return configured != null && !configured.isEmpty();
+}
+
+public boolean isAuthenticated(Context ctx) {
+  if (!isEnabled()) {
+    return true;
+  }
+  return configuration.accessKey().equals(ctx.header("X-Api-Access-Key"));
+}
+```
+
+`BffApplication` 的 `beforeMatched` 过滤器只保护 `/api/` 开头路径：
+
+```text
+/health、/openapi/bff.yaml、/swagger-ui/* 不受 accessKey 保护
+/api/* 受 accessKey 保护
+```
+
+`ProjectStore` 使用 `BffWorkspaceConfiguration` 初始化磁盘工作区：
+
+```java
+public ProjectStore(BffWorkspaceConfiguration configuration) {
+  this(Paths.get(configuration.dir()), configuration.assetMaxBytes());
+}
+```
+
+随后构造函数会：
+
+```text
+workspaceRoot = Paths.get(dir).toAbsolutePath().normalize()
+projectsRoot = workspaceRoot.resolve("projects")
+Files.createDirectories(projectsRoot)
+```
+
+也就是说 `bff.workspace.dir = ./data/bff-workspace` 是相对进程工作目录解析的。开发态 `run` 的工作目录是 `build/install/opentcs-bff`，所以默认工作区通常落在：
+
+```text
+opentcs-bff/build/install/opentcs-bff/data/bff-workspace/projects
+```
+
+#### 4.9.5 多份配置文件优先级、覆盖机制与底层实现原理
+
+当前 BFF 配置源添加顺序来自 `GestaltConfigurationBindingProvider#buildSources()`：
+
+```text
+1. baseline defaults 文件
+2. supplementary files，按 RunBff 传入顺序逐个追加
+3. ServiceLoader 发现的 SupplementaryConfigSource
+4. JVM system properties
+```
+
+对 BFF 来说，文件层面的顺序就是：
+
+```text
+低优先级
+  ${opentcs.base}/config/opentcs-bff-defaults-baseline.properties
+  ${opentcs.base}/config/opentcs-bff-defaults-custom.properties
+  ${opentcs.home}/config/opentcs-bff.properties
+  ServiceLoader 额外配置源
+  JVM -Dkey=value
+高优先级
+```
+
+举例：
+
+```properties
+# opentcs-bff-defaults-baseline.properties
+bff.bindPort = 8090
+bff.kernel.host = localhost
+```
+
+```properties
+# opentcs-bff.properties
+bff.bindPort = 18090
+```
+
+启动时最终结果是：
+
+```text
+bff.bindPort -> 18090
+bff.kernel.host -> localhost
+```
+
+也就是“后面的配置源覆盖前面的同名 key；没有覆盖的 key 沿用低优先级默认值”。这和 C++ 中多层 ini 合并很像：先加载 default，再加载 site override，再加载命令行 `--key=value`。
+
+最高优先级的 JVM system property 可以直接覆盖单个业务配置，例如：
+
+```powershell
+-Dbff.bindPort=18090
+-Dbff.kernel.host=192.168.10.20
+-Dbff.security.accessKey=dev-key
+```
+
+这里要区分两类 JVM system property：
+
+| 类型 | 示例 | 作用 |
+| :--- | :--- | :--- |
+| 配置框架控制参数 | `-Dopentcs.base=...`、`-Dopentcs.home=...`、`-Dopentcs.configuration.reload.interval=10000` | 决定去哪读配置、多久检查配置源 |
+| 业务配置覆盖参数 | `-Dbff.bindPort=18090`、`-Dbff.kernel.host=192.168.10.20` | 直接覆盖 BFF 业务配置 key |
+
+`opentcs.configuration.provider` 当前也在 `RunBff#configurationBindingProvider()` 中读取：
+
+```java
+String chosenProvider = System.getProperty("opentcs.configuration.provider", "gestalt");
+switch (chosenProvider) {
+  case "gestalt":
+  default:
+    return gestaltConfigurationBindingProvider();
+}
+```
+
+当前代码只有 Gestalt 一个实际 provider。即使传入其他值，也会走 default 分支继续使用 Gestalt。
+
+#### 4.9.6 配置修改后是否需要重启，是否支持热更新
+
+结论：对当前 BFF 业务来说，修改配置后应重启 BFF 进程。不要依赖热更新。
+
+原因要分两层看。
+
+第一层，Gestalt provider 本身确实配置了 reload strategy：
+
+```java
+.addConfigReloadStrategy(new TimedConfigReloadStrategy(reloadInterval))
+```
+
+`reloadInterval` 来自：
+
+```text
+-Dopentcs.configuration.reload.interval
+```
+
+Gradle `run` 默认设置为 `10000` 毫秒。没有设置时，`GestaltConfigurationBindingProvider` 默认也是 `10000` 毫秒。
+
+第二层，BFF 的业务对象不是“每次请求都重新从配置中心拿新对象”。当前 `RunBff#main` 只在启动时执行一次：
+
+```text
+bindingProvider.get(...)
+new BffModule(配置对象...)
+Guice.createInjector(...)
+```
+
+随后这些配置对象被 `BffModule#toInstance()` 固定绑定到 Guice。业务类已经基于这些对象完成初始化：
+
+| 配置项 | 使用位置 | 为什么需要重启 |
+| :--- | :--- | :--- |
+| `bff.bindAddress`、`bff.bindPort` | `BffApplication` 构造 Javalin/Jetty 时设置 | HTTP server 已经绑定 socket，改文件不会自动 stop/start server |
+| `bff.workspace.dir` | `ProjectStore` 构造时解析成 `Path` 并创建目录 | `workspaceRoot/projectsRoot` 已存为字段，后续不会自动换目录 |
+| `bff.workspace.assetMaxBytes` | `ProjectStore` 构造时存成 `assetMaxBytes` 字段 | 上传限制已保存在对象字段中 |
+| `bff.kernel.host/port/userName/password` | `KernelClient#ensureConnected()` 登录时使用 | 如果 portal 已连接，会继续复用旧 portal；改文件不会自动 logout/reconnect |
+| `bff.security.accessKey` | `AccessKeyAuthenticator` 请求时读取配置对象 | 这项理论上最接近可动态读取，但当前项目没有围绕它设计、测试或声明热更新行为 |
+
+更关键的是，四个配置接口的 `@ConfigurationEntry` 都声明了：
+
+```java
+changesApplied = ConfigurationEntry.ChangesApplied.ON_APPLICATION_START
+```
+
+这就是源码层面对使用者的明确提示：这些配置变更在应用启动时生效。换句话说，Gestalt 的底层 reload 能力存在，但当前 BFF 配置字段按项目约定都属于“重启生效”。
+
+现场运维建议：
+
+1. 修改 `config/opentcs-bff.properties` 后重启 BFF。
+2. 修改端口、工作区、Kernel 地址、access key 后都按重启处理。
+3. 如果怀疑配置没生效，优先看 BFF 启动日志中 `Using default configuration file ...`、`Using overrides from supplementary configuration file ...`、`Supplementary configuration file ... not found, skipped.` 这些日志，确认实际读取的是哪几个文件。
+
+#### 4.9.7 Gestalt 在本项目中的标准使用流程
+
+在 dd-opentcs/openTCS 这套代码里，Gestalt 的标准使用范式可以总结为六步。
+
+第一步，写默认配置文件：
+
+```properties
+bff.kernel.host = localhost
+bff.kernel.port = 1099
+```
+
+第二步，写配置接口，prefix 对应 key 前缀，方法名对应 key 后半段：
+
+```java
+@ConfigurationPrefix(BffKernelConfiguration.PREFIX)
+public interface BffKernelConfiguration {
+  String PREFIX = "bff.kernel";
+  String host();
+  int port();
+}
+```
+
+第三步，启动入口创建 provider，并传入默认文件和覆盖文件路径：
+
+```java
+ConfigurationBindingProvider provider = new GestaltConfigurationBindingProvider(
+    baselinePath,
+    defaultsCustomPath,
+    runtimeOverridePath
+);
+```
+
+第四步，用 prefix + interface class 获取强类型配置对象：
+
+```java
+BffKernelConfiguration kernelConfig
+    = provider.get(BffKernelConfiguration.PREFIX, BffKernelConfiguration.class);
+```
+
+第五步，把配置对象交给 Guice：
+
+```java
+bind(BffKernelConfiguration.class).toInstance(kernelConfig);
+```
+
+第六步，业务类通过构造函数注入并使用：
+
+```java
+@Inject
+public KernelClient(BffKernelConfiguration configuration, KernelServicePortalFactory portalFactory) {
+  this.configuration = configuration;
+}
+```
+
+这个模式的好处是：
+
+1. 业务代码拿到的是强类型接口，不需要到处写字符串 key。
+2. 配置缺失能在启动读取阶段暴露，不容易拖到运行时请求失败。
+3. 文件、JVM `-D`、额外配置源可以统一合并，覆盖规则集中在 provider 中。
+4. openTCS 各模块风格一致，BFF 没有引入 Spring Boot 配置体系，避免和现有 Guice/Gestalt 架构混用。
+
+它背后的设计模式可以按 C++ 经验这样类比：
+
+| Java/Gestalt 机制 | C++ 类比 | 说明 |
+| :--- | :--- | :--- |
+| `BffKernelConfiguration` 接口 | 纯虚接口 / 强类型配置视图 | 只声明“需要哪些配置字段” |
+| Gestalt 代理对象 | 动态生成的接口实现类 | 调用 `host()` 时从配置树取值并转换类型 |
+| `ConfigurationBindingProvider` | 配置工厂 / provider 抽象 | 屏蔽底层到底从文件、系统属性还是别的源读取 |
+| Guice `bind(...).toInstance(...)` | 把单例对象注册进对象容器 | 业务类构造时自动拿到同一份配置对象 |
+| 多配置源覆盖 | default.ini + local.ini + 命令行参数 | 越靠后的来源优先级越高 |
+
+#### 4.9.8 新增或修改 BFF 配置项的实战步骤
+
+如果后续要给 BFF 增加一个配置项，例如 SSE 心跳间隔，可以按当前源码风格做：
+
+1. 在合适的配置接口中新增方法，或者新建一个带 `@ConfigurationPrefix` 的配置接口。
+2. 给方法补 `@ConfigurationEntry`，明确 `type`、`description`、`changesApplied` 和 `orderKey`。
+3. 在 `opentcs-bff-defaults-baseline.properties` 中增加默认值，保证 baseline 完整。
+4. 如果是新配置接口，在 `RunBff#main` 中调用 `bindingProvider.get(...)` 读取。
+5. 在 `BffModule` 中 `bind(...).toInstance(...)`。
+6. 在业务类构造函数中注入配置接口并使用。
+7. 增加类似 `BffKernelConfigurationTest` 的测试，验证 properties 能绑定到接口字段。
+8. 修改后用 `:opentcs-bff:test` 或至少相关测试确认绑定没有破坏。
+
+最容易踩的坑：
+
+| 问题 | 典型表现 | 排查点 |
+| :--- | :--- | :--- |
+| baseline 缺少 key | BFF 启动时配置读取失败 | 检查默认 properties 是否包含接口所有方法对应 key |
+| key 拼错大小写 | 启动失败或值未覆盖 | 方法 `userName()` 对应 `userName`，不是 `username` |
+| 改了源码 resources，但运行目录旧文件没更新 | 修改看似不生效 | 重新执行 `:opentcs-bff:installDist` 或 `:opentcs-bff:run` |
+| 改了 `opentcs-bff-defaults-baseline.properties` 做现场配置 | 下次构建/升级容易被覆盖 | 现场值应放 `opentcs-bff.properties` |
+| 期望热更新端口或 workspace | 文件改了但服务行为不变 | 当前配置声明和对象生命周期都是重启生效 |
+
+#### 4.9.9 用一条完整链路串起来
+
+以 `bff.bindPort` 为例，完整链路是：
+
+```text
+opentcs-bff-defaults-baseline.properties
+  bff.bindPort = 8090
+
+RunBff#gestaltConfigurationBindingProvider
+  组织 baseline/custom/runtime 三份路径
+
+GestaltConfigurationBindingProvider#buildSources
+  添加 FileConfigSource + SystemPropertiesConfigSource
+
+GestaltConfigurationBindingProvider#get("bff", BffConfiguration.class)
+  生成/返回 BffConfiguration 代理对象
+
+BffModule#configure
+  bind(BffConfiguration.class).toInstance(configuration)
+
+BffApplication 构造函数
+  cfg.jetty.port = configuration.bindPort()
+
+BffApplication#start
+  javalin.start()
+  实际监听 8090
+```
+
+以 `bff.kernel.host` 为例，完整链路是：
+
+```text
+properties: bff.kernel.host = localhost
+  -> provider.get("bff.kernel", BffKernelConfiguration.class)
+  -> BffModule 绑定 BffKernelConfiguration
+  -> KernelClient 构造函数注入该配置
+  -> 第一次调用 KernelClient#ensureConnected()
+  -> newPortal.login(configuration.host(), configuration.port())
+```
+
+以 `bff.workspace.dir` 为例，完整链路是：
+
+```text
+properties: bff.workspace.dir = ./data/bff-workspace
+  -> provider.get("bff.workspace", BffWorkspaceConfiguration.class)
+  -> BffModule 绑定 BffWorkspaceConfiguration
+  -> ProjectStore(BffWorkspaceConfiguration)
+  -> Paths.get(configuration.dir()).toAbsolutePath().normalize()
+  -> 创建 ${workspaceRoot}/projects
+  -> 工程草稿、meta.json、assets 都落到该目录树下
+```
+
+最终可以把 BFF 配置机制记成一句话：
+
+```text
+文件只是输入，Gestalt 负责合并和类型绑定，RunBff 负责启动期取出配置对象，Guice 负责把配置对象送到业务类，业务类按启动期配置运行；当前 BFF 配置修改统一按重启生效处理。
+```
+
 ## 章节5：opentcs-spa 前端专项深度解析
 
 ### 5.1 模块定位
@@ -4390,3 +4968,4 @@ AGV车载VDA5050客户端（订阅指令、上报车辆state/connection/order报
 2. 全文统一使用中文，严格Markdown结构化排版，增量追加写入docs/project-manual.md，不覆盖已有内容
 3. 仅输出手册正文，不额外增加闲聊、解释类文字；阶段完成后固定输出阶段完成提示文本
 ```
+
