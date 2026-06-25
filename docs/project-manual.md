@@ -2707,6 +2707,12 @@ opentcs-kernel
 
 #### 6.2.4 关键配置
 
+为了使车辆驱动程序能够正常运行，以下条目需要在内核应用程序的配置文件中设置为有效值。
+
+内核应用程序配置文件: D:\byd_agv_njc\opentcs\opentcs-kernel\src\dist\config\opentcs-kernel.properties
+
+配置条目说明: [驱动程序的使用与配置](../../opentcs-commadapter-vda5050/doc/configuration-zh.adoc)
+
 全局 MQTT 配置前缀：
 
 ```text
