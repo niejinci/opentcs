@@ -1140,6 +1140,208 @@ StandardVehicleService
   -> 在部分方法中也会通过 VehicleControllerPool 获取 controller 执行 pause/message 等操作
 ```
 
+
+#### 5.3.1 StandardVehicleService.fetch 委托链路
+
+`DefaultVehicleControllerPool.attachVehicleController()` 中有一行关键代码：
+
+```java
+Vehicle vehicle = vehicleService.fetch(Vehicle.class, vehicleName).orElse(null);
+```
+
+这行代码的含义是：按 `vehicleName` 从 openTCS 内核对象仓库中查询一个类型为 `Vehicle` 的对象。
+
+```text
+输入:
+  clazz = Vehicle.class
+  name  = vehicleName
+
+返回:
+  Optional<Vehicle>
+    -> 找到车辆: Optional.of(vehicle)
+    -> 找不到车辆: Optional.empty()
+
+orElse(null):
+  -> 找到车辆时返回 Vehicle
+  -> 找不到车辆时返回 null
+```
+
+随后源码会做存在性校验：
+
+```java
+checkArgument(vehicle != null, "No such vehicle: %s", vehicleName);
+```
+
+如果指定名称的车辆不存在，就不会继续创建 `DefaultVehicleController`。
+
+##### 1. 为什么 StandardVehicleService 里看不到 Vehicle 容器
+
+`vehicleService` 在 Guice 中注入为 `StandardVehicleService` 单例，但 `StandardVehicleService` 本身并不直接维护类似下面这样的字段：
+
+```java
+private Map<String, Vehicle> vehicles;
+```
+
+原因是：车辆、点、路径、订单等 openTCS 对象统一存放在通用对象仓库 `TCSObjectRepository` 中，不是分别保存在每个业务 service 自己的字段里。
+
+`StandardVehicleService` 的角色更像“车辆业务服务门面”：
+
+```text
+StandardVehicleService
+  -> 提供 VehicleService / InternalVehicleService 语义
+  -> 自己实现车辆相关 update/attach/enable/disable 等业务方法
+  -> 通用对象查询 fetch/stream/updateObjectProperty 委托给 AbstractTCSObjectService
+```
+
+##### 2. fetch() 方法来自父类 AbstractTCSObjectService
+
+`StandardVehicleService` 继承关系：
+
+```java
+public class StandardVehicleService
+    extends AbstractTCSObjectService
+    implements InternalVehicleService {
+  ...
+}
+```
+
+因此，`fetch()` 不是在 `StandardVehicleService` 本类中定义的，而是继承自 `AbstractTCSObjectService`。
+
+`StandardVehicleService` 构造函数接收一个通用对象服务：
+
+```java
+@Inject
+public StandardVehicleService(
+    InternalTCSObjectService objectService,
+    ...
+) {
+  super(objectService);
+  ...
+}
+```
+
+父类保存这个委托对象：
+
+```java
+private final InternalTCSObjectService objectService;
+```
+
+##### 3. fetch(Vehicle.class, vehicleName) 的真实委托链路
+
+```text
+DefaultVehicleControllerPool.attachVehicleController(vehicleName, commAdapter)
+  -> vehicleService.fetch(Vehicle.class, vehicleName)
+       vehicleService 声明类型: InternalVehicleService
+       运行时实例: StandardVehicleService
+
+StandardVehicleService
+  -> 继承 AbstractTCSObjectService.fetch(Class<T>, String name)
+
+AbstractTCSObjectService.fetch(Class<T>, String name)
+  -> getObjectService().fetch(clazz, name)
+       getObjectService() 返回构造函数注入的 InternalTCSObjectService
+       运行时实例: StandardTCSObjectService
+
+StandardTCSObjectService.fetch(Class<T>, String name)
+  -> getObjectRepo().getObjectOrNull(clazz, name)
+       getObjectRepo() 来自 TCSObjectManager.getObjectRepo()
+
+TCSObjectRepository
+  -> 按对象类型 Vehicle.class 和对象名称 vehicleName 查询 Vehicle
+```
+
+对应核心代码可简化理解为：
+
+```java
+// DefaultVehicleControllerPool
+Vehicle vehicle = vehicleService.fetch(Vehicle.class, vehicleName).orElse(null);
+```
+
+```java
+// AbstractTCSObjectService
+public <T extends TCSObject<T>> Optional<T> fetch(Class<T> clazz, String name) {
+  return getObjectService().fetch(clazz, name);
+}
+```
+
+```java
+// StandardTCSObjectService
+public <T extends TCSObject<T>> Optional<T> fetch(Class<T> clazz, String name) {
+  synchronized (getGlobalSyncObject()) {
+    return Optional.ofNullable(getObjectRepo().getObjectOrNull(clazz, name));
+  }
+}
+```
+
+##### 4. 从 C++ 背景理解
+
+可以把这套结构理解为：
+
+```cpp
+class StandardVehicleService : public AbstractTCSObjectService {
+public:
+  StandardVehicleService(InternalTCSObjectService* objectService)
+    : AbstractTCSObjectService(objectService) {}
+
+  // StandardVehicleService 自己不保存 vehicles map。
+  // fetch() 继承自 AbstractTCSObjectService。
+};
+
+class AbstractTCSObjectService {
+public:
+  Optional<Vehicle> fetchVehicleByName(std::string name) {
+    return objectService->fetch(Vehicle::classType, name);
+  }
+
+private:
+  InternalTCSObjectService* objectService;
+};
+
+class StandardTCSObjectService : public InternalTCSObjectService {
+public:
+  Optional<TCSObject> fetch(Class clazz, std::string name) {
+    return objectRepository.getObjectOrNull(clazz, name);
+  }
+};
+```
+
+也就是说：
+
+```text
+StandardVehicleService 不是车辆 Map 的所有者。
+StandardTCSObjectService / TCSObjectRepository 才是通用对象查询入口。
+StandardVehicleService.fetch(...) 只是继承来的委托方法。
+```
+
+##### 5. 在 attachVehicleController() 中的作用
+
+这行查询有两个作用：
+
+```text
+1. 校验 vehicleName 是否对应真实存在的 Vehicle。
+2. 拿到创建 DefaultVehicleController 所需的 Vehicle 对象。
+```
+
+后续创建 controller 时会把查到的 `Vehicle` 和已经创建好的 `VehicleCommAdapter` 一起传给工厂：
+
+```java
+VehicleController controller = vehicleManagerFactory.createVehicleController(
+    vehicle,
+    commAdapter
+);
+```
+
+因此这条链路可以压缩为：
+
+```text
+vehicleName
+  -> TCSObjectRepository 查询 Vehicle
+  -> Vehicle + VehicleCommAdapter
+  -> VehicleControllerFactory
+  -> DefaultVehicleController
+  -> DefaultVehicleControllerPool.poolEntries
+```
+
 ### 5.4 数据流转方向
 
 ```text
