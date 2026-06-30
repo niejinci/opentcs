@@ -12,6 +12,7 @@
 你是 openTCS 内核源码资深工程师，精通 Guice 依赖注入、VehicleCommAdapter 全生命周期、Controller 池绑定、Multibinder 多实例注册机制，能完成源码链路校验、流程标准化梳理、分层架构建模、组件依赖关系拆解。
 
 ## 前置背景：人工梳理的 LoopbackCommunicationAdapter 注册&实例化完整调用链路
+```
 【完整追踪链路原文】
 TransportOrderUtil.assignTransportOrder()
     vehicleControllerPool.getVehicleController()
@@ -21,7 +22,9 @@ TransportOrderUtil.assignTransportOrder()
         DefaultVehicleControllerPool.attachVehicleController(vehicleName, commAdapter)
             VehicleController controller = vehicleManagerFactory.createVehicleController(vehicle, commAdapter);
                 vehicleManagerFactory 接口 VehicleControllerFactory，Guice生成代理，产出 DefaultVehicleController
-# attachVehicleController 入参 commAdapter 溯源
+```
+### attachVehicleController 入参 commAdapter 溯源
+```
 全局检索 attachVehicleController，唯一有效调用方：AttachmentManager
 AttachmentManager.initialize()
     autoAttachAllAdapters()
@@ -29,20 +32,27 @@ AttachmentManager.initialize()
             commAdapter = factory.getAdapterFor(vehicle) // factory 为 VehicleCommAdapterFactory 接口
             controllerPool.attachVehicleController(vehicleEntry.getVehicle().getName(), commAdapter)
                 controllerPool 声明 LocalVehicleControllerPool，实现同样 DefaultVehicleControllerPool
-# factory 溯源
+```
+### factory 溯源
+```
 factories = commAdapterRegistry.findFactoriesFor(vehicle)
 factory = factories.get(0)
 commAdapterRegistry 类型 VehicleCommAdapterRegistry，Guice构造注入 Set<VehicleCommAdapterFactory> factories
 VehicleCommAdapterRegistry 构造函数：遍历注入的 factories 存入本地Map
-# Guice 多绑定注册适配器工厂
+```
+### Guice 多绑定注册适配器工厂
+```
 Multibinder<VehicleCommAdapterFactory> vehicleCommAdaptersBinder()
 vehicleCommAdaptersBinder().addBinding().to(LoopbackCommunicationAdapterFactory.class);
 LoopbackCommunicationAdapterFactory 实现 VehicleCommAdapterFactory
 LoopbackCommunicationAdapterFactory.getAdapterFor(Vehicle vehicle):
     return adapterFactory.createLoopbackCommAdapter(vehicle);
 adapterFactory 接口 LoopbackAdapterComponentsFactory，Guice实现产出 LoopbackCommunicationAdapter（VehicleCommAdapter 标准实现类）
-# 最终结论
+```
+### 最终结论
+```
 attachVehicleController 传入的 commAdapter 实际实例为 LoopbackCommunicationAdapter
+```
 
 ## 三大核心任务
 ### 任务1：源码链路评审 & 标准化书写规范优化
@@ -1166,3 +1176,159 @@ VehicleCommAdapter.getProcessModel()
 - `DefaultVehicleController` 是单车运行期控制核心，持有具体 `VehicleCommAdapter`，负责把 kernel 的运输订单转换成 adapter 可执行的移动命令。
 - `AttachmentManager` 是 adapter 与 vehicle/controller 建立关系的编排者，决定何时创建 adapter、何时解绑旧 controller、何时写入 `VehicleEntry` 和 `ControllerPool`。
 - `VehicleService`/`InternalVehicleService` 是车辆数据服务，不是 controller 池；它提供车辆对象读取和状态更新能力，并在少数业务方法中委托 controller 执行动作。
+#### 5.5.1 池-工厂-控制器宏观线框图
+
+```text
+图例:
+  ==> 运行期主流程
+  --> 持有/依赖/调用关系
+  []  组件角色
+
+================================================================================
+宏观角色划分
+================================================================================
+
+  [xxxPool]
+    职责: 保存对象、按 key 查找对象、协调生命周期
+    典型类: DefaultVehicleControllerPool
+    关键词: Map / attach / detach / get
+
+  [xxxFactory]
+    职责: 创建对象，不保存对象，不处理业务流程
+    典型类: VehicleControllerFactory, LoopbackCommunicationAdapterFactory
+    关键词: create / getAdapterFor / AssistedInject
+
+  [xxxController]
+    职责: 单个业务对象的运行期控制核心
+    典型类: DefaultVehicleController
+    关键词: setTransportOrder / sendCommand / processModel / resource allocation
+
+================================================================================
+Controller Pool / Factory / Controller 关系
+================================================================================
+
++--------------------------------------------------------------------------------+
+|                               AttachmentManager                                |
+|  编排者: 选择 adapter，决定何时 attach/detach controller                       |
++--------------------------------------------------------------------------------+
+        |
+        | calls attachVehicleController(vehicleName, commAdapter)
+        v
++--------------------------------------------------------------------------------+
+|                         DefaultVehicleControllerPool                           |
+|                         角色: xxxPool / 容器                                   |
+|                                                                                |
+|  持有:                                                                          |
+|    - Map<String, PoolEntry> poolEntries                                         |
+|    - InternalVehicleService vehicleService                                      |
+|    - VehicleControllerFactory vehicleManagerFactory                             |
+|                                                                                |
+|  负责:                                                                          |
+|    - attachVehicleController(vehicleName, commAdapter)                          |
+|    - detachVehicleController(vehicleName)                                       |
+|    - getVehicleController(vehicleName)                                          |
++--------------------------------------------------------------------------------+
+        |
+        | fetch Vehicle by name
+        v
++--------------------------------------------------------------------------------+
+|                         InternalVehicleService                                 |
+|  车辆对象查询/状态更新服务                                                      |
+|  vehicleService.fetch(Vehicle.class, vehicleName)                               |
++--------------------------------------------------------------------------------+
+        |
+        | returns Vehicle
+        v
++--------------------------------------------------------------------------------+
+|                         DefaultVehicleControllerPool                           |
+|  拿到 Vehicle 后，不直接 new Controller                                         |
+|  而是委托 Factory 创建                                                          |
++--------------------------------------------------------------------------------+
+        |
+        | calls createVehicleController(vehicle, commAdapter)
+        v
++--------------------------------------------------------------------------------+
+|                         VehicleControllerFactory                               |
+|                         角色: xxxFactory / 创建器                              |
+|                                                                                |
+|  负责:                                                                          |
+|    - 接收运行期参数 Vehicle                                                     |
+|    - 接收运行期参数 VehicleCommAdapter                                          |
+|    - 由 Guice 补齐 DefaultVehicleController 的其它依赖                          |
+|                                                                                |
+|  不负责:                                                                        |
+|    - 不保存 controller                                                          |
+|    - 不处理 transport order                                                     |
+|    - 不维护 poolEntries                                                         |
++--------------------------------------------------------------------------------+
+        |
+        | creates
+        v
++--------------------------------------------------------------------------------+
+|                         DefaultVehicleController                               |
+|                         角色: xxxController / 单车控制器                       |
+|                                                                                |
+|  持有:                                                                          |
+|    - Vehicle vehicle                                                            |
+|    - VehicleCommAdapter commAdapter                                             |
+|    - InternalVehicleService / Scheduler / DispatcherService / ...               |
+|                                                                                |
+|  负责:                                                                          |
+|    - setTransportOrder(updatedOrder)                                            |
+|    - 将 DriveOrder 映射为 MovementCommand                                       |
+|    - 向 VehicleCommAdapter 发送命令                                             |
+|    - 监听 commAdapter.getProcessModel()                                         |
+|    - 更新车辆位置、状态、资源等内核数据                                         |
++--------------------------------------------------------------------------------+
+        |
+        | returns created controller
+        v
++--------------------------------------------------------------------------------+
+|                         DefaultVehicleControllerPool                           |
+|                                                                                |
+|  poolEntries.put(vehicleName, new PoolEntry(vehicleName, controller))           |
+|  controller.initialize()                                                        |
++--------------------------------------------------------------------------------+
+        |
+        | later: getVehicleController(vehicleName)
+        v
++--------------------------------------------------------------------------------+
+|                         TransportOrderUtil / VehicleService / RerouteUtil       |
+|  调度和业务侧只通过 VehicleControllerPool 读取 controller                       |
+|  不直接依赖 VehicleControllerFactory，也不直接 new DefaultVehicleController     |
++--------------------------------------------------------------------------------+
+
+================================================================================
+压缩理解模型
+================================================================================
+
+  AttachmentManager
+    ==> DefaultVehicleControllerPool.attachVehicleController(...)
+        ==> VehicleControllerFactory.createVehicleController(...)
+            ==> DefaultVehicleController
+        ==> poolEntries[vehicleName] = DefaultVehicleController
+
+  TransportOrderUtil
+    ==> DefaultVehicleControllerPool.getVehicleController(vehicleName)
+        ==> DefaultVehicleController.setTransportOrder(updatedOrder)
+
+================================================================================
+一句话边界
+================================================================================
+
+  Pool:
+    管“有没有、放在哪里、按 vehicleName 怎么取、生命周期怎么清理”。
+
+  Factory:
+    管“如何把运行期参数和 Guice 依赖拼装成一个新对象”。
+
+  Controller:
+    管“单台车拿到订单后如何转换命令、申请资源、驱动 adapter、回写状态”。
+```
+
+文字解读：
+
+1. `DefaultVehicleControllerPool` 是池：它是 `vehicleName -> VehicleController` 的集中保存点，也是 attach/detach 生命周期入口。
+2. `VehicleControllerFactory` 是工厂：它只在 attach 时创建 `DefaultVehicleController`，创建完就把对象交还给 Pool，不参与后续订单控制。
+3. `DefaultVehicleController` 是控制器：它被 Pool 保存，被调度侧取出，真正处理 `setTransportOrder()`、资源申请、命令发送和车辆状态回写。
+4. 三者的核心方向是 `Pool -> Factory -> Controller -> Pool保存`；后续业务使用方向是 `业务组件 -> Pool -> Controller`。
