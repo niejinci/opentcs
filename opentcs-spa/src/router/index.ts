@@ -23,6 +23,13 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '地图导入' },
   },
   {
+    path: '/monitor/:projectId?',
+    name: 'realtime-monitor',
+    component: () => import('@/views/RealtimeMonitorView.vue'),
+    meta: { title: '实时监控' },
+    props: true,
+  },
+  {
     path: '/editor/:projectId?',
     name: 'editor',
     component: () => import('@/views/EditorView.vue'),

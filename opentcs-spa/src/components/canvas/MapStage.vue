@@ -39,6 +39,10 @@ const props = defineProps<{
   imageHeight: number;
   affine: AffineMapping;
   tool: EditorToolId;
+  /** Read-only render mode for pages that monitor instead of edit. */
+  readonly?: boolean;
+  /** Vehicle name highlighted by an external selection. */
+  selectedVehicleName?: string | null;
 }>();
 
 const settings = useEditorSettingsStore();
@@ -54,6 +58,8 @@ const emit = defineEmits<{
       world: { x: number; y: number };
     },
   ];
+  /** Forwarded from AnnotationLayer when a vehicle is clicked in monitor mode. */
+  'vehicle-click': [name: string];
 }>();
 
 /* ---------------------------- Container sizing --------------------------- */
@@ -107,6 +113,16 @@ function fitToContainer(): void {
   scale.value = next;
   stageX.value = (stageWidth.value - props.imageWidth * next) / 2;
   stageY.value = (stageHeight.value - props.imageHeight * next) / 2;
+}
+
+function focusPixel(pixel: { x: number; y: number }, preferredScale?: number): void {
+  const nextScale =
+    preferredScale === undefined
+      ? scale.value
+      : Math.max(MIN_SCALE, Math.min(MAX_SCALE, preferredScale));
+  scale.value = nextScale;
+  stageX.value = stageWidth.value / 2 - pixel.x * nextScale;
+  stageY.value = stageHeight.value / 2 - pixel.y * nextScale;
 }
 
 function setScaleAtScreenPoint(newScale: number, screenX: number, screenY: number): void {
@@ -175,14 +191,13 @@ function onStageClick(): void {
   }
   const cursor = cursorStage.value;
   if (!cursor) return;
+  if (props.readonly) return;
   // Snap creation tools to the nearest grid intersection when grid-snap
   // is enabled. The `select` tool keeps the raw cursor so empty-canvas
   // clicks remain pixel-accurate (selection logic does not care about
   // sub-grid offsets).
   const snap = settings.gridSnap && props.tool !== 'select';
-  const pixel = snap
-    ? snapToGrid(cursor, settings.gridSpacingPx)
-    : cursor;
+  const pixel = snap ? snapToGrid(cursor, settings.gridSpacingPx) : cursor;
   emit('tool-fire', {
     tool: props.tool,
     pixel,
@@ -201,14 +216,12 @@ function onEntityClick(): void {
 
 const PAN_DRAG_THRESHOLD_PX = 3;
 
-let panStart:
-  | {
-      clientX: number;
-      clientY: number;
-      stageX: number;
-      stageY: number;
-    }
-  | null = null;
+let panStart: {
+  clientX: number;
+  clientY: number;
+  stageX: number;
+  stageY: number;
+} | null = null;
 let suppressNextStageClick = false;
 let clearSuppressedClickTimer: number | null = null;
 
@@ -320,6 +333,7 @@ watch(
 
 defineExpose({
   resetView: fitToContainer,
+  focusPixel,
   zoomIn: () => {
     setScaleAtScreenPoint(scale.value * ZOOM_STEP, stageWidth.value / 2, stageHeight.value / 2);
   },
@@ -366,7 +380,14 @@ defineSlots<{
           :stage-y="stageY"
           :spacing-px="settings.gridSpacingPx"
         />
-        <AnnotationLayer :tool="tool" :scale="scale" @entity-click="onEntityClick" />
+        <AnnotationLayer
+          :tool="tool"
+          :scale="scale"
+          :readonly="readonly"
+          :selected-vehicle-name="selectedVehicleName"
+          @entity-click="onEntityClick"
+          @vehicle-click="(name: string) => emit('vehicle-click', name)"
+        />
         <HoverLayer :cursor="cursorStage" :tool="tool" :scale="scale" />
       </v-stage>
     </div>
@@ -392,17 +413,17 @@ defineSlots<{
   </div>
 </template>
 
- <style scoped>
- .map-stage {
-   position: relative;
-   width: 100%;
-   height: 100%;
-   overflow: hidden;
+<style scoped>
+.map-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-   background:
-     repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 0 0 / 16px 16px,
-     #ffffff;
+  background:
+    repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 0 0 / 16px 16px,
+    #ffffff;
 }
 .map-stage__canvas {
   position: relative;
@@ -415,5 +436,5 @@ defineSlots<{
 .map-stage__canvas :deep(> div) {
   position: absolute;
   inset: 0;
- }
- </style>
+}
+</style>

@@ -31,6 +31,7 @@ onBeforeUnmount(() => live.stop());
       <nav class="app-nav">
         <RouterLink to="/projects">工程</RouterLink>
         <RouterLink to="/import">地图导入</RouterLink>
+        <RouterLink to="/monitor">实时监控</RouterLink>
         <RouterLink to="/editor">画布编辑器</RouterLink>
         <RouterLink to="/debug">BFF 调试</RouterLink>
       </nav>

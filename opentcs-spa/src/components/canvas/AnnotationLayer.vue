@@ -41,12 +41,18 @@ const props = defineProps<{
   tool: EditorToolId;
   /** Current Stage scale; used to keep visual sizes screen-constant. */
   scale: number;
+  /** Read-only render mode used by the realtime monitor page. */
+  readonly?: boolean;
+  /** Vehicle highlighted by an external monitor selection. */
+  selectedVehicleName?: string | null;
 }>();
 
 const emit = defineEmits<{
   /** Fired so MapStage can suppress its own click-to-create when the user
    *  hit an entity (Konva's bubble flag is unreliable across pointer paths). */
   'entity-click': [];
+  /** Fired in monitor/read-only mode when the user clicks a vehicle. */
+  'vehicle-click': [name: string];
 }>();
 
 const store = useProjectStore();
@@ -335,7 +341,9 @@ const TOLERANCE_STROKE_DEFAULT = '#0969da';
 const TOLERANCE_STROKE_SELECTED = '#bf3989';
 
 function vehicleStrokeWidth(v: DraftVehicle): number {
-  const selected = store.selection?.kind === 'vehicle' && store.selection.name === v.name;
+  const selected =
+    props.selectedVehicleName === v.name ||
+    (store.selection?.kind === 'vehicle' && store.selection.name === v.name);
   return (selected ? 2.5 : 1.5) / safeScale(props.scale);
 }
 
@@ -367,6 +375,7 @@ function onPointClick(p: DraftPoint, e: KonvaEventObject<MouseEvent>): void {
   // Cancel bubble so MapStage's click-to-create doesn't also fire.
   e.cancelBubble = true;
   emit('entity-click');
+  if (props.readonly) return;
   if (props.tool === 'path') {
     if (store.pathDraftSrc === null) {
       store.startPath(p.name);
@@ -385,6 +394,11 @@ function onPointClick(p: DraftPoint, e: KonvaEventObject<MouseEvent>): void {
 }
 
 function onPointDragStart(p: DraftPoint, e: KonvaEventObject<DragEvent>): void {
+  if (props.readonly) {
+    e.target.stopDrag();
+    e.target.position({ x: p.layout.pixelX, y: p.layout.pixelY });
+    return;
+  }
   if (props.tool !== 'select') {
     // Prevent dragging while in creation tools — would otherwise displace
     // the point on accident.
@@ -398,6 +412,7 @@ function onPointDragStart(p: DraftPoint, e: KonvaEventObject<DragEvent>): void {
 }
 
 function onPointDragMove(p: DraftPoint, e: KonvaEventObject<DragEvent>): void {
+  if (props.readonly) return;
   if (props.tool !== 'select') return;
   const node = e.target as Konva.Node;
   store.movePoint(p.name, { x: node.x(), y: node.y() });
@@ -410,16 +425,23 @@ function onPointDragEnd(): void {
 function onPathClick(rp: RenderedPath, e: KonvaEventObject<MouseEvent>): void {
   e.cancelBubble = true;
   emit('entity-click');
+  if (props.readonly) return;
   store.select({ kind: 'path', name: rp.path.name });
 }
 
 function onLocationClick(l: DraftLocation, e: KonvaEventObject<MouseEvent>): void {
   e.cancelBubble = true;
   emit('entity-click');
+  if (props.readonly) return;
   store.select({ kind: 'location', name: l.name });
 }
 
 function onLocationDragStart(l: DraftLocation, e: KonvaEventObject<DragEvent>): void {
+  if (props.readonly) {
+    e.target.stopDrag();
+    e.target.position({ x: l.layout.pixelX, y: l.layout.pixelY });
+    return;
+  }
   if (props.tool !== 'select') {
     e.target.stopDrag();
     e.target.position({ x: l.layout.pixelX, y: l.layout.pixelY });
@@ -431,6 +453,7 @@ function onLocationDragStart(l: DraftLocation, e: KonvaEventObject<DragEvent>): 
 }
 
 function onLocationDragMove(l: DraftLocation, e: KonvaEventObject<DragEvent>): void {
+  if (props.readonly) return;
   if (props.tool !== 'select') return;
   const node = e.target as Konva.Node;
   store.moveLocation(l.name, { x: node.x(), y: node.y() });
@@ -490,6 +513,13 @@ function pointNearPointer(e: KonvaEventObject<MouseEvent>): DraftPoint | null {
 }
 
 function onVehicleClick(v: DraftVehicle, e: KonvaEventObject<MouseEvent>): void {
+  if (props.readonly) {
+    e.cancelBubble = true;
+    emit('entity-click');
+    emit('vehicle-click', v.name);
+    return;
+  }
+
   if (props.tool === 'path') {
     const point = pointNearPointer(e) ?? pointUnderVehicle(v);
     if (point) {
@@ -529,6 +559,12 @@ function onVehicleClick(v: DraftVehicle, e: KonvaEventObject<MouseEvent>): void 
 }
 
 function onVehicleDragStart(v: DraftVehicle, e: KonvaEventObject<DragEvent>): void {
+  if (props.readonly) {
+    e.target.stopDrag();
+    const pos = vehiclePixel(v);
+    e.target.position({ x: pos.x, y: pos.y });
+    return;
+  }
   if (props.tool !== 'select') {
     e.target.stopDrag();
     e.target.position({ x: v.layout.pixelX, y: v.layout.pixelY });
@@ -560,6 +596,7 @@ function onVehicleDragStart(v: DraftVehicle, e: KonvaEventObject<DragEvent>): vo
 }
 
 function onVehicleDragMove(v: DraftVehicle, e: KonvaEventObject<DragEvent>): void {
+  if (props.readonly) return;
   if (props.tool !== 'select') return;
   const node = e.target as Konva.Node;
   store.moveVehicle(v.name, { x: node.x(), y: node.y() });
@@ -572,6 +609,7 @@ function onVehicleDragEnd(): void {
 /* The Point / Location / Vehicle are `draggable` only under the select
  * tool; in creation tools we still want clicks but not accidental drags. */
 function isEntityDraggable(): boolean {
+  if (props.readonly) return false;
   return props.tool === 'select';
 }
 

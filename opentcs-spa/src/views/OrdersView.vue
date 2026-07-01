@@ -549,6 +549,15 @@ function orderErrorHint(
 watch(
   () => live.vehicleList.length,
   (n, prev) => {
+    const requestedVehicle = String(route.query.vehicle ?? '').trim();
+    if (
+      requestedVehicle &&
+      live.vehicleList.some((vehicle) => vehicle.name === requestedVehicle) &&
+      intendedVehicle.value !== requestedVehicle
+    ) {
+      intendedVehicle.value = requestedVehicle;
+      return;
+    }
     if (n > 0 && prev === 0 && !intendedVehicle.value) {
       intendedVehicle.value = live.vehicleList[0].name;
     }

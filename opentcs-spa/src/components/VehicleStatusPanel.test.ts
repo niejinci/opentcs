@@ -77,6 +77,7 @@ describe('VehicleStatusPanel', () => {
     expect(headers).toEqual([
       '名称',
       '状态',
+      '操作模式',
       '运行',
       '集成级别',
       '当前点位',
@@ -119,8 +120,8 @@ describe('VehicleStatusPanel', () => {
     await wrapper.vm.$nextTick();
 
     const cells = wrapper.findAll('tbody tr')[0].findAll('td');
-    expect(cells[3].text()).toBe('—');
-    expect(cells[4].text()).toBe('Point-34');
+    expect(cells[4].text()).toBe('—');
+    expect(cells[5].text()).toBe('Point-34');
   });
 
   it('requests regular and forced rerouting for a vehicle', async () => {
