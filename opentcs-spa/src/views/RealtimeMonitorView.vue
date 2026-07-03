@@ -6,12 +6,14 @@ import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 
 import MapStage from '@/components/canvas/MapStage.vue';
+import TaskPoolStatusCard from '@/components/monitor/TaskPoolStatusCard.vue';
 import VehicleDetailWindow from '@/components/monitor/VehicleDetailWindow.vue';
 import VehicleFilterBar from '@/components/monitor/VehicleFilterBar.vue';
 import VehicleListTable from '@/components/monitor/VehicleListTable.vue';
 import VehicleStatusRail from '@/components/monitor/VehicleStatusRail.vue';
 import { useBackgroundMap } from '@/composables/useBackgroundMap';
 import { useLiveVehicleOverlay } from '@/composables/useLiveVehicleOverlay';
+import { taskPoolCounts } from '@/domain/orders/taskPool';
 import {
   availableVehicleGroups,
   buildVehicleMonitorRows,
@@ -48,10 +50,10 @@ const projectId = computed(() => {
   return fromRoute || projects.currentId || '';
 });
 
-const rows = computed(() =>
-  buildVehicleMonitorRows(live.vehicleList, Object.values(live.transportOrders)),
-);
+const transportOrderList = computed(() => Object.values(live.transportOrders));
+const rows = computed(() => buildVehicleMonitorRows(live.vehicleList, transportOrderList.value));
 const counts = computed(() => vehicleMonitorCounts(rows.value));
+const taskPool = computed(() => taskPoolCounts(transportOrderList.value));
 const groups = computed(() => availableVehicleGroups(rows.value));
 const filteredRows = computed(() =>
   filterVehicleMonitorRows(
@@ -199,6 +201,11 @@ onMounted(() => {
             </footer>
           </template>
         </MapStage>
+        <TaskPoolStatusCard
+          :counts="taskPool"
+          :orders="transportOrderList"
+          :sse-state="live.sseState"
+        />
         <VehicleDetailWindow
           v-if="selectedRow"
           :vehicle="selectedRow.vehicle"
