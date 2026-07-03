@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   createTaskRow,
+  operationForTask,
   TASK_TYPE_OPTIONS,
   taskTypeLabel,
   type CreateTaskType,
@@ -19,6 +20,16 @@ const emit = defineEmits<{
   'update:activeRowId': [id: number | null];
   'edit-params': [rowId: number];
 }>();
+
+interface RowTargetOption extends TargetOption {
+  optionLabel: string;
+  title: string;
+}
+
+interface TargetSupportState {
+  level: 'ok' | 'error';
+  text: string;
+}
 
 function nextRowId(): number {
   return Math.max(0, ...props.rows.map((row) => row.id)) + 1;
@@ -65,15 +76,78 @@ function onTypeChange(row: TaskRow, value: string): void {
 }
 
 function onTargetChange(row: TaskRow, value: string): void {
+  if (!value) {
+    updateRow(row.id, { targetName: '', targetKind: '' });
+    return;
+  }
+
   const target = props.targets.find((item) => item.name === value);
+  if (!target || !targetSupportsRow(row, target)) return;
   updateRow(row.id, {
     targetName: value,
-    targetKind: target?.kind ?? '',
+    targetKind: target.kind,
   });
 }
 
 function targetKindText(kind: TargetOption['kind']): string {
   return kind === 'location' ? 'Location' : 'Point';
+}
+
+function operationsText(operations: readonly string[], separator = ' / '): string {
+  return operations.length ? operations.join(separator) : '无';
+}
+
+function targetSupportsRow(row: TaskRow, target: TargetOption): boolean {
+  return target.allowedOperations.includes(operationForTask(row));
+}
+
+function unsupportedText(row: TaskRow, target: TargetOption): string {
+  return `${target.name} 不支持 ${operationForTask(row)}，可用操作：${operationsText(
+    target.allowedOperations,
+    '、',
+  )}`;
+}
+
+function toRowTargetOption(target: TargetOption, row: TaskRow): RowTargetOption {
+  const operationLabel = operationsText(target.allowedOperations);
+  const supported = targetSupportsRow(row, target);
+  return {
+    ...target,
+    optionLabel: supported
+      ? `${target.name}（${operationLabel}）`
+      : `${target.name}（不支持 ${operationForTask(row)}，${operationLabel}）`,
+    title: supported
+      ? `${targetKindText(target.kind)} 支持：${operationLabel}`
+      : unsupportedText(row, target),
+  };
+}
+
+function rowTargetOptions(row: TaskRow): RowTargetOption[] {
+  const supportedTargets = props.targets.filter((target) => targetSupportsRow(row, target));
+  const selected = selectedTarget(row);
+  const selectedUnsupported = selected && !targetSupportsRow(row, selected) ? [selected] : [];
+  return [...selectedUnsupported, ...supportedTargets].map((target) =>
+    toRowTargetOption(target, row),
+  );
+}
+
+function selectedTarget(row: TaskRow): TargetOption | null {
+  if (!row.targetName) return null;
+  return props.targets.find((target) => target.name === row.targetName) ?? null;
+}
+
+function targetSupportState(row: TaskRow): TargetSupportState | null {
+  const target = selectedTarget(row);
+  if (!row.targetName) return null;
+  if (!target) {
+    return { level: 'error', text: `未找到点位 ${row.targetName}` };
+  }
+
+  const operation = operationForTask(row);
+  if (targetSupportsRow(row, target)) {
+    return { level: 'ok', text: `支持 ${operation}` };
+  }
+  return { level: 'error', text: unsupportedText(row, target) };
 }
 </script>
 
@@ -127,23 +201,32 @@ function targetKindText(kind: TargetOption['kind']): string {
             </td>
             <td class="map-name">HZ27</td>
             <td>
-              <select
-                :value="row.targetName"
-                aria-label="目标点位"
-                @change="onTargetChange(row, ($event.target as HTMLSelectElement).value)"
-                @focus="selectRow(row.id)"
-              >
-                <option value="">请选择</option>
-                <option
-                  v-for="target in targets"
-                  :key="`${target.kind}:${target.name}`"
-                  :value="target.name"
-                  :title="targetKindText(target.kind)"
-                  :disabled="target.disabled"
+              <div class="target-field">
+                <select
+                  :value="row.targetName"
+                  aria-label="目标点位"
+                  :class="{ 'select--invalid': targetSupportState(row)?.level === 'error' }"
+                  @change="onTargetChange(row, ($event.target as HTMLSelectElement).value)"
+                  @focus="selectRow(row.id)"
                 >
-                  {{ target.name }}
-                </option>
-              </select>
+                  <option value="">请选择</option>
+                  <option
+                    v-for="target in rowTargetOptions(row)"
+                    :key="`${target.kind}:${target.name}`"
+                    :value="target.name"
+                    :title="target.title"
+                  >
+                    {{ target.optionLabel }}
+                  </option>
+                </select>
+                <p
+                  v-if="targetSupportState(row)"
+                  class="target-hint"
+                  :class="`target-hint--${targetSupportState(row)?.level}`"
+                >
+                  {{ targetSupportState(row)?.text }}
+                </p>
+              </div>
             </td>
             <td>
               <button type="button" class="param-button" @click.stop="emit('edit-params', row.id)">
@@ -279,6 +362,35 @@ select {
 select:focus {
   border-color: #ff6a3a;
   outline: none;
+}
+
+.select--invalid,
+.select--invalid:focus {
+  border-color: #ff4d1d;
+  background: #fff7f5;
+}
+
+.target-field {
+  min-width: 0;
+}
+
+.target-hint {
+  margin: 0.35rem 0 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.target-hint--ok {
+  color: #2da44e;
+}
+
+.target-hint--error {
+  color: #ff4d1d;
 }
 
 .map-name {

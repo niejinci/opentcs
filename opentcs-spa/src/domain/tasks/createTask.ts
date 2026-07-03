@@ -26,7 +26,7 @@ export interface TaskRow {
 export interface TargetOption {
   name: string;
   kind: Exclude<TargetKind, ''>;
-  disabled?: boolean;
+  allowedOperations: readonly string[];
 }
 
 export const TASK_TYPE_OPTIONS: readonly TaskTypeOption[] = Object.freeze([

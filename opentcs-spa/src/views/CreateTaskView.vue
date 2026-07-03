@@ -57,8 +57,20 @@ const targetModel = computed(() =>
 const targetOptions = computed<TargetOption[]>(() => {
   const locations = project.locations
     .filter((location) => !location.locked)
-    .map((location) => ({ name: location.name, kind: 'location' as const }));
-  const points = project.points.map((point) => ({ name: point.name, kind: 'point' as const }));
+    .map((location) => ({
+      name: location.name,
+      kind: 'location' as const,
+      allowedOperations: allowedOperationsForTarget(
+        targetModel.value.targetInfoByName.get(location.name),
+      ),
+    }));
+  const points = project.points.map((point) => ({
+    name: point.name,
+    kind: 'point' as const,
+    allowedOperations: allowedOperationsForTarget(
+      targetModel.value.targetInfoByName.get(point.name),
+    ),
+  }));
   return [...locations, ...points].sort((a, b) => a.name.localeCompare(b.name));
 });
 
@@ -127,6 +139,19 @@ function updateEditingParams(params: TaskParams): void {
   rows.value = rows.value.map((row) => (row.id === rowId ? { ...row, params } : row));
 }
 
+function allowedOperationsText(operations: readonly string[]): string {
+  return operations.length ? operations.join('、') : '无';
+}
+
+function targetOperationSupportError(row: TaskRow, targetName: string): string | null {
+  const info = targetModel.value.targetInfoByName.get(targetName);
+  if (!info) return null;
+  const operation = operationForTask(row);
+  const allowed = allowedOperationsForTarget(info);
+  if (allowed.includes(operation)) return null;
+  return `${targetName} 不支持 ${operation}，可用操作：${allowedOperationsText(allowed)}`;
+}
+
 function onMapTargetClick(target: { kind: 'point' | 'location'; name: string }): void {
   if (activeRowId.value === null) {
     toastWarning('请先选择要编辑的任务', '地图选点');
@@ -135,6 +160,12 @@ function onMapTargetClick(target: { kind: 'point' | 'location'; name: string }):
   const active = rows.value.find((row) => row.id === activeRowId.value);
   if (!active) {
     toastWarning('请先选择要编辑的任务', '地图选点');
+    return;
+  }
+
+  const supportError = targetOperationSupportError(active, target.name);
+  if (supportError) {
+    toastWarning(supportError, '地图选点');
     return;
   }
 
@@ -149,16 +180,9 @@ function operationSupportErrors(): string[] {
   rows.value.forEach((row, index) => {
     const targetName = row.targetName.trim();
     if (!targetName) return;
-    const info = targetModel.value.targetInfoByName.get(targetName);
-    if (!info) return;
-    const operation = operationForTask(row);
-    const allowed = allowedOperationsForTarget(info);
-    if (!allowed.includes(operation)) {
-      errors.push(
-        `第 ${index + 1} 行 ${targetName} 不支持 ${operation}，可用操作：${
-          allowed.length ? allowed.join('、') : '无'
-        }`,
-      );
+    const supportError = targetOperationSupportError(row, targetName);
+    if (supportError) {
+      errors.push(`第 ${index + 1} 行 ${supportError}`);
     }
   });
   return errors;
