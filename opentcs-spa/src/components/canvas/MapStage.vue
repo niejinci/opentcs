@@ -58,6 +58,8 @@ const emit = defineEmits<{
       world: { x: number; y: number };
     },
   ];
+  /** Forwarded from AnnotationLayer when a Point/Location is clicked in read-only mode. */
+  'target-click': [target: { kind: 'point' | 'location'; name: string }];
   /** Forwarded from AnnotationLayer when a vehicle is clicked in monitor mode. */
   'vehicle-click': [name: string];
 }>();
@@ -386,6 +388,7 @@ defineSlots<{
           :readonly="readonly"
           :selected-vehicle-name="selectedVehicleName"
           @entity-click="onEntityClick"
+          @target-click="(target) => emit('target-click', target)"
           @vehicle-click="(name: string) => emit('vehicle-click', name)"
         />
         <HoverLayer :cursor="cursorStage" :tool="tool" :scale="scale" />

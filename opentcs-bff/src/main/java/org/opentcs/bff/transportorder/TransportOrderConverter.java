@@ -121,6 +121,10 @@ public final class TransportOrderConverter {
       Destination dest = new Destination();
       dest.setLocationName(driveOrder.getDestination().getDestination().getName());
       dest.setOperation(driveOrder.getDestination().getOperation());
+      Map<String, String> destProperties = driveOrder.getDestination().getProperties();
+      if (destProperties != null && !destProperties.isEmpty()) {
+        dest.setProperties(destProperties);
+      }
       dests.add(dest);
     });
     dto.setDestinations(dests);

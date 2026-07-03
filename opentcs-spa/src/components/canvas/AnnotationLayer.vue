@@ -51,6 +51,8 @@ const emit = defineEmits<{
   /** Fired so MapStage can suppress its own click-to-create when the user
    *  hit an entity (Konva's bubble flag is unreliable across pointer paths). */
   'entity-click': [];
+  /** Fired in read-only order/task pages when a Point or Location is picked. */
+  'target-click': [target: { kind: 'point' | 'location'; name: string }];
   /** Fired in monitor/read-only mode when the user clicks a vehicle. */
   'vehicle-click': [name: string];
 }>();
@@ -375,7 +377,10 @@ function onPointClick(p: DraftPoint, e: KonvaEventObject<MouseEvent>): void {
   // Cancel bubble so MapStage's click-to-create doesn't also fire.
   e.cancelBubble = true;
   emit('entity-click');
-  if (props.readonly) return;
+  if (props.readonly) {
+    emit('target-click', { kind: 'point', name: p.name });
+    return;
+  }
   if (props.tool === 'path') {
     if (store.pathDraftSrc === null) {
       store.startPath(p.name);
@@ -432,7 +437,10 @@ function onPathClick(rp: RenderedPath, e: KonvaEventObject<MouseEvent>): void {
 function onLocationClick(l: DraftLocation, e: KonvaEventObject<MouseEvent>): void {
   e.cancelBubble = true;
   emit('entity-click');
-  if (props.readonly) return;
+  if (props.readonly) {
+    emit('target-click', { kind: 'location', name: l.name });
+    return;
+  }
   store.select({ kind: 'location', name: l.name });
 }
 

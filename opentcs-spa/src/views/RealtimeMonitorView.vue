@@ -122,7 +122,7 @@ function createOrderForVehicle(name: string): void {
     return;
   }
   void router.push({
-    name: 'project-orders',
+    name: 'project-create-task',
     params: { projectId: projectId.value },
     query: { vehicle: name },
   });
@@ -167,7 +167,7 @@ onMounted(() => {
       </div>
       <nav>
         <RouterLink to="/projects">工程列表</RouterLink>
-        <RouterLink v-if="projectId" :to="{ name: 'project-orders', params: { projectId } }">
+        <RouterLink v-if="projectId" :to="{ name: 'project-create-task', params: { projectId } }">
           创建任务
         </RouterLink>
       </nav>

@@ -23,6 +23,9 @@ import org.opentcs.access.to.order.TransportOrderCreationTO;
 import org.opentcs.bff.error.ErrorResponses;
 import org.opentcs.bff.kernel.KernelClient;
 import org.opentcs.data.ObjectUnknownException;
+import org.opentcs.data.model.Location;
+import org.opentcs.data.model.LocationType;
+import org.opentcs.data.order.DriveOrder;
 import org.opentcs.data.order.TransportOrder;
 
 /**
@@ -84,6 +87,33 @@ class CreateTransportOrderHandlerTest {
           assertThat(root.get("type").asText()).isEqualTo("Charge");
         }
     );
+  }
+
+  @Test
+  void includesDestinationPropertiesInResponseDto() {
+    Location location = new Location(
+        "Location-1",
+        new LocationType("LocType-1").getReference()
+    );
+    Map<String, String> destinationProperties = Map.of(
+        "vda5050:destinationAction.parameter.loadType", "SS27C",
+        "vda5050:destinationAction.parameter.loadId", "22",
+        "vda5050:destinationAction.parameter.height", "float:0.06"
+    );
+    DriveOrder driveOrder = new DriveOrder(
+        "drive-order-1",
+        new DriveOrder.Destination(location.getReference())
+            .withOperation("pick")
+            .withProperties(destinationProperties)
+    );
+    TransportOrder order = new TransportOrder("order-1", List.of(driveOrder))
+        .withType("BYD_CREATE_TASK");
+
+    org.opentcs.bff.api.v1.model.TransportOrder dto = TransportOrderConverter.toDto(order);
+
+    assertThat(dto.getDestinations()).hasSize(1);
+    assertThat(dto.getDestinations().get(0).getProperties())
+        .containsExactlyInAnyOrderEntriesOf(destinationProperties);
   }
 
   @Test
