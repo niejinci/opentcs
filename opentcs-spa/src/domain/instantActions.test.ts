@@ -88,4 +88,41 @@ describe('instant actions', () => {
     const request = formStateToInstantActionsRequest(form);
     expect(request.actions[0].actionParameters).toContainEqual({ key: 'vendorFlag', value: 7 });
   });
+
+  it('provides dual-arm robot templates with numeric defaults', () => {
+    const actionTypes = [
+      'dualArmEnable',
+      'dualArmSwitchFrame',
+      'dualArmSwitchTool',
+      'dualArmManualControl',
+      'ONE_CLICK_HOMING',
+    ];
+
+    expect(
+      actionTypes.map(
+        (actionType) => findInstantActionTemplatesByActionType(actionType)[0]?.blockingType,
+      ),
+    ).toEqual(['HARD', 'HARD', 'HARD', 'HARD', 'HARD']);
+
+    const manualControlTemplate = findInstantActionTemplatesByActionType('dualArmManualControl')[0];
+    let nextId = 1;
+    const manualControlForm = templateToFormState(manualControlTemplate, () => nextId++);
+    manualControlForm.actionId = 'manual-control-1';
+
+    expect(formStateToInstantActionsRequest(manualControlForm)).toMatchObject({
+      actions: [
+        {
+          actionType: 'dualArmManualControl',
+          blockingType: 'HARD',
+          actionParameters: [
+            { key: 'is_jogging', value: 0 },
+            { key: 'type', value: 1 },
+            { key: 'index', value: 1 },
+            { key: 'positive', value: 1 },
+            { key: 'speed', value: 21 },
+          ],
+        },
+      ],
+    });
+  });
 });
