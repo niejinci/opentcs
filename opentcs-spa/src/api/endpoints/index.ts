@@ -6,3 +6,5 @@ export * as publish from './publish';
 export * as sseEvents from './sseEvents';
 export * as transportOrders from './transportOrders';
 export * as vehicles from './vehicles';
+export * as warehouse from './warehouse';
+

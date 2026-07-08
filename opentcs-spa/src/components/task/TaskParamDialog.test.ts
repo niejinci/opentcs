@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { createPinia, setActivePinia } from 'pinia';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import TaskParamDialog from './TaskParamDialog.vue';
 import {
@@ -16,6 +17,11 @@ function params(patch: Partial<TaskParams> = {}): TaskParams {
 }
 
 describe('TaskParamDialog', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    localStorage.clear();
+  });
+
   it('keeps the dialog open and shows an error for invalid charge duration', async () => {
     const wrapper = mount(TaskParamDialog, {
       props: {
@@ -45,6 +51,24 @@ describe('TaskParamDialog', () => {
     ]);
     expect(wrapper.emitted('close')).toHaveLength(1);
   });
+
+  it('binds warehouse type display name to the submitted type code', async () => {
+    const wrapper = mount(TaskParamDialog, {
+      props: {
+        modelValue: params(),
+      },
+    });
+
+    expect(wrapper.find('select').text()).toContain('后地板面板总成货架');
+
+    await wrapper.find('select').setValue('HJ27HDBMBZC');
+    await wrapper.find('.confirm-button').trigger('click');
+
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([
+      params({ loadType: 'HJ27HDBMBZC' }),
+    ]);
+  });
+
   it('emits updated params for empty or valid charge duration', async () => {
     const wrapper = mount(TaskParamDialog, {
       props: {

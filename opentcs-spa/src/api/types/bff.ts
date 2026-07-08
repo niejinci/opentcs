@@ -178,6 +178,66 @@ export interface TransportOrderRequest {
 export const TRANSPORT_ORDER_OPERATIONS = ['NOP', 'MOVE', 'PARK'] as const;
 export type TransportOrderOperation = (typeof TRANSPORT_ORDER_OPERATIONS)[number];
 
+
+/* ------------------------------------------------------------------ */
+/* Warehouse                                                           */
+/* ------------------------------------------------------------------ */
+
+export interface WarehouseLoadDetect {
+  MinLoadingHeight: number;
+  LoadSensor: boolean;
+  LoadDetectType: number;
+  QrCodeSensor: boolean;
+  QrCodeMin: number;
+  QrCodeMax: number;
+}
+
+/** Mirrors one entry under the BFF on-disk `{ "WaresType": [...] }` JSON envelope. */
+export interface WarehouseType {
+  QrCenterLeft?: number | null;
+  LoadDetect: WarehouseLoadDetect;
+  QrCenterBack?: number | null;
+  WareModel: string;
+  LegLength: number;
+  PutHeight: number;
+  LegInnerWidth: number;
+  CollisionAvoidanceAreaType: number;
+  LegInnerLength: number;
+  Name: string;
+  QrCenterFront?: number | null;
+  LegHeight: number;
+  QrCodeRectifyType: string;
+  Length: number;
+  LegWidth: number;
+  AllowRotate: boolean;
+  PickHeight: number;
+  Height: number;
+  Id: string;
+  DefaultOrientationType: string;
+  Width: number;
+  Manageable: boolean;
+}
+
+export interface WarehouseRack {
+  id: string;
+  name: string;
+  code: string;
+  carrierBottomCode: string;
+  typeCode: string;
+  typeName: string;
+  warehouseKind: string;
+  region: string;
+  mapName: string;
+  storageCode: string;
+  locationName: string;
+  lockStatus: string;
+  emptyStatus: string;
+  vehicleName: string;
+  containerInfo: string;
+  enabled: boolean;
+  updatedAt: string;
+}
+
 /* ------------------------------------------------------------------ */
 /* SSE                                                                 */
 /* ------------------------------------------------------------------ */
@@ -200,3 +260,4 @@ export interface SseEventEnvelope<T = Vehicle | TransportOrder> {
   currentObjectState: T | null;
   previousObjectState: T | null;
 }
+

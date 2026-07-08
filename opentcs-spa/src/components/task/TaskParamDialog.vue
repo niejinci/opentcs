@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import {
   CHARGE_DURATION_VALIDATION_MESSAGE,
@@ -9,6 +9,7 @@ import {
   MIN_CHARGE_DURATION_MINUTES,
   type TaskParams,
 } from '@/domain/tasks/createTask';
+import { useWarehouseStore } from '@/stores/warehouse';
 
 const props = defineProps<{
   modelValue: TaskParams;
@@ -19,8 +20,15 @@ const emit = defineEmits<{
   close: [];
 }>();
 
+const warehouse = useWarehouseStore();
+
 const draft = ref<TaskParams>({ ...props.modelValue });
 const chargeDurationError = ref('');
+const loadTypeOptions = computed(() => warehouse.typeOptions);
+const unknownLoadType = computed(() => {
+  const value = draft.value.loadType.trim();
+  return value && !warehouse.findTypeByCode(value) ? value : '';
+});
 
 watch(
   () => props.modelValue,
@@ -86,7 +94,15 @@ function confirm(): void {
         </label>
         <label>
           <span class="field-label">货架型号<small>loadType</small></span>
-          <input v-model.trim="draft.loadType" autocomplete="off" />
+          <select v-model="draft.loadType">
+            <option value="">请选择货架型号</option>
+            <option v-if="unknownLoadType" :value="unknownLoadType">
+              {{ unknownLoadType }}（未登记）
+            </option>
+            <option v-for="option in loadTypeOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
         </label>
         <label>
           <span class="field-label field-label--inline">顶升/下降高度<small>(米)</small></span>
@@ -236,7 +252,8 @@ label {
   line-height: 1.25;
 }
 
-input {
+input,
+select {
   width: 100%;
   min-width: 0;
   height: 3.25rem;
@@ -247,7 +264,8 @@ input {
   font: inherit;
 }
 
-input:focus {
+input:focus,
+select:focus {
   border-color: #ff6a3a;
   outline: none;
 }

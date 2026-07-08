@@ -29,6 +29,8 @@ import org.opentcs.bff.transportorder.CreateTransportOrderHandler;
 import org.opentcs.bff.vehicle.GetVehicleHandler;
 import org.opentcs.bff.vehicle.ListVehiclesHandler;
 import org.opentcs.bff.vehicle.RerouteVehicleHandler;
+import org.opentcs.bff.warehouse.WarehouseHandler;
+import org.opentcs.bff.warehouse.WarehouseStore;
 
 /**
  * JavalinTest-driven coverage of the {@code /api/v1/projects} endpoints.
@@ -57,6 +59,7 @@ class ProjectsHandlerTest {
         new CreateTransportOrderHandler(kernelClient),
         new ProjectsHandler(store),
         new ProjectAssetsHandler(store),
+        new WarehouseHandler(new WarehouseStore(workspace)),
         org.mockito.Mockito.mock(org.opentcs.bff.publish.PublishHandler.class),
         new OpenApiSpecHandler(),
         sse,
@@ -190,3 +193,4 @@ class ProjectsHandlerTest {
     });
   }
 }
+

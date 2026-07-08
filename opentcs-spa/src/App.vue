@@ -13,11 +13,18 @@ import { RouterLink, RouterView } from 'vue-router';
 
 import ToastContainer from '@/ui/toast/ToastContainer.vue';
 import { useLiveStatusStore } from '@/stores/liveStatus';
+import { useWarehouseStore } from '@/stores/warehouse';
 
 const milestone = 'S9 · 运输订单创建 + SSE 实时状态可视化';
 
 const live = useLiveStatusStore();
-onMounted(() => live.start());
+const warehouse = useWarehouseStore();
+onMounted(() => {
+  live.start();
+  void warehouse.ensureLoaded({ toastOnError: false }).catch(() => {
+    // Warehouse pages surface loading failures explicitly; the shell only primes the cache.
+  });
+});
 onBeforeUnmount(() => live.stop());
 </script>
 
@@ -33,6 +40,7 @@ onBeforeUnmount(() => live.stop());
         <RouterLink to="/import">地图导入</RouterLink>
         <RouterLink to="/monitor">实时监控</RouterLink>
         <RouterLink to="/editor">画布编辑器</RouterLink>
+        <RouterLink to="/warehouse">货架管理</RouterLink>
         <RouterLink to="/debug">BFF 调试</RouterLink>
       </nav>
     </header>
@@ -102,3 +110,6 @@ onBeforeUnmount(() => live.stop());
   font-weight: 600;
 }
 </style>
+
+
+

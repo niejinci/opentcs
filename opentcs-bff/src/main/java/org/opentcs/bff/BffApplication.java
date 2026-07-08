@@ -45,6 +45,10 @@ import org.opentcs.bff.vehicle.ListVehiclesHandler;
 import org.opentcs.bff.vehicle.PostInstantActionHandler;
 import org.opentcs.bff.vehicle.RerouteVehicleHandler;
 import org.opentcs.bff.vehicle.UpdateVehicleIntegrationLevelHandler;
+import org.opentcs.bff.warehouse.WarehouseConflictException;
+import org.opentcs.bff.warehouse.WarehouseFileException;
+import org.opentcs.bff.warehouse.WarehouseHandler;
+import org.opentcs.bff.warehouse.WarehouseNotFoundException;
 import org.opentcs.data.ObjectExistsException;
 import org.opentcs.data.ObjectUnknownException;
 import org.slf4j.Logger;
@@ -115,6 +119,7 @@ public class BffApplication {
    * @param projectsHandler The handler bundle serving {@code /api/v1/projects} CRUD endpoints.
    * @param projectAssetsHandler The handler bundle serving
    * {@code /api/v1/projects/{id}/assets} endpoints.
+   * @param warehouseHandler The handler bundle serving warehouse JSON CRUD endpoints.
    * @param openApiSpecHandler The handler serving the OpenAPI specification.
    * @param sseEventBridge The bridge that broadcasts kernel events to connected SSE clients.
    * @param ssePingHandler The handler serving {@code GET /api/v1/sse/ping}.
@@ -135,6 +140,7 @@ public class BffApplication {
       CreateTransportOrderHandler createTransportOrderHandler,
       ProjectsHandler projectsHandler,
       ProjectAssetsHandler projectAssetsHandler,
+      WarehouseHandler warehouseHandler,
       PublishHandler publishHandler,
       OpenApiSpecHandler openApiSpecHandler,
       SseEventBridge sseEventBridge,
@@ -156,6 +162,7 @@ public class BffApplication {
     requireNonNull(createTransportOrderHandler, "createTransportOrderHandler");
     requireNonNull(projectsHandler, "projectsHandler");
     requireNonNull(projectAssetsHandler, "projectAssetsHandler");
+    requireNonNull(warehouseHandler, "warehouseHandler");
     requireNonNull(publishHandler, "publishHandler");
     requireNonNull(openApiSpecHandler, "openApiSpecHandler");
     requireNonNull(ssePingHandler, "ssePingHandler");
@@ -231,6 +238,24 @@ public class BffApplication {
               });
             });
           });
+          path("/warehouse", () -> {
+            path("/types", () -> {
+              get(warehouseHandler.listTypes());
+              post(warehouseHandler.createType());
+              path("/{" + WarehouseHandler.TYPE_ID_PARAM + "}", () -> {
+                put(warehouseHandler.updateType());
+                delete(warehouseHandler.deleteType());
+              });
+            });
+            path("/racks", () -> {
+              get(warehouseHandler.listRacks());
+              post(warehouseHandler.createRack());
+              path("/{" + WarehouseHandler.RACK_ID_PARAM + "}", () -> {
+                put(warehouseHandler.updateRack());
+                delete(warehouseHandler.deleteRack());
+              });
+            });
+          });
           sse("/sse", sseEventBridge::register);
           get("/sse/ping", ssePingHandler);
         });
@@ -275,6 +300,21 @@ public class BffApplication {
       cfg.routes.exception(AssetTooLargeException.class, (e, ctx) -> {
         ErrorResponses.write(
             ctx, HttpStatus.CONTENT_TOO_LARGE, "ASSET_TOO_LARGE", e.getMessage()
+        );
+      });
+      cfg.routes.exception(WarehouseNotFoundException.class, (e, ctx) -> {
+        ErrorResponses.write(ctx, HttpStatus.NOT_FOUND, "WAREHOUSE_NOT_FOUND", e.getMessage());
+      });
+      cfg.routes.exception(WarehouseConflictException.class, (e, ctx) -> {
+        ErrorResponses.write(ctx, HttpStatus.CONFLICT, "WAREHOUSE_CONFLICT", e.getMessage());
+      });
+      cfg.routes.exception(WarehouseFileException.class, (e, ctx) -> {
+        LOG.warn("Warehouse file operation failed (trace {})", ErrorResponses.traceIdFor(ctx), e);
+        ErrorResponses.write(
+            ctx,
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "WAREHOUSE_FILE_ERROR",
+            e.getMessage()
         );
       });
       cfg.routes.exception(PublishValidationException.class, (e, ctx) -> {
@@ -361,3 +401,4 @@ public class BffApplication {
     return javalin;
   }
 }
+

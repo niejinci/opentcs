@@ -19,7 +19,11 @@ export type {
   VehicleIntegrationLevel,
   VehicleProcState,
   VehicleState,
+  WarehouseRack,
+  WarehouseType,
 } from './types/bff';
 export { SSE_EVENT_TRANSPORT_ORDERS, SSE_EVENT_VEHICLES } from './types/bff';
 
 export * as endpoints from './endpoints';
+
+

@@ -24,6 +24,8 @@ import org.opentcs.bff.transportorder.CreateTransportOrderHandler;
 import org.opentcs.bff.vehicle.GetVehicleHandler;
 import org.opentcs.bff.vehicle.ListVehiclesHandler;
 import org.opentcs.bff.vehicle.RerouteVehicleHandler;
+import org.opentcs.bff.warehouse.WarehouseHandler;
+import org.opentcs.bff.warehouse.WarehouseStore;
 import org.opentcs.data.model.PlantModel;
 
 /**
@@ -209,13 +211,11 @@ class BffApplicationTest {
         = new org.opentcs.bff.events.SsePingHandler(sseEventBridge);
     org.opentcs.bff.events.SseHeartbeatScheduler sseHeartbeatScheduler
         = new org.opentcs.bff.events.SseHeartbeatScheduler(sseEventBridge);
-    ProjectStore projectStore = new ProjectStore(
-        java.nio.file.Paths.get(
-            System.getProperty("java.io.tmpdir"),
-            "opentcs-bff-test-" + java.util.UUID.randomUUID()
-        ),
-        1024L * 1024L
+    java.nio.file.Path workspace = java.nio.file.Paths.get(
+        System.getProperty("java.io.tmpdir"),
+        "opentcs-bff-test-" + java.util.UUID.randomUUID()
     );
+    ProjectStore projectStore = new ProjectStore(workspace, 1024L * 1024L);
     return new BffApplication(
         bff("127.0.0.1", 0),
         new AccessKeyAuthenticator(securityConfig),
@@ -229,6 +229,7 @@ class BffApplicationTest {
         new CreateTransportOrderHandler(kernelClient),
         new ProjectsHandler(projectStore),
         new ProjectAssetsHandler(projectStore),
+        new WarehouseHandler(new WarehouseStore(workspace)),
         org.mockito.Mockito.mock(org.opentcs.bff.publish.PublishHandler.class),
         new OpenApiSpecHandler(),
         sseEventBridge,
@@ -238,3 +239,5 @@ class BffApplicationTest {
     );
   }
 }
+
+

@@ -37,6 +37,26 @@ const routes: RouteRecordRaw[] = [
     props: true,
   },
   {
+    path: '/warehouse',
+    component: () => import('@/views/WarehouseManagementView.vue'),
+    meta: { title: '货架管理' },
+    redirect: { name: 'warehouse-types' },
+    children: [
+      {
+        path: 'types',
+        name: 'warehouse-types',
+        component: () => import('@/views/WarehouseTypesView.vue'),
+        meta: { title: '货架型号' },
+      },
+      {
+        path: 'racks',
+        name: 'warehouse-racks',
+        component: () => import('@/views/WarehouseRacksView.vue'),
+        meta: { title: '货架列表' },
+      },
+    ],
+  },
+  {
     path: '/debug',
     name: 'debug',
     component: () => import('@/views/DebugView.vue'),

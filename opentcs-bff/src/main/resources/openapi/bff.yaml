@@ -20,6 +20,8 @@ tags:
     description: Server-Sent Events (SSE) for real-time object state updates
   - name: Projects
     description: SPA project (draft + assets) CRUD persisted to the BFF workspace
+  - name: Warehouse
+    description: BYD warehouse type and rack instance JSON CRUD persisted to the BFF workspace
 security:
   - ApiKeyAuth: []
 paths:
@@ -512,6 +514,160 @@ paths:
           description: Asset deleted.
         '404':
           $ref: '#/components/responses/NotFound'
+  /api/v1/warehouse/types:
+    get:
+      tags: [Warehouse]
+      summary: List warehouse types from the BYD warehouse type JSON file.
+      operationId: listWarehouseTypes
+      responses:
+        '200':
+          description: Warehouse type list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WarehouseType'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Warehouse]
+      summary: Create a warehouse type and rewrite the wrapped BYD JSON file.
+      operationId: createWarehouseType
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WarehouseType'
+      responses:
+        '201':
+          description: Warehouse type created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WarehouseType'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/warehouse/types/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+        description: Warehouse type Id field.
+    put:
+      tags: [Warehouse]
+      summary: Replace a warehouse type by Id.
+      operationId: updateWarehouseType
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WarehouseType'
+      responses:
+        '200':
+          description: Updated warehouse type.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WarehouseType'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [Warehouse]
+      summary: Delete a warehouse type by Id.
+      operationId: deleteWarehouseType
+      responses:
+        '204':
+          description: Warehouse type deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/warehouse/racks:
+    get:
+      tags: [Warehouse]
+      summary: List warehouse rack instances from the rack JSON file.
+      operationId: listWarehouseRacks
+      responses:
+        '200':
+          description: Warehouse rack list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WarehouseRack'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Warehouse]
+      summary: Create a warehouse rack instance and rewrite the rack JSON file.
+      operationId: createWarehouseRack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WarehouseRack'
+      responses:
+        '201':
+          description: Warehouse rack created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WarehouseRack'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/warehouse/racks/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+        description: Warehouse rack instance id.
+    put:
+      tags: [Warehouse]
+      summary: Replace a warehouse rack instance by id.
+      operationId: updateWarehouseRack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WarehouseRack'
+      responses:
+        '200':
+          description: Updated warehouse rack.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WarehouseRack'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    delete:
+      tags: [Warehouse]
+      summary: Delete a warehouse rack instance by id.
+      operationId: deleteWarehouseRack
+      responses:
+        '204':
+          description: Warehouse rack deleted.
+        '404':
+          $ref: '#/components/responses/NotFound'
   /api/v1/plant-models/publish:
     post:
       tags: [PlantModels]
@@ -984,6 +1140,93 @@ components:
         size: { type: integer, format: int64 }
         contentType: { type: string }
         updatedAt: { type: string, format: date-time }
+    WarehouseLoadDetect:
+      type: object
+      required: [MinLoadingHeight, LoadSensor, LoadDetectType, QrCodeSensor, QrCodeMin, QrCodeMax]
+      properties:
+        MinLoadingHeight: { type: integer, format: int32 }
+        LoadSensor: { type: boolean }
+        LoadDetectType: { type: integer, format: int32 }
+        QrCodeSensor:
+          type: boolean
+          description: Maps to the lanxin-rcs "二维码信息校验" field.
+        QrCodeMin: { type: integer, format: int32 }
+        QrCodeMax: { type: integer, format: int32 }
+    WarehouseType:
+      type: object
+      description: A BYD warehouse type entry stored inside the top-level `WaresType` array.
+      required:
+        - LoadDetect
+        - WareModel
+        - LegLength
+        - PutHeight
+        - LegInnerWidth
+        - CollisionAvoidanceAreaType
+        - LegInnerLength
+        - Name
+        - LegHeight
+        - QrCodeRectifyType
+        - Length
+        - LegWidth
+        - AllowRotate
+        - PickHeight
+        - Height
+        - Id
+        - DefaultOrientationType
+        - Width
+        - Manageable
+      properties:
+        QrCenterLeft: { type: number, format: double, nullable: true }
+        LoadDetect:
+          $ref: '#/components/schemas/WarehouseLoadDetect'
+        QrCenterBack: { type: number, format: double, nullable: true }
+        WareModel:
+          type: string
+          description: Warehouse type display name.
+        LegLength: { type: integer, format: int32, description: L2 in millimetres. }
+        PutHeight: { type: integer, format: int32, description: Fixed put/drop height. }
+        LegInnerWidth: { type: integer, format: int32, description: W1 in millimetres. }
+        CollisionAvoidanceAreaType: { type: integer, format: int32 }
+        LegInnerLength: { type: integer, format: int32, description: L1 in millimetres. }
+        Name:
+          type: string
+          description: Warehouse type code submitted as create-task loadType.
+        QrCenterFront: { type: number, format: double, nullable: true }
+        LegHeight: { type: integer, format: int32, description: H1 in millimetres. }
+        QrCodeRectifyType: { type: string }
+        Length: { type: integer, format: int32, description: L in millimetres. }
+        LegWidth: { type: integer, format: int32, description: W2 in millimetres. }
+        AllowRotate: { type: boolean }
+        PickHeight: { type: integer, format: int32, description: Fixed pick height. }
+        Height: { type: integer, format: int32, description: H in millimetres. }
+        Id:
+          type: string
+          description: Warehouse type id; numeric value must be in the LoadDetect QR-code range.
+        DefaultOrientationType: { type: string }
+        Width: { type: integer, format: int32, description: W in millimetres. }
+        Manageable: { type: boolean }
+    WarehouseRack:
+      type: object
+      description: A warehouse rack instance persisted to the separate rack JSON file.
+      required: [id, name, code, typeCode, typeName, warehouseKind, region, mapName, lockStatus, emptyStatus, enabled, updatedAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        code: { type: string }
+        carrierBottomCode: { type: string }
+        typeCode: { type: string }
+        typeName: { type: string }
+        warehouseKind: { type: string }
+        region: { type: string }
+        mapName: { type: string }
+        storageCode: { type: string }
+        locationName: { type: string }
+        lockStatus: { type: string }
+        emptyStatus: { type: string }
+        vehicleName: { type: string }
+        containerInfo: { type: string }
+        enabled: { type: boolean }
+        updatedAt: { type: string }
     PublishRequest:
       type: object
       required: [projectId]
@@ -1070,3 +1313,5 @@ components:
       description: >-
         Static access key configured via `bff.security.accessKey`. If the configured key is empty,
         no authentication is required and this header is ignored.
+
+
