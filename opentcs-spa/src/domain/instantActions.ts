@@ -309,15 +309,16 @@ export const INSTANT_ACTION_TEMPLATES: readonly InstantActionTemplate[] = Object
       },
       {
         key: 'type',
-        description: '类型：0=关节运动，1=笛卡尔坐标系运动',
+        description: '类型：0=关节运动，1=笛卡尔坐标系运动，2=双臂笛卡尔坐标系运动',
         defaultValue: 1,
         min: 0,
-        max: 1,
+        max: 2,
         step: 1,
       },
       {
         key: 'index',
-        description: '轴：关节运动 0~18；笛卡尔右臂 0~5，左臂 6~11',
+        description:
+          '轴：关节运动 0~18(19个关节)；笛卡尔右臂 0~5(x,y,z,rx,ry,rz)，左臂 6~11(x,y,z,rx,ry,rz)；双臂笛卡尔 0~2(x,y,z)',
         defaultValue: 1,
         min: 0,
         max: 18,
@@ -467,6 +468,8 @@ export function formStateToInstantActionsRequest(
 ): InstantActionsRequest {
   const seenKeys = new Set<string>();
   const actionParameters: InstantActionParameter[] = [];
+  const parsedParameters = new Map<string, InstantActionParameterValue>();
+  const actionType = form.actionType.trim();
 
   for (const row of form.parameters) {
     const key = row.key.trim();
@@ -482,14 +485,18 @@ export function formStateToInstantActionsRequest(
     }
 
     seenKeys.add(key);
+    const value = parseParameterValue(row.kind, row.valueText);
+    parsedParameters.set(key, value);
     actionParameters.push({
       key,
-      value: parseParameterValue(row.kind, row.valueText),
+      value,
     });
   }
 
+  validateInstantActionParameters(actionType, parsedParameters);
+
   const action: InstantAction = {
-    actionType: form.actionType.trim(),
+    actionType,
     actionId: form.actionId.trim(),
     actionDescription: form.actionDescription.trim() || null,
     blockingType: form.blockingType,
@@ -497,6 +504,45 @@ export function formStateToInstantActionsRequest(
   };
 
   return { actions: [action] };
+}
+
+function validateInstantActionParameters(
+  actionType: string,
+  parameters: ReadonlyMap<string, InstantActionParameterValue>,
+): void {
+  if (actionType !== 'dualArmManualControl') return;
+
+  const type = requireIntegerParameter(actionType, parameters, 'type');
+  const index = requireIntegerParameter(actionType, parameters, 'index');
+
+  if (type < 0 || type > 2) {
+    throw new Error('dualArmManualControl 参数 type 必须是整数 0、1 或 2');
+  }
+
+  const indexRule =
+    type === 0
+      ? { min: 0, max: 18, description: '关节运动范围为 0~18(19个关节)' }
+      : type === 1
+        ? { min: 0, max: 11, description: '笛卡尔坐标系运动范围为 0~11' }
+        : { min: 0, max: 2, description: '双臂笛卡尔坐标系运动范围为 0~2(x,y,z)' };
+
+  if (index < indexRule.min || index > indexRule.max) {
+    throw new Error(
+      `dualArmManualControl 参数 index 与 type=${type} 不匹配：${indexRule.description}`,
+    );
+  }
+}
+
+function requireIntegerParameter(
+  actionType: string,
+  parameters: ReadonlyMap<string, InstantActionParameterValue>,
+  key: string,
+): number {
+  const value = parameters.get(key);
+  if (typeof value !== 'number' || !Number.isInteger(value)) {
+    throw new Error(`${actionType} 参数 ${key} 必须是整数`);
+  }
+  return value;
 }
 
 export function findInstantActionTemplate(templateId: string): InstantActionTemplate | null {

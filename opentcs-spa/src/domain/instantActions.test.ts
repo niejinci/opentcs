@@ -109,6 +109,19 @@ describe('instant actions', () => {
     const manualControlForm = templateToFormState(manualControlTemplate, () => nextId++);
     manualControlForm.actionId = 'manual-control-1';
 
+    expect(manualControlForm.parameters.find((param) => param.key === 'type')).toMatchObject({
+      min: 0,
+      max: 2,
+      step: 1,
+      description: expect.stringContaining('2=双臂笛卡尔坐标系运动'),
+    });
+    expect(manualControlForm.parameters.find((param) => param.key === 'index')).toMatchObject({
+      min: 0,
+      max: 18,
+      step: 1,
+      description: expect.stringContaining('双臂笛卡尔 0~2(x,y,z)'),
+    });
+
     expect(formStateToInstantActionsRequest(manualControlForm)).toMatchObject({
       actions: [
         {
@@ -124,5 +137,28 @@ describe('instant actions', () => {
         },
       ],
     });
+  });
+
+  it('validates dualArmManualControl index against the selected movement type', () => {
+    const template = findInstantActionTemplatesByActionType('dualArmManualControl')[0];
+    let nextId = 1;
+    const form = templateToFormState(template, () => nextId++);
+    form.actionId = 'manual-control-2';
+
+    const setParam = (key: string, valueText: string): void => {
+      const row = form.parameters.find((param) => param.key === key);
+      if (!row) throw new Error(`Missing parameter ${key}`);
+      row.valueText = valueText;
+    };
+
+    setParam('type', '2');
+    setParam('index', '2');
+    expect(formStateToInstantActionsRequest(form).actions[0].actionParameters).toContainEqual({
+      key: 'index',
+      value: 2,
+    });
+
+    setParam('index', '3');
+    expect(() => formStateToInstantActionsRequest(form)).toThrow('双臂笛卡尔坐标系运动范围为 0~2');
   });
 });
