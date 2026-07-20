@@ -34,12 +34,15 @@ const projects = useProjectsStore();
 const { background, hasBackground } = useBackgroundMap();
 const { overlay: vehicleOverlay } = useLiveVehicleOverlay();
 
+const FLEET_PANEL_COLLAPSED_KEY = 'dd-opentcs.monitor.fleetPanel.collapsed';
+
 const projectName = ref('');
 const loadingProject = ref(false);
 const activeCategory = ref<VehicleMonitorCategoryId>('all');
 const selectedGroup = ref('');
 const searchQuery = ref('');
 const selectedVehicleName = ref<string | null>(null);
+const fleetPanelCollapsed = ref(readFleetPanelCollapsed());
 const mapStageRef = useTemplateRef<{
   resetView: () => void;
   focusPixel: (p: { x: number; y: number }, s?: number) => void;
@@ -68,6 +71,24 @@ const selectedRow = computed(() =>
     ? (rows.value.find((row) => row.vehicle.name === selectedVehicleName.value) ?? null)
     : null,
 );
+
+function readFleetPanelCollapsed(): boolean {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    return localStorage.getItem(FLEET_PANEL_COLLAPSED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function writeFleetPanelCollapsed(value: boolean): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(FLEET_PANEL_COLLAPSED_KEY, String(value));
+  } catch {
+    // The toggle remains usable even when browser storage is unavailable.
+  }
+}
 
 async function activateProject(): Promise<void> {
   if (!projectId.value) {
@@ -136,6 +157,8 @@ watch(
   { immediate: true },
 );
 
+watch(fleetPanelCollapsed, writeFleetPanelCollapsed);
+
 watch(
   () => rows.value.map((row) => row.vehicle.name).join('\n'),
   () => {
@@ -175,7 +198,7 @@ onMounted(() => {
       </nav>
     </header>
 
-    <div class="monitor-shell">
+    <div class="monitor-shell" :data-fleet-collapsed="fleetPanelCollapsed">
       <main class="map-panel">
         <div v-if="!hasBackground" class="empty-map">
           <p>当前会话没有可渲染底图。</p>
@@ -216,13 +239,15 @@ onMounted(() => {
         />
       </main>
 
-      <aside class="fleet-panel" aria-label="车辆分类列表">
+      <aside class="fleet-panel" :data-collapsed="fleetPanelCollapsed" aria-label="车辆分类列表">
         <VehicleStatusRail
           :active="activeCategory"
           :counts="counts"
+          :compact="fleetPanelCollapsed"
           @select="activeCategory = $event"
+          @toggle-compact="fleetPanelCollapsed = !fleetPanelCollapsed"
         />
-        <section class="fleet-main">
+        <section v-show="!fleetPanelCollapsed" class="fleet-main">
           <div class="fleet-summary">
             <strong>{{ counts[activeCategory] }}</strong>
             <span>匹配车辆</span>
@@ -288,6 +313,9 @@ onMounted(() => {
   grid-template-columns: minmax(0, 1fr) minmax(24rem, 34rem);
   gap: 0.75rem;
 }
+.monitor-shell[data-fleet-collapsed='true'] {
+  grid-template-columns: minmax(0, 1fr) 3.25rem;
+}
 .map-panel {
   position: relative;
   min-width: 0;
@@ -342,6 +370,9 @@ onMounted(() => {
   overflow: hidden;
   background: #ffffff;
 }
+.fleet-panel[data-collapsed='true'] {
+  grid-template-columns: minmax(0, 1fr);
+}
 .fleet-main {
   min-width: 0;
   min-height: 0;
@@ -364,9 +395,13 @@ onMounted(() => {
   font-size: 0.85rem;
 }
 @media (max-width: 1080px) {
-  .monitor-shell {
+  .monitor-shell,
+  .monitor-shell[data-fleet-collapsed='true'] {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(30rem, 1fr) minmax(24rem, 0.75fr);
+  }
+  .monitor-shell[data-fleet-collapsed='true'] {
+    grid-template-rows: minmax(30rem, 1fr) auto;
   }
 }
 </style>
