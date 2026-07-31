@@ -45,6 +45,8 @@ const props = defineProps<{
   readonly?: boolean;
   /** Vehicle highlighted by an external monitor selection. */
   selectedVehicleName?: string | null;
+  /** Whether Point / Location / Vehicle name labels should be rendered. */
+  showEntityLabels?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -82,6 +84,7 @@ const locationHalf = computed(() => LOCATION_HALF_CSS_PX / safeScale(props.scale
 const vehicleLength = computed(() => VEHICLE_LENGTH_CSS_PX / safeScale(props.scale));
 const vehicleWidth = computed(() => VEHICLE_WIDTH_CSS_PX / safeScale(props.scale));
 const blockOutlinePadding = computed(() => BLOCK_OUTLINE_PADDING_CSS_PX / safeScale(props.scale));
+const entityLabelsVisible = computed(() => props.showEntityLabels !== false);
 
 function safeScale(s: number): number {
   return s > 0.0001 ? s : 0.0001;
@@ -801,6 +804,7 @@ function onPreciseMarkerClick(marker: PreciseMarker, e: KonvaEventObject<MouseEv
         @dragend="onLocationDragEnd"
       />
       <v-text
+        v-if="entityLabelsVisible"
         :config="{
           x: l.layout.pixelX + locationHalf * 1.2,
           y: l.layout.pixelY + locationHalf * 0.2,
@@ -851,6 +855,7 @@ function onPreciseMarkerClick(marker: PreciseMarker, e: KonvaEventObject<MouseEv
         @dragend="onPointDragEnd"
       />
       <v-text
+        v-if="entityLabelsVisible"
         :config="{
           x: p.layout.pixelX + pointRadius * 1.4,
           y: p.layout.pixelY - labelFontSize * 0.6,
@@ -887,6 +892,7 @@ function onPreciseMarkerClick(marker: PreciseMarker, e: KonvaEventObject<MouseEv
         @dragend="onVehicleDragEnd"
       />
       <v-text
+        v-if="entityLabelsVisible"
         :config="{
           x: vehiclePixel(v).x + vehicleLength * 0.6,
           y: vehiclePixel(v).y - vehicleWidth * 0.6,
@@ -954,6 +960,7 @@ function onPreciseMarkerClick(marker: PreciseMarker, e: KonvaEventObject<MouseEv
         />
       </v-group>
       <v-text
+        v-if="entityLabelsVisible"
         :config="{
           x: m.x + preciseMarkerHalf * 1.4,
           y: m.y + preciseMarkerHalf * 0.4,

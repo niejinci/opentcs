@@ -43,6 +43,8 @@ const props = defineProps<{
   readonly?: boolean;
   /** Vehicle name highlighted by an external selection. */
   selectedVehicleName?: string | null;
+  /** Whether Point / Location / Vehicle name labels should be rendered. */
+  showEntityLabels?: boolean;
 }>();
 
 const settings = useEditorSettingsStore();
@@ -387,6 +389,7 @@ defineSlots<{
           :scale="scale"
           :readonly="readonly"
           :selected-vehicle-name="selectedVehicleName"
+          :show-entity-labels="showEntityLabels"
           @entity-click="onEntityClick"
           @target-click="(target) => emit('target-click', target)"
           @vehicle-click="(name: string) => emit('vehicle-click', name)"

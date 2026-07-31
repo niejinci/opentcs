@@ -35,6 +35,12 @@ const { background, hasBackground } = useBackgroundMap();
 const { overlay: vehicleOverlay } = useLiveVehicleOverlay();
 
 const FLEET_PANEL_COLLAPSED_KEY = 'dd-opentcs.monitor.fleetPanel.collapsed';
+const LABEL_DISPLAY_MODE_KEY = 'dd-opentcs.monitor.entityLabels.mode';
+const LABEL_DISPLAY_MODE_OPTIONS = [
+  { value: 'always', label: '始终显示' },
+  { value: 'hidden', label: '隐藏名称' },
+] as const;
+type MonitorLabelDisplayMode = (typeof LABEL_DISPLAY_MODE_OPTIONS)[number]['value'];
 
 const projectName = ref('');
 const loadingProject = ref(false);
@@ -43,6 +49,7 @@ const selectedGroup = ref('');
 const searchQuery = ref('');
 const selectedVehicleName = ref<string | null>(null);
 const fleetPanelCollapsed = ref(readFleetPanelCollapsed());
+const labelDisplayMode = ref<MonitorLabelDisplayMode>(readLabelDisplayMode());
 const mapStageRef = useTemplateRef<{
   resetView: () => void;
   focusPixel: (p: { x: number; y: number }, s?: number) => void;
@@ -71,6 +78,7 @@ const selectedRow = computed(() =>
     ? (rows.value.find((row) => row.vehicle.name === selectedVehicleName.value) ?? null)
     : null,
 );
+const showEntityLabels = computed(() => labelDisplayMode.value === 'always');
 
 function readFleetPanelCollapsed(): boolean {
   if (typeof localStorage === 'undefined') return false;
@@ -87,6 +95,25 @@ function writeFleetPanelCollapsed(value: boolean): void {
     localStorage.setItem(FLEET_PANEL_COLLAPSED_KEY, String(value));
   } catch {
     // The toggle remains usable even when browser storage is unavailable.
+  }
+}
+
+function readLabelDisplayMode(): MonitorLabelDisplayMode {
+  if (typeof localStorage === 'undefined') return 'always';
+  try {
+    const stored = localStorage.getItem(LABEL_DISPLAY_MODE_KEY);
+    return stored === 'hidden' ? 'hidden' : 'always';
+  } catch {
+    return 'always';
+  }
+}
+
+function writeLabelDisplayMode(value: MonitorLabelDisplayMode): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(LABEL_DISPLAY_MODE_KEY, value);
+  } catch {
+    // The label display mode remains usable even when persistence is unavailable.
   }
 }
 
@@ -158,6 +185,7 @@ watch(
 );
 
 watch(fleetPanelCollapsed, writeFleetPanelCollapsed);
+watch(labelDisplayMode, writeLabelDisplayMode);
 
 watch(
   () => rows.value.map((row) => row.vehicle.name).join('\n'),
@@ -214,12 +242,25 @@ onMounted(() => {
           :affine="background.affine"
           tool="select"
           :selected-vehicle-name="selectedVehicleName"
+          :show-entity-labels="showEntityLabels"
           @vehicle-click="(name: string) => selectVehicle(name, true)"
         >
           <template #status="{ scale }">
             <footer class="monitor-statusbar">
               <span>车辆：{{ rows.length }} 台</span>
               <span>缩放：{{ (scale * 100).toFixed(0) }}%</span>
+              <label class="label-mode-control">
+                <span>名称</span>
+                <select v-model="labelDisplayMode" aria-label="地图元素名称显示方式">
+                  <option
+                    v-for="option in LABEL_DISPLAY_MODE_OPTIONS"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
               <button type="button" @click="mapStageRef?.resetView()">重置视口</button>
             </footer>
           </template>
@@ -351,8 +392,24 @@ onMounted(() => {
   font-size: 0.84rem;
   color: #57606a;
 }
-.monitor-statusbar button {
+.label-mode-control {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.label-mode-control select {
+  height: 1.75rem;
+  min-width: 6.5rem;
+  border: 1px solid #d0d7de;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #1f2328;
+  font: inherit;
+  padding: 0 0.45rem;
+}
+.monitor-statusbar button {
+  margin-left: 0;
   border: 1px solid #d0d7de;
   border-radius: 5px;
   background: #ffffff;
