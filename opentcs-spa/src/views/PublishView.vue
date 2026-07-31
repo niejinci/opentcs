@@ -16,6 +16,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { getDraft, getProject } from '@/api/endpoints/projects';
 import { publishPlantModel, type PublishDiff } from '@/api/endpoints/publish';
 import { HttpError } from '@/api/errors';
+import { validateVda5050VehicleProperties } from '@/domain/vehicles/registration';
 import { toastError, toastInfo, toastSuccess } from '@/ui/toast/toastBus';
 
 interface LocalCounts {
@@ -35,9 +36,7 @@ interface ValidationIssue {
 const route = useRoute();
 const router = useRouter();
 
-const projectId = computed(
-  () => String(route.params.projectId ?? '').trim(),
-);
+const projectId = computed(() => String(route.params.projectId ?? '').trim());
 
 const projectName = ref<string>('');
 const draftLoaded = ref(false);
@@ -118,6 +117,25 @@ function collectLocalIssues(payload: Record<string, unknown>): ValidationIssue[]
       seen.add(n);
     }
   }
+  const vehicles = arr('vehicles').map((vehicle) => ({
+    name: String(vehicle.name ?? ''),
+    properties: readStringProperties(vehicle.properties),
+  }));
+  for (const vehicle of vehicles) {
+    const fieldPrefix = vehicle.name ? `vehicles[name=${vehicle.name}]` : 'vehicles[]';
+    for (const issue of validateVda5050VehicleProperties(
+      vehicle.name,
+      vehicle.properties,
+      vehicles,
+    )) {
+      issues.push({
+        message: vehicle.name
+          ? `Vehicle '${vehicle.name}': ${issue.message}`
+          : `Vehicle: ${issue.message}`,
+        fieldPath: `${fieldPrefix}.properties.${issue.field}`,
+      });
+    }
+  }
   for (const p of arr('paths')) {
     // Draft schema names mirror PathCreationTO: srcPointName / destPointName.
     // The BFF publish converter emits the same names in `fieldPath`
@@ -140,6 +158,15 @@ function collectLocalIssues(payload: Record<string, unknown>): ValidationIssue[]
   return issues;
 }
 
+function readStringProperties(input: unknown): Record<string, string> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    if (value === null || value === undefined) continue;
+    out[key] = typeof value === 'string' ? value : String(value);
+  }
+  return out;
+}
 function clearLastError(): void {
   lastError.value = null;
 }
@@ -228,12 +255,30 @@ function jumpToField(fieldPath?: string): void {
         <p v-if="!draftLoaded" class="muted">加载中…</p>
         <table v-else class="kv">
           <tbody>
-            <tr><th>Point</th><td>{{ counts.points }}</td></tr>
-            <tr><th>Path</th><td>{{ counts.paths }}</td></tr>
-            <tr><th>Location</th><td>{{ counts.locations }}</td></tr>
-            <tr><th>LocationType</th><td>{{ counts.locationTypes }}</td></tr>
-            <tr><th>Block</th><td>{{ counts.blocks }}</td></tr>
-            <tr><th>Vehicle</th><td>{{ counts.vehicles }}</td></tr>
+            <tr>
+              <th>Point</th>
+              <td>{{ counts.points }}</td>
+            </tr>
+            <tr>
+              <th>Path</th>
+              <td>{{ counts.paths }}</td>
+            </tr>
+            <tr>
+              <th>Location</th>
+              <td>{{ counts.locations }}</td>
+            </tr>
+            <tr>
+              <th>LocationType</th>
+              <td>{{ counts.locationTypes }}</td>
+            </tr>
+            <tr>
+              <th>Block</th>
+              <td>{{ counts.blocks }}</td>
+            </tr>
+            <tr>
+              <th>Vehicle</th>
+              <td>{{ counts.vehicles }}</td>
+            </tr>
           </tbody>
         </table>
 
@@ -247,7 +292,9 @@ function jumpToField(fieldPath?: string): void {
                 type="button"
                 class="link"
                 @click="jumpToField(iss.fieldPath)"
-              >定位</button>
+              >
+                定位
+              </button>
             </li>
           </ul>
         </div>
@@ -260,37 +307,72 @@ function jumpToField(fieldPath?: string): void {
           <button
             type="button"
             class="btn"
-            :disabled="publishing || !draftLoaded"
+            :disabled="publishing || !draftLoaded || localIssues.length > 0"
             @click="tryDryRun"
-          >先试运行（dryRun）</button>
+          >
+            先试运行（dryRun）
+          </button>
           <button
             type="button"
             class="btn primary"
-            :disabled="publishing || !draftLoaded"
+            :disabled="publishing || !draftLoaded || localIssues.length > 0"
             @click="doPublish"
-          >确认发布</button>
+          >
+            确认发布
+          </button>
         </div>
 
         <div v-if="dryRunDiff" class="diff">
           <h4>试运行 / 本地对比</h4>
           <table class="kv">
             <thead>
-              <tr><th>种类</th><th>本地</th><th>服务端（dryRun）</th></tr>
+              <tr>
+                <th>种类</th>
+                <th>本地</th>
+                <th>服务端（dryRun）</th>
+              </tr>
             </thead>
             <tbody>
-              <tr><th>Point</th><td>{{ counts.points }}</td><td>{{ dryRunDiff.pointCount }}</td></tr>
-              <tr><th>Path</th><td>{{ counts.paths }}</td><td>{{ dryRunDiff.pathCount }}</td></tr>
-              <tr><th>Location</th><td>{{ counts.locations }}</td><td>{{ dryRunDiff.locationCount }}</td></tr>
-              <tr><th>LocationType</th><td>{{ counts.locationTypes }}</td><td>{{ dryRunDiff.locationTypeCount }}</td></tr>
-              <tr><th>Block</th><td>{{ counts.blocks }}</td><td>{{ dryRunDiff.blockCount }}</td></tr>
-              <tr><th>Vehicle</th><td>{{ counts.vehicles }}</td><td>{{ dryRunDiff.vehicleCount }}</td></tr>
+              <tr>
+                <th>Point</th>
+                <td>{{ counts.points }}</td>
+                <td>{{ dryRunDiff.pointCount }}</td>
+              </tr>
+              <tr>
+                <th>Path</th>
+                <td>{{ counts.paths }}</td>
+                <td>{{ dryRunDiff.pathCount }}</td>
+              </tr>
+              <tr>
+                <th>Location</th>
+                <td>{{ counts.locations }}</td>
+                <td>{{ dryRunDiff.locationCount }}</td>
+              </tr>
+              <tr>
+                <th>LocationType</th>
+                <td>{{ counts.locationTypes }}</td>
+                <td>{{ dryRunDiff.locationTypeCount }}</td>
+              </tr>
+              <tr>
+                <th>Block</th>
+                <td>{{ counts.blocks }}</td>
+                <td>{{ dryRunDiff.blockCount }}</td>
+              </tr>
+              <tr>
+                <th>Vehicle</th>
+                <td>{{ counts.vehicles }}</td>
+                <td>{{ dryRunDiff.vehicleCount }}</td>
+              </tr>
             </tbody>
           </table>
           <p v-if="dryRunOk" class="ok-line">服务端校验通过，可执行确认发布。</p>
         </div>
 
         <div v-if="lastError" class="error-box">
-          <p><strong>{{ lastError.code ?? '错误' }}</strong>：{{ lastError.message }}</p>
+          <p>
+            <strong>{{ lastError.code ?? '错误' }}</strong
+            >：{{ lastError.message }}
+          </p>
           <p v-if="lastError.fieldPath">
             字段：
             <button type="button" class="link" @click="jumpToField(lastError.fieldPath)">
@@ -333,7 +415,8 @@ function jumpToField(fieldPath?: string): void {
   width: 100%;
   border-collapse: collapse;
 }
-.kv th, .kv td {
+.kv th,
+.kv td {
   text-align: left;
   padding: 0.25rem 0.5rem;
   border-bottom: 1px solid #eaeef2;
@@ -370,8 +453,15 @@ function jumpToField(fieldPath?: string): void {
   margin: 0.25rem 0 0 1rem;
   padding: 0;
 }
-.error-line { color: #cf222e; font-weight: 600; margin: 0; }
-.ok-line { color: #1a7f37; margin-top: 0.5rem; }
+.error-line {
+  color: #cf222e;
+  font-weight: 600;
+  margin: 0;
+}
+.ok-line {
+  color: #1a7f37;
+  margin-top: 0.5rem;
+}
 .error-box {
   margin-top: 0.75rem;
   padding: 0.5rem 0.75rem;

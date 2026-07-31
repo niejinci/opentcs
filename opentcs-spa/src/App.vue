@@ -40,6 +40,7 @@ onBeforeUnmount(() => live.stop());
         <RouterLink to="/import">地图导入</RouterLink>
         <RouterLink to="/monitor">实时监控</RouterLink>
         <RouterLink to="/editor">画布编辑器</RouterLink>
+        <RouterLink to="/agv-registry">AGV注册</RouterLink>
         <RouterLink to="/warehouse">货架管理</RouterLink>
         <RouterLink to="/debug">BFF 调试</RouterLink>
       </nav>
@@ -110,6 +111,3 @@ onBeforeUnmount(() => live.stop());
   font-weight: 600;
 }
 </style>
-
-
-

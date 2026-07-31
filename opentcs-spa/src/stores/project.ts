@@ -189,6 +189,10 @@ function withProperties<T extends { properties?: Record<string, string> }>(entit
   return { ...entity, properties: {} };
 }
 
+function cloneVehicle(vehicle: DraftVehicle): DraftVehicle {
+  return JSON.parse(JSON.stringify(vehicle)) as DraftVehicle;
+}
+
 interface HistoryEntry {
   label: string;
   snapshot: PersistedDraft;
@@ -1222,6 +1226,74 @@ export const useProjectStore = defineStore('project', () => {
     });
   }
 
+  function addVehicleDraft(vehicle: DraftVehicle): {
+    ok: boolean;
+    vehicle?: DraftVehicle;
+    error?: string;
+  } {
+    const created = cloneVehicle(vehicle);
+    if (!isValidEntityName(created.name)) {
+      return { ok: false, error: '名称非法（不能为空 / 含空白 / 含 / \\）' };
+    }
+    if (nameTaken(created.name)) {
+      return { ok: false, error: `名称 '${created.name}' 已被占用` };
+    }
+    return applyWithHistory('注册 AGV', () => {
+      vehicles.value.push(created);
+      selection.value = { kind: 'vehicle', name: created.name };
+      return { ok: true, vehicle: created };
+    });
+  }
+
+  function replaceVehicleDraft(
+    oldName: string,
+    vehicle: DraftVehicle,
+  ): {
+    ok: boolean;
+    vehicle?: DraftVehicle;
+    error?: string;
+  } {
+    const idx = vehicles.value.findIndex((v) => v.name === oldName);
+    if (idx < 0) return { ok: false, error: `未找到 Vehicle '${oldName}'` };
+    const next = cloneVehicle(vehicle);
+    if (!isValidEntityName(next.name)) {
+      return { ok: false, error: '名称非法（不能为空 / 含空白 / 含 / \\）' };
+    }
+    if (oldName !== next.name && nameTaken(next.name)) {
+      return { ok: false, error: `名称 '${next.name}' 已被占用` };
+    }
+    return applyWithHistory('更新 AGV 注册', () => {
+      vehicles.value[idx] = next;
+      if (selection.value?.kind === 'vehicle' && selection.value.name === oldName) {
+        selection.value = { kind: 'vehicle', name: next.name };
+      }
+      const oldKey = `vehicle:${oldName}`;
+      if (multiSelection.value.has(oldKey)) {
+        const replacement = new Set(multiSelection.value);
+        replacement.delete(oldKey);
+        replacement.add(`vehicle:${next.name}`);
+        multiSelection.value = replacement;
+      }
+      return { ok: true, vehicle: next };
+    });
+  }
+
+  function deleteVehicleByName(name: string): { ok: boolean; error?: string } {
+    if (!findVehicle(name)) return { ok: false, error: `未找到 Vehicle '${name}'` };
+    return applyWithHistory('删除 AGV', () => {
+      vehicles.value = vehicles.value.filter((v) => v.name !== name);
+      if (selection.value?.kind === 'vehicle' && selection.value.name === name) {
+        selection.value = null;
+      }
+      const key = `vehicle:${name}`;
+      if (multiSelection.value.has(key)) {
+        const next = new Set(multiSelection.value);
+        next.delete(key);
+        multiSelection.value = next;
+      }
+      return { ok: true };
+    });
+  }
   function moveVehicle(name: string, pixel: { x: number; y: number }): void {
     const v = findVehicle(name);
     if (!v) return;
@@ -1633,6 +1705,9 @@ export const useProjectStore = defineStore('project', () => {
     // vehicle actions
     addVehicle,
     copyVehicle,
+    addVehicleDraft,
+    replaceVehicleDraft,
+    deleteVehicleByName,
     moveVehicle,
     renameVehicle,
     updateVehicleFields,

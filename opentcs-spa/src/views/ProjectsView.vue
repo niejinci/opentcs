@@ -165,12 +165,21 @@ function fmt(ts: string): string {
       <tbody>
         <tr v-for="p in projects.list" :key="p.id">
           <td>{{ p.name }}</td>
-          <td><code>{{ p.id }}</code></td>
+          <td>
+            <code>{{ p.id }}</code>
+          </td>
           <td>{{ fmt(p.updatedAt) }}</td>
           <td>{{ p.hasDraft ? '✔' : '—' }}</td>
           <td class="actions">
             <button type="button" class="btn" @click="open(p.id)">打开</button>
             <button type="button" class="btn" @click="publish(p.id)">发布</button>
+            <button
+              type="button"
+              class="btn"
+              @click="router.push({ name: 'agv-registry', params: { projectId: p.id } })"
+            >
+              AGV注册
+            </button>
             <button type="button" class="btn" @click="openOrders(p.id)">订单</button>
             <button type="button" class="btn" @click="startRename(p.id, p.name)">重命名</button>
             <button type="button" class="btn" @click="startCopy(p.id, p.name)">另存为</button>

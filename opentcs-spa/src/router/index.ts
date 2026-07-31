@@ -37,6 +37,13 @@ const routes: RouteRecordRaw[] = [
     props: true,
   },
   {
+    path: '/agv-registry/:projectId?',
+    name: 'agv-registry',
+    component: () => import('@/views/AgvRegistryView.vue'),
+    meta: { title: 'AGV注册管理' },
+    props: true,
+  },
+  {
     path: '/warehouse',
     component: () => import('@/views/WarehouseManagementView.vue'),
     meta: { title: '货架管理' },
