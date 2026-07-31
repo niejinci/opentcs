@@ -160,10 +160,12 @@ function vehiclePixel(name: string): { x: number; y: number } | null {
 }
 
 function openMapTargetDetail(target: MonitorMapTargetRef): void {
+  selectedVehicleName.value = null;
   selectedMapTarget.value = { ...target };
 }
 
-function selectVehicle(name: string, locate = true): void {
+function openVehicleDetail(name: string, locate = true): void {
+  selectedMapTarget.value = null;
   selectedVehicleName.value = name;
   if (!locate) return;
   const pixel = vehiclePixel(name);
@@ -174,13 +176,17 @@ function selectVehicle(name: string, locate = true): void {
   mapStageRef.value?.focusPixel(pixel, 1.2);
 }
 
+function closeVehicleDetail(): void {
+  selectedVehicleName.value = null;
+}
+
 function locateSelected(): void {
   if (selectedVehicleName.value) {
-    selectVehicle(selectedVehicleName.value, true);
+    openVehicleDetail(selectedVehicleName.value, true);
     return;
   }
   const first = filteredRows.value[0];
-  if (first) selectVehicle(first.vehicle.name, true);
+  if (first) openVehicleDetail(first.vehicle.name, true);
 }
 
 function openVehicleHome(url: string): void {
@@ -265,7 +271,7 @@ onMounted(() => {
           :selected-vehicle-name="selectedVehicleName"
           :show-entity-labels="showEntityLabels"
           @target-click="openMapTargetDetail"
-          @vehicle-click="(name: string) => selectVehicle(name, true)"
+          @vehicle-click="openVehicleDetail"
         >
           <template #status="{ scale }">
             <footer class="monitor-statusbar">
@@ -302,7 +308,7 @@ onMounted(() => {
           v-if="selectedRow"
           :vehicle="selectedRow.vehicle"
           :active-order="selectedRow.activeOrder"
-          @close="selectedVehicleName = null"
+          @close="closeVehicleDetail"
           @open-home="openVehicleHome"
           @create-order="createOrderForVehicle"
         />
@@ -330,7 +336,7 @@ onMounted(() => {
           <VehicleListTable
             :rows="filteredRows"
             :selected-vehicle-name="selectedVehicleName"
-            @select="selectVehicle"
+            @select="openVehicleDetail"
           />
         </section>
       </aside>

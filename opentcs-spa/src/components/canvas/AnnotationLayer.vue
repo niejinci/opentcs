@@ -243,6 +243,10 @@ const LOCATION_FILL_DEFAULT = '#8250df';
 const LOCATION_FILL_SELECTED = '#bf3989';
 const LOCATION_FILL_LOCKED = '#8c959f';
 const VEHICLE_STROKE = '#1f2328';
+const VEHICLE_SELECTED_HALO_STROKE = '#0969da';
+const VEHICLE_SELECTED_HALO_FILL = 'rgba(9, 105, 218, 0.12)';
+const VEHICLE_HALO_RADIUS_CSS_PX = 22;
+const VEHICLE_HALO_STROKE_CSS_PX = 2;
 
 function isMemberHighlighted(name: string): boolean {
   return highlightedBlockMembers.value.has(name);
@@ -345,11 +349,20 @@ const toleranceRings = computed<ToleranceRing[]>(() => {
 const TOLERANCE_STROKE_DEFAULT = '#0969da';
 const TOLERANCE_STROKE_SELECTED = '#bf3989';
 
-function vehicleStrokeWidth(v: DraftVehicle): number {
-  const selected =
+const vehicleHaloRadius = computed(() => VEHICLE_HALO_RADIUS_CSS_PX / safeScale(props.scale));
+const vehicleHaloStrokeWidth = computed(
+  () => VEHICLE_HALO_STROKE_CSS_PX / safeScale(props.scale),
+);
+
+function vehicleSelected(v: DraftVehicle): boolean {
+  return (
     props.selectedVehicleName === v.name ||
-    (store.selection?.kind === 'vehicle' && store.selection.name === v.name);
-  return (selected ? 2.5 : 1.5) / safeScale(props.scale);
+    (store.selection?.kind === 'vehicle' && store.selection.name === v.name)
+  );
+}
+
+function vehicleStrokeWidth(v: DraftVehicle): number {
+  return (vehicleSelected(v) ? 2.5 : 1.5) / safeScale(props.scale);
 }
 
 /* --------------------------- Link rendering --------------------------- */
@@ -869,6 +882,19 @@ function onPreciseMarkerClick(marker: PreciseMarker, e: KonvaEventObject<MouseEv
 
     <!-- Vehicles (oriented rectangle + small triangle indicator). -->
     <template v-for="v in store.vehicles" :key="`veh-${v.name}`">
+      <v-circle
+        v-if="vehicleSelected(v)"
+        :config="{
+          x: vehiclePixel(v).x,
+          y: vehiclePixel(v).y,
+          radius: vehicleHaloRadius,
+          fill: VEHICLE_SELECTED_HALO_FILL,
+          stroke: VEHICLE_SELECTED_HALO_STROKE,
+          strokeWidth: vehicleHaloStrokeWidth,
+          listening: false,
+          name: 'selected-vehicle-halo',
+        }"
+      />
       <v-rect
         :config="{
           x: vehiclePixel(v).x,
