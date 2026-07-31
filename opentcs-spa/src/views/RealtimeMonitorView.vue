@@ -44,6 +44,12 @@ const LABEL_DISPLAY_MODE_OPTIONS = [
 ] as const;
 type MonitorLabelDisplayMode = (typeof LABEL_DISPLAY_MODE_OPTIONS)[number]['value'];
 type MonitorMapTargetRef = { kind: 'point' | 'location'; name: string };
+type VehiclePointOverlapMenu = {
+  vehicleName: string;
+  pointName: string;
+  clientX: number;
+  clientY: number;
+};
 type MonitorMapTargetDetail =
   | { kind: 'point'; point: DraftPoint }
   | { kind: 'location'; location: DraftLocation };
@@ -55,6 +61,7 @@ const selectedGroup = ref('');
 const searchQuery = ref('');
 const selectedVehicleName = ref<string | null>(null);
 const selectedMapTarget = ref<MonitorMapTargetRef | null>(null);
+const vehiclePointOverlapMenu = ref<VehiclePointOverlapMenu | null>(null);
 const fleetPanelCollapsed = ref(readFleetPanelCollapsed());
 const labelDisplayMode = ref<MonitorLabelDisplayMode>(readLabelDisplayMode());
 const mapStageRef = useTemplateRef<{
@@ -145,6 +152,7 @@ async function activateProject(): Promise<void> {
     projectName.value = meta.name;
     const env = await projects.loadCurrentDraft();
     project.hydrateDraftPayload(env?.payload ?? null);
+    vehiclePointOverlapMenu.value = null;
   } catch {
     toastError('加载实时监控工程失败', '实时监控');
   } finally {
@@ -160,11 +168,37 @@ function vehiclePixel(name: string): { x: number; y: number } | null {
 }
 
 function openMapTargetDetail(target: MonitorMapTargetRef): void {
+  vehiclePointOverlapMenu.value = null;
   selectedVehicleName.value = null;
   selectedMapTarget.value = { ...target };
 }
 
+function openVehiclePointOverlapMenu(payload: VehiclePointOverlapMenu): void {
+  selectedVehicleName.value = null;
+  selectedMapTarget.value = null;
+  vehiclePointOverlapMenu.value = { ...payload };
+}
+
+function closeVehiclePointOverlapMenu(): void {
+  vehiclePointOverlapMenu.value = null;
+}
+
+function chooseOverlapVehicle(): void {
+  const menu = vehiclePointOverlapMenu.value;
+  if (!menu) return;
+  vehiclePointOverlapMenu.value = null;
+  openVehicleDetail(menu.vehicleName, true);
+}
+
+function chooseOverlapPoint(): void {
+  const menu = vehiclePointOverlapMenu.value;
+  if (!menu) return;
+  vehiclePointOverlapMenu.value = null;
+  openMapTargetDetail({ kind: 'point', name: menu.pointName });
+}
+
 function openVehicleDetail(name: string, locate = true): void {
+  vehiclePointOverlapMenu.value = null;
   selectedMapTarget.value = null;
   selectedVehicleName.value = name;
   if (!locate) return;
@@ -272,6 +306,7 @@ onMounted(() => {
           :show-entity-labels="showEntityLabels"
           @target-click="openMapTargetDetail"
           @vehicle-click="openVehicleDetail"
+          @vehicle-point-overlap-click="openVehiclePointOverlapMenu"
         >
           <template #status="{ scale }">
             <footer class="monitor-statusbar">
@@ -293,6 +328,31 @@ onMounted(() => {
             </footer>
           </template>
         </MapStage>
+        <div
+          v-if="vehiclePointOverlapMenu"
+          class="overlap-menu"
+          :style="{
+            left: vehiclePointOverlapMenu.clientX + 'px',
+            top: vehiclePointOverlapMenu.clientY + 'px',
+          }"
+          role="menu"
+          aria-label="选择查看对象"
+        >
+          <header>
+            <span>选择查看对象</span>
+            <button type="button" aria-label="关闭重叠对象菜单" @click="closeVehiclePointOverlapMenu">
+              ×
+            </button>
+          </header>
+          <button type="button" role="menuitem" @click="chooseOverlapVehicle">
+            <span>车辆详情</span>
+            <strong>{{ vehiclePointOverlapMenu.vehicleName }}</strong>
+          </button>
+          <button type="button" role="menuitem" @click="chooseOverlapPoint">
+            <span>点位详情</span>
+            <strong>{{ vehiclePointOverlapMenu.pointName }}</strong>
+          </button>
+        </div>
         <TaskPoolStatusCard
           :counts="taskPool"
           :orders="transportOrderList"
@@ -450,6 +510,70 @@ onMounted(() => {
   cursor: pointer;
   font: inherit;
   padding: 0.2rem 0.55rem;
+}
+.overlap-menu {
+  position: fixed;
+  z-index: 36;
+  width: min(18rem, calc(100vw - 1rem));
+  transform: translate(8px, 8px);
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(27, 31, 36, 0.18);
+  overflow: hidden;
+}
+.overlap-menu header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid #eaeef2;
+  color: #57606a;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+.overlap-menu header button {
+  width: 1.55rem;
+  height: 1.55rem;
+  border: 1px solid #d0d7de;
+  border-radius: 5px;
+  background: #f6f8fa;
+  color: #cf222e;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+}
+.overlap-menu > button[role='menuitem'] {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.55rem 0.65rem;
+  border: none;
+  border-bottom: 1px solid #f0f3f6;
+  background: #ffffff;
+  color: #1f2328;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.overlap-menu > button[role='menuitem']:last-child {
+  border-bottom: none;
+}
+.overlap-menu > button[role='menuitem']:hover {
+  background: #ddf4ff;
+}
+.overlap-menu > button[role='menuitem'] span {
+  color: #57606a;
+  font-size: 0.84rem;
+}
+.overlap-menu > button[role='menuitem'] strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9rem;
 }
 .fleet-panel {
   min-width: 0;

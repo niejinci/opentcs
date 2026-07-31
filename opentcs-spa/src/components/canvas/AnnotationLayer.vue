@@ -57,6 +57,10 @@ const emit = defineEmits<{
   'target-click': [target: { kind: 'point' | 'location'; name: string }];
   /** Fired in monitor/read-only mode when the user clicks a vehicle. */
   'vehicle-click': [name: string];
+  /** Fired in monitor/read-only mode when a click hits a vehicle that overlaps a Point. */
+  'vehicle-point-overlap-click': [
+    payload: { vehicleName: string; pointName: string; clientX: number; clientY: number },
+  ];
 }>();
 
 const store = useProjectStore();
@@ -509,6 +513,32 @@ function pointUnderVehicle(v: DraftVehicle): DraftPoint | null {
   return null;
 }
 
+function pointCoveredByVehicleIcon(v: DraftVehicle): DraftPoint | null {
+  const pos = vehiclePixel(v);
+  const angleRad =
+    ((Number.isFinite(v.layout.orientationDeg) ? v.layout.orientationDeg : 0) * Math.PI) / 180;
+  const cos = Math.cos(angleRad);
+  const sin = Math.sin(angleRad);
+  const halfLength = vehicleLength.value / 2 + pointRadius.value;
+  const halfWidth = vehicleWidth.value / 2 + pointRadius.value;
+  let best: { point: DraftPoint; distanceSq: number } | null = null;
+
+  for (const p of store.points) {
+    const dx = p.layout.pixelX - pos.x;
+    const dy = p.layout.pixelY - pos.y;
+    const localX = dx * cos + dy * sin;
+    const localY = -dx * sin + dy * cos;
+    if (Math.abs(localX) > halfLength || Math.abs(localY) > halfWidth) continue;
+
+    const distanceSq = dx * dx + dy * dy;
+    if (!best || distanceSq < best.distanceSq) {
+      best = { point: p, distanceSq };
+    }
+  }
+
+  return best?.point ?? null;
+}
+
 function pointerPixel(e: KonvaEventObject<MouseEvent>): { x: number; y: number } | null {
   const stage = e.target.getStage();
   const pointer = stage?.getPointerPosition();
@@ -540,6 +570,16 @@ function onVehicleClick(v: DraftVehicle, e: KonvaEventObject<MouseEvent>): void 
   if (props.readonly) {
     e.cancelBubble = true;
     emit('entity-click');
+    const underlying = pointCoveredByVehicleIcon(v);
+    if (underlying) {
+      emit('vehicle-point-overlap-click', {
+        vehicleName: v.name,
+        pointName: underlying.name,
+        clientX: e.evt.clientX,
+        clientY: e.evt.clientY,
+      });
+      return;
+    }
     emit('vehicle-click', v.name);
     return;
   }

@@ -64,6 +64,10 @@ const emit = defineEmits<{
   'target-click': [target: { kind: 'point' | 'location'; name: string }];
   /** Forwarded from AnnotationLayer when a vehicle is clicked in monitor mode. */
   'vehicle-click': [name: string];
+  /** Forwarded when a vehicle click also has an underlying Point candidate. */
+  'vehicle-point-overlap-click': [
+    payload: { vehicleName: string; pointName: string; clientX: number; clientY: number },
+  ];
 }>();
 
 /* ---------------------------- Container sizing --------------------------- */
@@ -393,6 +397,7 @@ defineSlots<{
           @entity-click="onEntityClick"
           @target-click="(target) => emit('target-click', target)"
           @vehicle-click="(name: string) => emit('vehicle-click', name)"
+          @vehicle-point-overlap-click="(payload) => emit('vehicle-point-overlap-click', payload)"
         />
         <HoverLayer :cursor="cursorStage" :tool="tool" :scale="scale" />
       </v-stage>
