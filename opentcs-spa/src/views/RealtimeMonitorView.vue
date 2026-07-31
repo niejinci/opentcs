@@ -6,6 +6,7 @@ import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 
 import MapStage from '@/components/canvas/MapStage.vue';
+import PointLocationDetailWindow from '@/components/monitor/PointLocationDetailWindow.vue';
 import TaskPoolStatusCard from '@/components/monitor/TaskPoolStatusCard.vue';
 import VehicleDetailWindow from '@/components/monitor/VehicleDetailWindow.vue';
 import VehicleFilterBar from '@/components/monitor/VehicleFilterBar.vue';
@@ -14,6 +15,7 @@ import VehicleStatusRail from '@/components/monitor/VehicleStatusRail.vue';
 import { useBackgroundMap } from '@/composables/useBackgroundMap';
 import { useLiveVehicleOverlay } from '@/composables/useLiveVehicleOverlay';
 import { taskPoolCounts } from '@/domain/orders/taskPool';
+import type { DraftLocation, DraftPoint } from '@/domain/model/types';
 import {
   availableVehicleGroups,
   buildVehicleMonitorRows,
@@ -41,6 +43,10 @@ const LABEL_DISPLAY_MODE_OPTIONS = [
   { value: 'hidden', label: '隐藏名称' },
 ] as const;
 type MonitorLabelDisplayMode = (typeof LABEL_DISPLAY_MODE_OPTIONS)[number]['value'];
+type MonitorMapTargetRef = { kind: 'point' | 'location'; name: string };
+type MonitorMapTargetDetail =
+  | { kind: 'point'; point: DraftPoint }
+  | { kind: 'location'; location: DraftLocation };
 
 const projectName = ref('');
 const loadingProject = ref(false);
@@ -48,6 +54,7 @@ const activeCategory = ref<VehicleMonitorCategoryId>('all');
 const selectedGroup = ref('');
 const searchQuery = ref('');
 const selectedVehicleName = ref<string | null>(null);
+const selectedMapTarget = ref<MonitorMapTargetRef | null>(null);
 const fleetPanelCollapsed = ref(readFleetPanelCollapsed());
 const labelDisplayMode = ref<MonitorLabelDisplayMode>(readLabelDisplayMode());
 const mapStageRef = useTemplateRef<{
@@ -79,6 +86,16 @@ const selectedRow = computed(() =>
     : null,
 );
 const showEntityLabels = computed(() => labelDisplayMode.value === 'always');
+const selectedMapTargetDetail = computed<MonitorMapTargetDetail | null>(() => {
+  const selected = selectedMapTarget.value;
+  if (!selected) return null;
+  if (selected.kind === 'point') {
+    const point = project.findPoint(selected.name);
+    return point ? { kind: 'point', point } : null;
+  }
+  const location = project.findLocation(selected.name);
+  return location ? { kind: 'location', location } : null;
+});
 
 function readFleetPanelCollapsed(): boolean {
   if (typeof localStorage === 'undefined') return false;
@@ -140,6 +157,10 @@ function vehiclePixel(name: string): { x: number; y: number } | null {
   if (entry) return { x: entry.pixelX, y: entry.pixelY };
   const draft = project.findVehicle(name);
   return draft ? { x: draft.layout.pixelX, y: draft.layout.pixelY } : null;
+}
+
+function openMapTargetDetail(target: MonitorMapTargetRef): void {
+  selectedMapTarget.value = { ...target };
 }
 
 function selectVehicle(name: string, locate = true): void {
@@ -243,6 +264,7 @@ onMounted(() => {
           tool="select"
           :selected-vehicle-name="selectedVehicleName"
           :show-entity-labels="showEntityLabels"
+          @target-click="openMapTargetDetail"
           @vehicle-click="(name: string) => selectVehicle(name, true)"
         >
           <template #status="{ scale }">
@@ -269,6 +291,12 @@ onMounted(() => {
           :counts="taskPool"
           :orders="transportOrderList"
           :sse-state="live.sseState"
+        />
+        <PointLocationDetailWindow
+          v-if="selectedMapTargetDetail && background"
+          :target="selectedMapTargetDetail"
+          :affine="background.affine"
+          @close="selectedMapTarget = null"
         />
         <VehicleDetailWindow
           v-if="selectedRow"
