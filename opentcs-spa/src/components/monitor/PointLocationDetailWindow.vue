@@ -2,8 +2,9 @@
 // SPDX-FileCopyrightText: The openTCS Authors
 // SPDX-License-Identifier: MIT
 
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 
+import CopyableValue from '@/components/monitor/CopyableValue.vue';
 import { pixelToWorld, type AffineMapping } from '@/domain/geometry/affine';
 import type { DraftLocation, DraftPoint } from '@/domain/model/types';
 
@@ -19,6 +20,15 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: [];
 }>();
+
+const position = ref({ x: 16, y: 16 });
+
+let dragStart: {
+  pointerX: number;
+  pointerY: number;
+  x: number;
+  y: number;
+} | null = null;
 
 const title = computed(() =>
   props.target.kind === 'point' ? props.target.point.name : props.target.location.name,
@@ -46,20 +56,61 @@ const linkEntries = computed(() =>
   props.target.kind === 'location' ? props.target.location.links : [],
 );
 
+function onHeaderPointerDown(e: PointerEvent): void {
+  if (e.button !== 0) return;
+  const target = e.target as HTMLElement;
+  if (target.closest('button')) return;
+  dragStart = {
+    pointerX: e.clientX,
+    pointerY: e.clientY,
+    x: position.value.x,
+    y: position.value.y,
+  };
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp, { once: true });
+  window.addEventListener('pointercancel', onPointerUp, { once: true });
+}
+
+function onPointerMove(e: PointerEvent): void {
+  if (!dragStart) return;
+  const nextX = dragStart.x + e.clientX - dragStart.pointerX;
+  const nextY = dragStart.y + e.clientY - dragStart.pointerY;
+  position.value = {
+    x: Math.max(0, Math.min(nextX, window.innerWidth - 320)),
+    y: Math.max(0, Math.min(nextY, window.innerHeight - 180)),
+  };
+}
+
+function onPointerUp(): void {
+  dragStart = null;
+  window.removeEventListener('pointermove', onPointerMove);
+  window.removeEventListener('pointerup', onPointerUp);
+  window.removeEventListener('pointercancel', onPointerUp);
+}
+
 function valueText(value: unknown): string {
   if (value === null || value === undefined || value === '') return '-';
   if (typeof value === 'number' && Number.isNaN(value)) return '-';
+  if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 }
 
 function operationsText(operations: readonly string[]): string {
   return operations.length > 0 ? operations.join(', ') : '继承 LocationType';
 }
+
+onBeforeUnmount(() => {
+  onPointerUp();
+});
 </script>
 
 <template>
-  <section class="target-detail-window" aria-label="点位详情">
-    <header class="detail-header">
+  <section
+    class="target-detail-window"
+    :style="{ transform: `translate(${position.x}px, ${position.y}px)` }"
+    aria-label="点位详情"
+  >
+    <header class="detail-header" @pointerdown="onHeaderPointerDown">
       <div>
         <p>{{ subtitle }}</p>
         <h3>{{ title }}</h3>
@@ -70,42 +121,48 @@ function operationsText(operations: readonly string[]): string {
     <div class="detail-body">
       <dl v-if="target.kind === 'point'" class="kv">
         <dt>名称</dt>
-        <dd>{{ target.point.name }}</dd>
+        <CopyableValue label="名称" :value="target.point.name" />
         <dt>类型</dt>
-        <dd>{{ target.point.type }}</dd>
+        <CopyableValue label="类型" :value="target.point.type" />
         <dt>像素坐标</dt>
-        <dd>{{ pixel.x.toFixed(1) }}, {{ pixel.y.toFixed(1) }}</dd>
+        <CopyableValue label="像素坐标" :value="pixel.x.toFixed(1) + ', ' + pixel.y.toFixed(1)" />
         <dt>世界坐标</dt>
-        <dd>{{ world.x.toFixed(3) }} m, {{ world.y.toFixed(3) }} m</dd>
+        <CopyableValue
+          label="世界坐标"
+          :value="world.x.toFixed(3) + ' m, ' + world.y.toFixed(3) + ' m'"
+        />
         <dt>openTCS X</dt>
-        <dd>{{ valueText(target.point.pose.position.x) }} mm</dd>
+        <CopyableValue label="openTCS X" :value="valueText(target.point.pose.position.x) + ' mm'" />
         <dt>openTCS Y</dt>
-        <dd>{{ valueText(target.point.pose.position.y) }} mm</dd>
+        <CopyableValue label="openTCS Y" :value="valueText(target.point.pose.position.y) + ' mm'" />
         <dt>openTCS Z</dt>
-        <dd>{{ valueText(target.point.pose.position.z) }} mm</dd>
+        <CopyableValue label="openTCS Z" :value="valueText(target.point.pose.position.z) + ' mm'" />
         <dt>方向角</dt>
-        <dd>{{ valueText(target.point.pose.orientationAngle) }}</dd>
+        <CopyableValue label="方向角" :value="valueText(target.point.pose.orientationAngle)" />
       </dl>
 
       <dl v-else class="kv">
         <dt>名称</dt>
-        <dd>{{ target.location.name }}</dd>
+        <CopyableValue label="名称" :value="target.location.name" />
         <dt>类型</dt>
-        <dd>{{ target.location.typeName }}</dd>
+        <CopyableValue label="类型" :value="target.location.typeName" />
         <dt>锁定</dt>
-        <dd>{{ target.location.locked ? '是' : '否' }}</dd>
+        <CopyableValue label="锁定" :value="target.location.locked ? '是' : '否'" />
         <dt>表现形式</dt>
-        <dd>{{ target.location.layout.locationRepresentation }}</dd>
+        <CopyableValue label="表现形式" :value="target.location.layout.locationRepresentation" />
         <dt>像素坐标</dt>
-        <dd>{{ pixel.x.toFixed(1) }}, {{ pixel.y.toFixed(1) }}</dd>
+        <CopyableValue label="像素坐标" :value="pixel.x.toFixed(1) + ', ' + pixel.y.toFixed(1)" />
         <dt>世界坐标</dt>
-        <dd>{{ world.x.toFixed(3) }} m, {{ world.y.toFixed(3) }} m</dd>
+        <CopyableValue
+          label="世界坐标"
+          :value="world.x.toFixed(3) + ' m, ' + world.y.toFixed(3) + ' m'"
+        />
         <dt>openTCS X</dt>
-        <dd>{{ valueText(target.location.position.x) }} mm</dd>
+        <CopyableValue label="openTCS X" :value="valueText(target.location.position.x) + ' mm'" />
         <dt>openTCS Y</dt>
-        <dd>{{ valueText(target.location.position.y) }} mm</dd>
+        <CopyableValue label="openTCS Y" :value="valueText(target.location.position.y) + ' mm'" />
         <dt>openTCS Z</dt>
-        <dd>{{ valueText(target.location.position.z) }} mm</dd>
+        <CopyableValue label="openTCS Z" :value="valueText(target.location.position.z) + ' mm'" />
       </dl>
 
       <section v-if="target.kind === 'location'" class="subsection">
@@ -125,7 +182,7 @@ function operationsText(operations: readonly string[]): string {
         <dl v-else class="kv properties">
           <template v-for="[key, value] in propertyEntries" :key="key">
             <dt>{{ key }}</dt>
-            <dd>{{ value }}</dd>
+            <CopyableValue :label="key" :value="valueText(value)" />
           </template>
         </dl>
       </section>
@@ -136,8 +193,8 @@ function operationsText(operations: readonly string[]): string {
 <style scoped>
 .target-detail-window {
   position: absolute;
-  left: 1rem;
-  top: 1rem;
+  left: 0;
+  top: 0;
   z-index: 24;
   width: min(27rem, calc(100vw - 2rem));
   max-height: min(34rem, calc(100vh - 2rem));
@@ -156,6 +213,8 @@ function operationsText(operations: readonly string[]): string {
   gap: 0.75rem;
   padding: 0.75rem 0.85rem;
   border-bottom: 1px solid #d8dee4;
+  cursor: move;
+  touch-action: none;
 }
 .detail-header p {
   margin: 0;
@@ -193,12 +252,6 @@ h3 {
 .kv dt {
   min-width: 0;
   color: #6e7781;
-  overflow-wrap: anywhere;
-}
-.kv dd {
-  min-width: 0;
-  margin: 0;
-  color: #1f2328;
   overflow-wrap: anywhere;
 }
 .subsection {
@@ -246,7 +299,7 @@ h4 {
   row-gap: 0;
 }
 .properties dt,
-.properties dd {
+.properties :deep(dd) {
   min-height: 1.75rem;
   padding: 0.3rem 0;
   border-bottom: 1px solid #f0f3f6;

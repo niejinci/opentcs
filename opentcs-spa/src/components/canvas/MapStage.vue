@@ -70,6 +70,8 @@ const emit = defineEmits<{
   'vehicle-point-overlap-click': [
     payload: { vehicleName: string; pointName: string; clientX: number; clientY: number },
   ];
+  /** Fired when a read-only monitor click lands on empty canvas. */
+  'blank-click': [];
 }>();
 
 /* ---------------------------- Container sizing --------------------------- */
@@ -80,12 +82,14 @@ const stageWidth = ref(1);
 const stageHeight = ref(1);
 
 let resizeObserver: ResizeObserver | null = null;
+let focusAnimationFrame: number | null = null;
 
 /* ---------------------------- Stage transform --------------------------- */
 
 const MIN_SCALE = 0.05;
 const MAX_SCALE = 20;
 const ZOOM_STEP = 1.1;
+const FOCUS_ANIMATION_MS = 280;
 
 const scale = ref(1);
 const stageX = ref(0);
@@ -114,7 +118,22 @@ const cursorCss = computed(() => {
 
 /* ------------------------------ View helpers ---------------------------- */
 
+function cancelFocusAnimation(): void {
+  if (focusAnimationFrame === null) return;
+  window.cancelAnimationFrame(focusAnimationFrame);
+  focusAnimationFrame = null;
+}
+
+function prefersReducedMotion(): boolean {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+}
+
+function easeOutCubic(t: number): number {
+  return 1 - (1 - t) ** 3;
+}
+
 function fitToContainer(): void {
+  cancelFocusAnimation();
   if (!props.imageWidth || !props.imageHeight) return;
   const padding = 0.05; // 5% breathing room
   const sx = (stageWidth.value * (1 - padding)) / props.imageWidth;
@@ -130,12 +149,40 @@ function focusPixel(pixel: { x: number; y: number }, preferredScale?: number): v
     preferredScale === undefined
       ? scale.value
       : Math.max(MIN_SCALE, Math.min(MAX_SCALE, preferredScale));
-  scale.value = nextScale;
-  stageX.value = stageWidth.value / 2 - pixel.x * nextScale;
-  stageY.value = stageHeight.value / 2 - pixel.y * nextScale;
+  const nextX = stageWidth.value / 2 - pixel.x * nextScale;
+  const nextY = stageHeight.value / 2 - pixel.y * nextScale;
+  cancelFocusAnimation();
+
+  if (prefersReducedMotion()) {
+    scale.value = nextScale;
+    stageX.value = nextX;
+    stageY.value = nextY;
+    return;
+  }
+
+  const startScale = scale.value;
+  const startX = stageX.value;
+  const startY = stageY.value;
+  const startedAt = window.performance.now();
+
+  const step = (now: number): void => {
+    const progress = Math.min(1, (now - startedAt) / FOCUS_ANIMATION_MS);
+    const eased = easeOutCubic(progress);
+    scale.value = startScale + (nextScale - startScale) * eased;
+    stageX.value = startX + (nextX - startX) * eased;
+    stageY.value = startY + (nextY - startY) * eased;
+    if (progress < 1) {
+      focusAnimationFrame = window.requestAnimationFrame(step);
+      return;
+    }
+    focusAnimationFrame = null;
+  };
+
+  focusAnimationFrame = window.requestAnimationFrame(step);
 }
 
 function setScaleAtScreenPoint(newScale: number, screenX: number, screenY: number): void {
+  cancelFocusAnimation();
   const clamped = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
   if (clamped === scale.value) return;
   // Keep the stage point currently under the screen point pinned in place.
@@ -201,7 +248,10 @@ function onStageClick(): void {
   }
   const cursor = cursorStage.value;
   if (!cursor) return;
-  if (props.readonly) return;
+  if (props.readonly) {
+    emit('blank-click');
+    return;
+  }
   // Snap creation tools to the nearest grid intersection when grid-snap
   // is enabled. The `select` tool keeps the raw cursor so empty-canvas
   // clicks remain pixel-accurate (selection logic does not care about
@@ -253,6 +303,7 @@ function onStagePointerDown(e: KonvaEventObject<PointerEvent>): void {
 
 function onPanPointerMove(e: PointerEvent): void {
   if (!panStart) return;
+  cancelFocusAnimation();
   if ((e.buttons & 1) === 0) {
     onPanPointerEnd();
     return;
@@ -294,6 +345,7 @@ function onPanPointerEnd(): void {
  * of the visible canvas.
  */
 function onMinimapRecenter(payload: { stageX: number; stageY: number }): void {
+  cancelFocusAnimation();
   stageX.value = payload.stageX;
   stageY.value = payload.stageY;
 }
@@ -322,6 +374,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  cancelFocusAnimation();
   resizeObserver?.disconnect();
   resizeObserver = null;
   window.removeEventListener('pointermove', onPanPointerMove);

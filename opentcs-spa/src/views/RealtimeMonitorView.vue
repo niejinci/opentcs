@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: The openTCS Authors
 // SPDX-License-Identifier: MIT
 
-import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 
 import MapStage from '@/components/canvas/MapStage.vue';
@@ -181,6 +181,12 @@ function findPointByQuery(query: string): DraftPoint | null {
   );
 }
 
+function closeMonitorDetails(): void {
+  vehiclePointOverlapMenu.value = null;
+  selectedVehicleName.value = null;
+  selectedMapTarget.value = null;
+}
+
 function openMapTargetDetail(target: MonitorMapTargetRef): void {
   vehiclePointOverlapMenu.value = null;
   selectedVehicleName.value = null;
@@ -255,6 +261,11 @@ function closeVehicleDetail(): void {
   selectedVehicleName.value = null;
 }
 
+function onMonitorKeydown(e: KeyboardEvent): void {
+  if (e.key !== 'Escape') return;
+  closeMonitorDetails();
+}
+
 function locateSelected(): void {
   if (selectedVehicleName.value) {
     openVehicleDetail(selectedVehicleName.value, true);
@@ -302,9 +313,14 @@ watch(
 );
 
 onMounted(() => {
+  window.addEventListener('keydown', onMonitorKeydown);
   if (!projectId.value) {
     toastInfo('实时监控将使用最近打开的工程；也可从工程列表进入指定工程。');
   }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onMonitorKeydown);
 });
 </script>
 
@@ -349,6 +365,7 @@ onMounted(() => {
           @target-click="openMapTargetDetail"
           @vehicle-click="openVehicleDetail"
           @vehicle-point-overlap-click="openVehiclePointOverlapMenu"
+          @blank-click="closeMonitorDetails"
         >
           <template #status="{ scale }">
             <footer class="monitor-statusbar">

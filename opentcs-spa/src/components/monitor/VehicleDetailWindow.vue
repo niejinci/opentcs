@@ -2,9 +2,10 @@
 // SPDX-FileCopyrightText: The openTCS Authors
 // SPDX-License-Identifier: MIT
 
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
 import type { TransportOrder, Vehicle } from '@/api/types/bff';
+import CopyableValue from '@/components/monitor/CopyableValue.vue';
 import { vehicleHomeUrl } from '@/domain/vehicles/monitor';
 
 const props = defineProps<{
@@ -83,6 +84,10 @@ function valueText(value: unknown): string {
 }
 
 const propertyEntries = computed(() => Object.entries(props.vehicle.properties ?? {}));
+
+onBeforeUnmount(() => {
+  onPointerUp();
+});
 </script>
 
 <template>
@@ -124,45 +129,45 @@ const propertyEntries = computed(() => Object.entries(props.vehicle.properties ?
     <div class="detail-body">
       <dl v-if="activeTab === '基本信息'" class="kv">
         <dt>状态</dt>
-        <dd>{{ vehicle.state }}</dd>
+        <CopyableValue label="状态" :value="vehicle.state" />
         <dt>运行</dt>
-        <dd>{{ vehicle.procState }}</dd>
+        <CopyableValue label="运行" :value="vehicle.procState" />
         <dt>集成级别</dt>
-        <dd>{{ vehicle.integrationLevel }}</dd>
+        <CopyableValue label="集成级别" :value="vehicle.integrationLevel" />
         <dt>操作模式</dt>
-        <dd>{{ valueText(vehicle.operatingMode) }}</dd>
+        <CopyableValue label="操作模式" :value="valueText(vehicle.operatingMode)" />
         <dt>电量</dt>
-        <dd>{{ Math.round(vehicle.energyLevel) }}%</dd>
+        <CopyableValue label="电量" :value="Math.round(vehicle.energyLevel) + '%'" />
         <dt>暂停</dt>
-        <dd>{{ vehicle.paused ? '是' : '否' }}</dd>
+        <CopyableValue label="暂停" :value="vehicle.paused ? '是' : '否'" />
         <dt>最后状态</dt>
-        <dd>{{ valueText(vehicle.lastStateAt) }}</dd>
+        <CopyableValue label="最后状态" :value="valueText(vehicle.lastStateAt)" />
       </dl>
 
       <dl v-else-if="activeTab === '任务信息'" class="kv">
         <dt>活跃订单</dt>
-        <dd>{{ activeOrder?.name ?? '-' }}</dd>
+        <CopyableValue label="活跃订单" :value="activeOrder?.name ?? '-'" />
         <dt>订单状态</dt>
-        <dd>{{ activeOrder?.state ?? '-' }}</dd>
+        <CopyableValue label="订单状态" :value="activeOrder?.state ?? '-'" />
         <dt>意向车辆</dt>
-        <dd>{{ activeOrder?.intendedVehicle ?? '-' }}</dd>
+        <CopyableValue label="意向车辆" :value="activeOrder?.intendedVehicle ?? '-'" />
         <dt>执行车辆</dt>
-        <dd>{{ activeOrder?.processingVehicle ?? '-' }}</dd>
+        <CopyableValue label="执行车辆" :value="activeOrder?.processingVehicle ?? '-'" />
         <dt>目的地数</dt>
-        <dd>{{ activeOrder?.destinations.length ?? 0 }}</dd>
+        <CopyableValue label="目的地数" :value="activeOrder?.destinations.length ?? 0" />
       </dl>
 
       <dl v-else-if="activeTab === '点位信息'" class="kv">
         <dt>当前点位</dt>
-        <dd>{{ vehicle.currentPosition ?? '-' }}</dd>
+        <CopyableValue label="当前点位" :value="vehicle.currentPosition ?? '-'" />
         <dt>精确坐标 X</dt>
-        <dd>{{ valueText(vehicle.precisePosition?.x) }}</dd>
+        <CopyableValue label="精确坐标 X" :value="valueText(vehicle.precisePosition?.x)" />
         <dt>精确坐标 Y</dt>
-        <dd>{{ valueText(vehicle.precisePosition?.y) }}</dd>
+        <CopyableValue label="精确坐标 Y" :value="valueText(vehicle.precisePosition?.y)" />
         <dt>精确坐标 Z</dt>
-        <dd>{{ valueText(vehicle.precisePosition?.z) }}</dd>
+        <CopyableValue label="精确坐标 Z" :value="valueText(vehicle.precisePosition?.z)" />
         <dt>方向角</dt>
-        <dd>{{ valueText(vehicle.orientationAngle) }}</dd>
+        <CopyableValue label="方向角" :value="valueText(vehicle.orientationAngle)" />
       </dl>
 
       <div v-else class="properties">
@@ -170,7 +175,7 @@ const propertyEntries = computed(() => Object.entries(props.vehicle.properties ?
         <dl v-else class="kv kv--properties">
           <template v-for="[key, value] in propertyEntries" :key="key">
             <dt>{{ key }}</dt>
-            <dd>{{ value }}</dd>
+            <CopyableValue :label="key" :value="valueText(value)" />
           </template>
         </dl>
       </div>
@@ -272,19 +277,13 @@ h3 {
   color: #6e7781;
   overflow-wrap: anywhere;
 }
-.kv dd {
-  min-width: 0;
-  margin: 0;
-  color: #1f2328;
-  overflow-wrap: anywhere;
-}
 .kv--properties {
   grid-template-columns: minmax(11rem, 0.42fr) minmax(0, 1fr);
   align-items: start;
   row-gap: 0;
 }
 .kv--properties dt,
-.kv--properties dd {
+.kv--properties :deep(dd) {
   min-height: 1.8rem;
   padding: 0.3rem 0;
   border-bottom: 1px solid #f0f3f6;
@@ -295,7 +294,7 @@ h3 {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.82rem;
 }
-.kv--properties dd {
+.kv--properties :deep(dd) {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.82rem;
 }
