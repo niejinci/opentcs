@@ -59,6 +59,7 @@ const loadingProject = ref(false);
 const activeCategory = ref<VehicleMonitorCategoryId>('all');
 const selectedGroup = ref('');
 const searchQuery = ref('');
+const pointSearchQuery = ref('');
 const selectedVehicleName = ref<string | null>(null);
 const selectedMapTarget = ref<MonitorMapTargetRef | null>(null);
 const vehiclePointOverlapMenu = ref<VehiclePointOverlapMenu | null>(null);
@@ -93,6 +94,9 @@ const selectedRow = computed(() =>
     : null,
 );
 const showEntityLabels = computed(() => labelDisplayMode.value === 'always');
+const selectedPointName = computed(() =>
+  selectedMapTarget.value?.kind === 'point' ? selectedMapTarget.value.name : null,
+);
 const selectedMapTargetDetail = computed<MonitorMapTargetDetail | null>(() => {
   const selected = selectedMapTarget.value;
   if (!selected) return null;
@@ -167,10 +171,47 @@ function vehiclePixel(name: string): { x: number; y: number } | null {
   return draft ? { x: draft.layout.pixelX, y: draft.layout.pixelY } : null;
 }
 
+function findPointByQuery(query: string): DraftPoint | null {
+  const normalized = query.trim().toLocaleLowerCase();
+  if (!normalized) return null;
+  return (
+    project.points.find((point) => point.name.toLocaleLowerCase() === normalized) ??
+    project.points.find((point) => point.name.toLocaleLowerCase().includes(normalized)) ??
+    null
+  );
+}
+
 function openMapTargetDetail(target: MonitorMapTargetRef): void {
   vehiclePointOverlapMenu.value = null;
   selectedVehicleName.value = null;
   selectedMapTarget.value = { ...target };
+}
+
+function focusPoint(name: string): void {
+  const point = project.findPoint(name);
+  if (!point) {
+    toastWarning('未能在当前工程地图中定位 ' + name, '点位定位');
+    return;
+  }
+  vehiclePointOverlapMenu.value = null;
+  selectedVehicleName.value = null;
+  selectedMapTarget.value = { kind: 'point', name: point.name };
+  mapStageRef.value?.focusPixel({ x: point.layout.pixelX, y: point.layout.pixelY }, 1.2);
+}
+
+function focusPointSearchResult(): void {
+  const query = pointSearchQuery.value.trim();
+  if (!query) {
+    toastWarning('请输入点位名称后再定位', '点位定位');
+    return;
+  }
+  const point = findPointByQuery(query);
+  if (!point) {
+    toastWarning('未找到匹配点位：' + query, '点位定位');
+    return;
+  }
+  pointSearchQuery.value = point.name;
+  focusPoint(point.name);
 }
 
 function openVehiclePointOverlapMenu(payload: VehiclePointOverlapMenu): void {
@@ -303,6 +344,7 @@ onMounted(() => {
           :affine="background.affine"
           tool="select"
           :selected-vehicle-name="selectedVehicleName"
+          :selected-point-name="selectedPointName"
           :show-entity-labels="showEntityLabels"
           @target-click="openMapTargetDetail"
           @vehicle-click="openVehicleDetail"
@@ -324,6 +366,19 @@ onMounted(() => {
                   </option>
                 </select>
               </label>
+              <form class="point-search-control" role="search" @submit.prevent="focusPointSearchResult">
+                <input
+                  v-model="pointSearchQuery"
+                  type="search"
+                  list="monitor-point-options"
+                  placeholder="搜索点位"
+                  aria-label="搜索并定位点位"
+                />
+                <datalist id="monitor-point-options">
+                  <option v-for="point in project.points" :key="point.name" :value="point.name" />
+                </datalist>
+                <button type="submit">定位点位</button>
+              </form>
               <button type="button" @click="mapStageRef?.resetView()">重置视口</button>
             </footer>
           </template>
@@ -502,6 +557,26 @@ onMounted(() => {
   font: inherit;
   padding: 0 0.45rem;
 }
+.point-search-control {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: min(18rem, 35vw);
+}
+.point-search-control input {
+  width: 11rem;
+  max-width: 100%;
+  height: 1.75rem;
+  border: 1px solid #d0d7de;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #1f2328;
+  font: inherit;
+  padding: 0 0.45rem;
+}
+.point-search-control input::placeholder {
+  color: #8c959f;
+}
 .monitor-statusbar button {
   margin-left: 0;
   border: 1px solid #d0d7de;
@@ -617,6 +692,18 @@ onMounted(() => {
   }
   .monitor-shell[data-fleet-collapsed='true'] {
     grid-template-rows: minmax(30rem, 1fr) auto;
+  }
+  .monitor-statusbar {
+    flex-wrap: wrap;
+  }
+  .label-mode-control {
+    margin-left: 0;
+  }
+  .point-search-control {
+    min-width: 100%;
+  }
+  .point-search-control input {
+    flex: 1 1 10rem;
   }
 }
 </style>

@@ -45,6 +45,8 @@ const props = defineProps<{
   readonly?: boolean;
   /** Vehicle highlighted by an external monitor selection. */
   selectedVehicleName?: string | null;
+  /** Point highlighted by an external monitor selection. */
+  selectedPointName?: string | null;
   /** Whether Point / Location / Vehicle name labels should be rendered. */
   showEntityLabels?: boolean;
 }>();
@@ -78,6 +80,8 @@ const LOCATION_HALF_CSS_PX = 7; // half-side of the square
 const VEHICLE_LENGTH_CSS_PX = 28; // icon length (= vehicle's +x dimension)
 const VEHICLE_WIDTH_CSS_PX = 16;
 const BLOCK_OUTLINE_PADDING_CSS_PX = 10;
+const POINT_SELECTED_HALO_RADIUS_CSS_PX = 14;
+const POINT_SELECTED_HALO_STROKE_CSS_PX = 2.5;
 
 const pointRadius = computed(() => POINT_RADIUS_CSS_PX / safeScale(props.scale));
 const pointStroke = computed(() => POINT_STROKE_CSS_PX / safeScale(props.scale));
@@ -88,6 +92,12 @@ const locationHalf = computed(() => LOCATION_HALF_CSS_PX / safeScale(props.scale
 const vehicleLength = computed(() => VEHICLE_LENGTH_CSS_PX / safeScale(props.scale));
 const vehicleWidth = computed(() => VEHICLE_WIDTH_CSS_PX / safeScale(props.scale));
 const blockOutlinePadding = computed(() => BLOCK_OUTLINE_PADDING_CSS_PX / safeScale(props.scale));
+const pointSelectedHaloRadius = computed(
+  () => POINT_SELECTED_HALO_RADIUS_CSS_PX / safeScale(props.scale),
+);
+const pointSelectedHaloStroke = computed(
+  () => POINT_SELECTED_HALO_STROKE_CSS_PX / safeScale(props.scale),
+);
 const entityLabelsVisible = computed(() => props.showEntityLabels !== false);
 
 function safeScale(s: number): number {
@@ -256,9 +266,16 @@ function isMemberHighlighted(name: string): boolean {
   return highlightedBlockMembers.value.has(name);
 }
 
+function pointSelected(p: DraftPoint): boolean {
+  return (
+    props.selectedPointName === p.name ||
+    (store.selection?.kind === 'point' && store.selection.name === p.name)
+  );
+}
+
 function pointFill(p: DraftPoint): string {
   if (store.pathDraftSrc === p.name) return POINT_FILL_PATH_SRC;
-  if (store.selection?.kind === 'point' && store.selection.name === p.name) {
+  if (pointSelected(p)) {
     return POINT_FILL_SELECTED;
   }
   return p.type === 'PARK_POSITION' ? POINT_FILL_PARK : POINT_FILL_DEFAULT;
@@ -966,6 +983,23 @@ function onPreciseMarkerClick(marker: PreciseMarker, e: KonvaEventObject<MouseEv
           fontSize: labelFontSize,
           fill: '#1f2328',
           listening: false,
+        }"
+      />
+    </template>
+
+    <!-- External point focus marker: drawn above vehicles so a searched Point stays visible. -->
+    <template v-for="p in store.points" :key="`point-focus-${p.name}`">
+      <v-circle
+        v-if="pointSelected(p)"
+        :config="{
+          x: p.layout.pixelX,
+          y: p.layout.pixelY,
+          radius: pointSelectedHaloRadius,
+          stroke: '#ff7b2f',
+          strokeWidth: pointSelectedHaloStroke,
+          dash: [pointSelectedHaloStroke * 2, pointSelectedHaloStroke * 1.4],
+          listening: false,
+          name: 'selected-point-halo',
         }"
       />
     </template>
