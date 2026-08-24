@@ -39,6 +39,7 @@ const projects = useProjectsStore();
 useCloudDraftSync();
 
 const loading = ref(true);
+const formDialogOpen = ref(false);
 const editingName = ref<string | null>(null);
 const validationIssues = ref<RegistrationValidationIssue[]>([]);
 const hasPendingPublish = ref(false);
@@ -54,6 +55,7 @@ const form = ref<AgvRegistrationForm>(createEmptyAgvRegistrationForm(allEntityNa
 const activeProjectId = computed(() => projects.currentId ?? '');
 const projectTitle = computed(() => projects.currentMeta?.name ?? activeProjectId.value);
 const effectiveTopicPreview = computed(() => effectiveTopicPrefixForForm(form.value));
+const formDialogTitle = computed(() => (editingName.value ? '编辑车辆' : '新增车辆'));
 
 const records = computed<AgvRegistrationRecord[]>(() =>
   store.vehicles.map((vehicle) => agvRegistrationFromVehicle(vehicle)),
@@ -101,7 +103,8 @@ async function activateProjectFromRoute(): Promise<void> {
     await projects.setCurrent(id);
     const env = await projects.loadCurrentDraft();
     store.hydrateDraftPayload(env?.payload ?? null);
-    startCreate();
+    resetCreateForm();
+    formDialogOpen.value = false;
   } catch {
     toastError('加载工程失败', 'AGV注册');
     void router.replace({ name: 'projects' });
@@ -110,10 +113,28 @@ async function activateProjectFromRoute(): Promise<void> {
   }
 }
 
-function startCreate(): void {
+function resetCreateForm(): void {
   editingName.value = null;
   validationIssues.value = [];
   form.value = createEmptyAgvRegistrationForm(allEntityNames());
+}
+
+function startCreate(): void {
+  resetCreateForm();
+  formDialogOpen.value = true;
+}
+
+function closeFormDialog(): void {
+  formDialogOpen.value = false;
+  resetCreateForm();
+}
+
+function resetDialogForm(): void {
+  if (editingName.value) {
+    startEdit(editingName.value);
+    return;
+  }
+  startCreate();
 }
 
 function startEdit(name: string): void {
@@ -135,6 +156,7 @@ function startEdit(name: string): void {
     manufacturer: record.manufacturer,
     serialNumber: record.serialNumber,
   };
+  formDialogOpen.value = true;
 }
 
 function submit(): void {
@@ -158,12 +180,7 @@ function submit(): void {
   }
 
   markPendingPublish(oldName ? `已更新 ${vehicle.name}` : `已新增 ${vehicle.name}`);
-  if (!oldName) {
-    startCreate();
-  } else {
-    editingName.value = vehicle.name;
-    form.value = agvRegistrationFromVehicle(vehicle);
-  }
+  closeFormDialog();
 }
 
 function removeVehicle(name: string): void {
@@ -173,7 +190,7 @@ function removeVehicle(name: string): void {
     toastError(res.error ?? '删除失败', 'AGV注册');
     return;
   }
-  if (editingName.value === name) startCreate();
+  if (editingName.value === name) closeFormDialog();
   markPendingPublish(`已删除 ${name}`);
 }
 
@@ -354,96 +371,110 @@ function allEntityNames(): string[] {
             </tbody>
           </table>
         </section>
+      </div>
 
-        <aside class="form-panel">
-          <header class="form-title">
-            <h3>{{ editingName ? '编辑车辆' : '新增车辆' }}</h3>
-            <button v-if="editingName" type="button" class="link-btn" @click="startCreate">
-              取消编辑
-            </button>
-          </header>
-
-          <form class="registration-form" @submit.prevent="submit">
-            <label>
-              <span>车辆名称 *</span>
-              <input v-model="form.name" type="text" required />
-            </label>
-            <label>
-              <span>车型 *</span>
-              <select v-model="form.model" required>
-                <option value="" disabled>请选择</option>
-                <option v-for="model in AGV_VEHICLE_MODELS" :key="model" :value="model">
-                  {{ model }}
-                </option>
-              </select>
-            </label>
-            <label>
-              <span>所属区域 *</span>
-              <select v-model="form.region" required>
-                <option value="" disabled>请选择</option>
-                <option v-for="region in AGV_REGIONS" :key="region" :value="region">
-                  {{ region }}
-                </option>
-              </select>
-            </label>
-            <label>
-              <span>MAC地址</span>
-              <input v-model="form.macAddress" type="text" placeholder="00:11:22:33:44:55" />
-            </label>
-            <label>
-              <span>通信适配器</span>
-              <select v-model="selectedCommAdapter" required>
-                <option v-for="adapter in COMM_ADAPTER_OPTIONS" :key="adapter" :value="adapter">
-                  {{ adapter }}
-                </option>
-              </select>
-            </label>
-            <label>
-              <span>{{ VDA5050_PROPERTY_KEYS.topicPrefix }}</span>
-              <input
-                v-model="form.topicPrefix"
-                type="text"
-                placeholder="VDA/V2.0.0/BYD_11/DP0055"
-              />
-            </label>
-            <label>
-              <span>{{ VDA5050_PROPERTY_KEYS.interfaceName }}</span>
-              <input v-model="form.interfaceName" type="text" placeholder="VDA" />
-            </label>
-            <label>
-              <span>{{ VDA5050_PROPERTY_KEYS.manufacturer }} *</span>
-              <input v-model="form.manufacturer" type="text" required placeholder="BYD_11" />
-            </label>
-            <label>
-              <span>{{ VDA5050_PROPERTY_KEYS.serialNumber }} *</span>
-              <input v-model="form.serialNumber" type="text" required placeholder="DP0055" />
-            </label>
-            <label class="wide">
-              <span>当前生效 Topic 前缀</span>
-              <input :value="effectiveTopicPreview || '-'" type="text" disabled />
-            </label>
-
-            <ul v-if="validationIssues.length > 0" class="issues">
-              <li v-for="issue in validationIssues" :key="`${issue.field}:${issue.message}`">
-                {{ issue.message }}
-              </li>
-            </ul>
-
-            <div class="form-actions">
-              <button type="button" class="btn" @click="startCreate">重置</button>
-              <button type="submit" class="btn primary">
-                {{ editingName ? '保存修改' : '确定新增' }}
+      <div v-if="formDialogOpen" class="dialog-backdrop" role="presentation">
+        <section
+          class="vehicle-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="agv-registration-dialog-title"
+        >
+          <header class="dialog-header">
+            <h3 id="agv-registration-dialog-title">{{ formDialogTitle }}</h3>
+            <div class="dialog-actions">
+              <button v-if="editingName" type="button" class="link-btn" @click="startCreate">
+                取消编辑
+              </button>
+              <button type="button" class="close-button" aria-label="关闭" @click="closeFormDialog">
+                ×
               </button>
             </div>
-          </form>
+          </header>
 
-          <dl class="managed-props">
-            <dt>业务属性</dt>
-            <dd>{{ BYD_AGV_PROPERTY_KEYS.model }} / {{ BYD_AGV_PROPERTY_KEYS.region }}</dd>
-            <dt>VDA5050版本</dt>
-            <dd>{{ VDA5050_PROPERTY_KEYS.version }} = 2.0</dd>
-          </dl>
-        </aside>
+          <div class="dialog-body">
+            <form class="registration-form" @submit.prevent="submit">
+              <label>
+                <span>车辆名称 *</span>
+                <input v-model="form.name" type="text" required />
+              </label>
+              <label>
+                <span>车型 *</span>
+                <select v-model="form.model" required>
+                  <option value="" disabled>请选择</option>
+                  <option v-for="model in AGV_VEHICLE_MODELS" :key="model" :value="model">
+                    {{ model }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                <span>所属区域 *</span>
+                <select v-model="form.region" required>
+                  <option value="" disabled>请选择</option>
+                  <option v-for="region in AGV_REGIONS" :key="region" :value="region">
+                    {{ region }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                <span>MAC地址</span>
+                <input v-model="form.macAddress" type="text" placeholder="00:11:22:33:44:55" />
+              </label>
+              <label>
+                <span>通信适配器</span>
+                <select v-model="selectedCommAdapter" required>
+                  <option v-for="adapter in COMM_ADAPTER_OPTIONS" :key="adapter" :value="adapter">
+                    {{ adapter }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                <span>{{ VDA5050_PROPERTY_KEYS.topicPrefix }}</span>
+                <input
+                  v-model="form.topicPrefix"
+                  type="text"
+                  placeholder="VDA/V2.0.0/BYD_11/DP0055"
+                />
+              </label>
+              <label>
+                <span>{{ VDA5050_PROPERTY_KEYS.interfaceName }}</span>
+                <input v-model="form.interfaceName" type="text" placeholder="VDA" />
+              </label>
+              <label>
+                <span>{{ VDA5050_PROPERTY_KEYS.manufacturer }} *</span>
+                <input v-model="form.manufacturer" type="text" required placeholder="BYD_11" />
+              </label>
+              <label>
+                <span>{{ VDA5050_PROPERTY_KEYS.serialNumber }} *</span>
+                <input v-model="form.serialNumber" type="text" required placeholder="DP0055" />
+              </label>
+              <label class="wide">
+                <span>当前生效 Topic 前缀</span>
+                <input :value="effectiveTopicPreview || '-'" type="text" disabled />
+              </label>
+
+              <ul v-if="validationIssues.length > 0" class="issues">
+                <li v-for="issue in validationIssues" :key="`${issue.field}:${issue.message}`">
+                  {{ issue.message }}
+                </li>
+              </ul>
+
+              <div class="form-actions">
+                <button type="button" class="btn" @click="resetDialogForm">重置</button>
+                <button type="submit" class="btn primary">
+                  {{ editingName ? '保存修改' : '确定新增' }}
+                </button>
+              </div>
+            </form>
+
+            <dl class="managed-props">
+              <dt>业务属性</dt>
+              <dd>{{ BYD_AGV_PROPERTY_KEYS.model }} / {{ BYD_AGV_PROPERTY_KEYS.region }}</dd>
+              <dt>VDA5050版本</dt>
+              <dd>{{ VDA5050_PROPERTY_KEYS.version }} = 2.0</dd>
+            </dl>
+          </div>
+        </section>
       </div>
     </template>
   </section>
@@ -456,9 +487,10 @@ function allEntityNames(): string[] {
   padding: 1rem;
 }
 .registry-header,
-.form-title,
 .header-actions,
-.form-actions {
+.form-actions,
+.dialog-header,
+.dialog-actions {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -468,7 +500,7 @@ function allEntityNames(): string[] {
   margin-bottom: 1rem;
 }
 .registry-header h2,
-.form-title h3 {
+.dialog-header h3 {
   margin: 0;
 }
 .muted {
@@ -478,8 +510,7 @@ function allEntityNames(): string[] {
 .publish-banner,
 .summary-strip,
 .filters,
-.table-panel,
-.form-panel {
+.table-panel {
   border: 1px solid #d0d7de;
   background: #ffffff;
 }
@@ -533,13 +564,9 @@ select:disabled {
   color: #57606a;
 }
 .registry-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 0.75rem;
-  align-items: start;
+  min-width: 0;
 }
-.table-panel,
-.form-panel {
+.table-panel {
   border-radius: 6px;
 }
 .table-panel {
@@ -597,12 +624,55 @@ select:disabled {
 .actions {
   white-space: nowrap;
 }
-.form-panel {
-  padding: 0.85rem;
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(246, 248, 250, 0.62);
 }
-.form-title {
+.vehicle-dialog {
+  width: min(52rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 18px 46px rgba(31, 35, 40, 0.18);
+}
+.dialog-header {
   justify-content: space-between;
-  margin-bottom: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid #eaeef2;
+}
+.dialog-header h3 {
+  color: #1f2328;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+.dialog-actions {
+  justify-content: flex-end;
+}
+.close-button {
+  border: 0;
+  background: transparent;
+  color: #57606a;
+  cursor: pointer;
+  font-size: 1.7rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+}
+.close-button:hover {
+  color: #1f2328;
+}
+.dialog-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 0.9rem 1rem 1rem;
 }
 .registration-form {
   display: grid;
@@ -694,7 +764,7 @@ select:disabled {
 }
 @media (max-width: 980px) {
   .filters,
-  .registry-layout {
+  .registration-form {
     grid-template-columns: 1fr;
   }
   .summary-strip {
@@ -702,5 +772,3 @@ select:disabled {
   }
 }
 </style>
-
-
