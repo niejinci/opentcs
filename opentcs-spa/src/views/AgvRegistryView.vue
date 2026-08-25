@@ -220,6 +220,14 @@ async function goPublish(): Promise<void> {
   await router.push({ name: 'project-publish', params: { projectId: projects.currentId } });
 }
 
+function goMonitorVehicle(name: string): void {
+  void router.push({
+    name: 'realtime-monitor',
+    params: activeProjectId.value ? { projectId: activeProjectId.value } : {},
+    query: { vehicle: name },
+  });
+}
+
 function draftVehicleFromForm(input: AgvRegistrationForm, existing?: DraftVehicle): DraftVehicle {
   const idx = Math.max(0, store.vehicles.length);
   return {
@@ -362,6 +370,9 @@ function allEntityNames(): string[] {
                 <td class="actions">
                   <button type="button" class="link-btn" @click="startEdit(record.name)">
                     编辑
+                  </button>
+                  <button type="button" class="link-btn" @click="goMonitorVehicle(record.name)">
+                    跳转
                   </button>
                   <button type="button" class="link-btn danger" @click="removeVehicle(record.name)">
                     删除

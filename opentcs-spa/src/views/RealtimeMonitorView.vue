@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: The openTCS Authors
 // SPDX-License-Identifier: MIT
 
-import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 
 import MapStage from '@/components/canvas/MapStage.vue';
@@ -63,6 +63,8 @@ const pointSearchQuery = ref('');
 const selectedVehicleName = ref<string | null>(null);
 const selectedMapTarget = ref<MonitorMapTargetRef | null>(null);
 const vehiclePointOverlapMenu = ref<VehiclePointOverlapMenu | null>(null);
+const pendingRouteVehicleName = ref('');
+const lastAppliedRouteVehicleName = ref('');
 const fleetPanelCollapsed = ref(readFleetPanelCollapsed());
 const labelDisplayMode = ref<MonitorLabelDisplayMode>(readLabelDisplayMode());
 const mapStageRef = useTemplateRef<{
@@ -73,6 +75,11 @@ const mapStageRef = useTemplateRef<{
 const projectId = computed(() => {
   const fromRoute = String(route.params.projectId ?? '').trim();
   return fromRoute || projects.currentId || '';
+});
+const routeVehicleName = computed(() => {
+  const raw = route.query.vehicle;
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return typeof value === 'string' ? value.trim() : '';
 });
 
 const transportOrderList = computed(() => Object.values(live.transportOrders));
@@ -169,6 +176,13 @@ function vehiclePixel(name: string): { x: number; y: number } | null {
   if (entry) return { x: entry.pixelX, y: entry.pixelY };
   const draft = project.findVehicle(name);
   return draft ? { x: draft.layout.pixelX, y: draft.layout.pixelY } : null;
+}
+
+function canApplyRouteVehicleTarget(name: string): boolean {
+  if (loadingProject.value) return false;
+  return (
+    project.findVehicle(name) !== undefined || rows.value.some((row) => row.vehicle.name === name)
+  );
 }
 
 function findPointByQuery(query: string): DraftPoint | null {
@@ -291,10 +305,52 @@ function createOrderForVehicle(name: string): void {
   });
 }
 
+async function applyPendingRouteVehicleTarget(): Promise<void> {
+  const name = pendingRouteVehicleName.value;
+  if (!name || !canApplyRouteVehicleTarget(name)) return;
+
+  pendingRouteVehicleName.value = '';
+  lastAppliedRouteVehicleName.value = name;
+  activeCategory.value = 'all';
+  selectedGroup.value = '';
+  searchQuery.value = name;
+
+  await nextTick();
+  openVehicleDetail(name, vehiclePixel(name) !== null);
+}
+
 watch(
   () => route.params.projectId,
-  () => void activateProject(),
+  () => {
+    lastAppliedRouteVehicleName.value = '';
+    if (routeVehicleName.value) pendingRouteVehicleName.value = routeVehicleName.value;
+    void activateProject();
+  },
   { immediate: true },
+);
+
+watch(
+  routeVehicleName,
+  (name) => {
+    if (!name) {
+      pendingRouteVehicleName.value = '';
+      lastAppliedRouteVehicleName.value = '';
+      return;
+    }
+    if (name === lastAppliedRouteVehicleName.value) return;
+    pendingRouteVehicleName.value = name;
+    void applyPendingRouteVehicleTarget();
+  },
+  { immediate: true },
+);
+
+watch(
+  [
+    () => loadingProject.value,
+    () => project.vehicles.map((vehicle) => vehicle.name).join('\n'),
+    () => rows.value.map((row) => row.vehicle.name).join('\n'),
+  ],
+  () => void applyPendingRouteVehicleTarget(),
 );
 
 watch(fleetPanelCollapsed, writeFleetPanelCollapsed);
@@ -305,7 +361,8 @@ watch(
   () => {
     if (
       selectedVehicleName.value &&
-      !rows.value.some((row) => row.vehicle.name === selectedVehicleName.value)
+      !rows.value.some((row) => row.vehicle.name === selectedVehicleName.value) &&
+      !project.findVehicle(selectedVehicleName.value)
     ) {
       selectedVehicleName.value = null;
     }
@@ -383,7 +440,11 @@ onBeforeUnmount(() => {
                   </option>
                 </select>
               </label>
-              <form class="point-search-control" role="search" @submit.prevent="focusPointSearchResult">
+              <form
+                class="point-search-control"
+                role="search"
+                @submit.prevent="focusPointSearchResult"
+              >
                 <input
                   v-model="pointSearchQuery"
                   type="search"
@@ -412,7 +473,11 @@ onBeforeUnmount(() => {
         >
           <header>
             <span>选择查看对象</span>
-            <button type="button" aria-label="关闭重叠对象菜单" @click="closeVehiclePointOverlapMenu">
+            <button
+              type="button"
+              aria-label="关闭重叠对象菜单"
+              @click="closeVehiclePointOverlapMenu"
+            >
               ×
             </button>
           </header>
