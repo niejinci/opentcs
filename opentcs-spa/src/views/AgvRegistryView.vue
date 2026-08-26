@@ -5,6 +5,8 @@
 import { computed, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 
+import AgvRelocationDialog from '@/components/AgvRelocationDialog.vue';
+import { useBackgroundMap } from '@/composables/useBackgroundMap';
 import { useCloudDraftSync } from '@/composables/useCloudDraftSync';
 import type { DraftVehicle } from '@/domain/model/types';
 import {
@@ -35,11 +37,13 @@ const route = useRoute();
 const router = useRouter();
 const store = useProjectStore();
 const projects = useProjectsStore();
+const { background } = useBackgroundMap();
 
 useCloudDraftSync();
 
 const loading = ref(true);
 const formDialogOpen = ref(false);
+const relocationVehicleName = ref<string | null>(null);
 const editingName = ref<string | null>(null);
 const validationIssues = ref<RegistrationValidationIssue[]>([]);
 const hasPendingPublish = ref(false);
@@ -56,6 +60,7 @@ const activeProjectId = computed(() => projects.currentId ?? '');
 const projectTitle = computed(() => projects.currentMeta?.name ?? activeProjectId.value);
 const effectiveTopicPreview = computed(() => effectiveTopicPrefixForForm(form.value));
 const formDialogTitle = computed(() => (editingName.value ? '编辑车辆' : '新增车辆'));
+const relocationMapId = computed(() => projectTitle.value || activeProjectId.value || 'HZ27');
 
 const records = computed<AgvRegistrationRecord[]>(() =>
   store.vehicles.map((vehicle) => agvRegistrationFromVehicle(vehicle)),
@@ -105,6 +110,7 @@ async function activateProjectFromRoute(): Promise<void> {
     store.hydrateDraftPayload(env?.payload ?? null);
     resetCreateForm();
     formDialogOpen.value = false;
+    relocationVehicleName.value = null;
   } catch {
     toastError('加载工程失败', 'AGV注册');
     void router.replace({ name: 'projects' });
@@ -226,6 +232,14 @@ function goMonitorVehicle(name: string): void {
     params: activeProjectId.value ? { projectId: activeProjectId.value } : {},
     query: { vehicle: name },
   });
+}
+
+function startRelocation(name: string): void {
+  if (!store.findVehicle(name)) {
+    toastError(`未找到车辆 ${name}`, 'AGV注册');
+    return;
+  }
+  relocationVehicleName.value = name;
 }
 
 function draftVehicleFromForm(input: AgvRegistrationForm, existing?: DraftVehicle): DraftVehicle {
@@ -374,6 +388,9 @@ function allEntityNames(): string[] {
                   <button type="button" class="link-btn" @click="goMonitorVehicle(record.name)">
                     跳转
                   </button>
+                  <button type="button" class="link-btn" @click="startRelocation(record.name)">
+                    重定位
+                  </button>
                   <button type="button" class="link-btn danger" @click="removeVehicle(record.name)">
                     删除
                   </button>
@@ -383,6 +400,16 @@ function allEntityNames(): string[] {
           </table>
         </section>
       </div>
+
+      <AgvRelocationDialog
+        v-if="relocationVehicleName"
+        :vehicle-name="relocationVehicleName"
+        :points="store.points"
+        :map-id="relocationMapId"
+        :background="background"
+        @close="relocationVehicleName = null"
+        @relocated="relocationVehicleName = null"
+      />
 
       <div v-if="formDialogOpen" class="dialog-backdrop" role="presentation">
         <section
