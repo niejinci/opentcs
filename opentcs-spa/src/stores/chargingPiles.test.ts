@@ -12,6 +12,9 @@ import {
   listChargingPiles,
   updateChargingPile,
 } from '@/api/endpoints/charging';
+import { getDraft, listProjects, putDraft } from '@/api/endpoints/projects';
+import { useProjectStore } from '@/stores/project';
+import { useProjectsStore } from '@/stores/projects';
 import { useChargingPilesStore } from './chargingPiles';
 
 vi.mock('@/api/endpoints/charging', () => ({
@@ -20,6 +23,16 @@ vi.mock('@/api/endpoints/charging', () => ({
   updateChargingPile: vi.fn(),
   deleteChargingPile: vi.fn(),
 }));
+
+vi.mock('@/api/endpoints/projects', () => ({
+  listProjects: vi.fn(),
+  getDraft: vi.fn(),
+  putDraft: vi.fn(),
+}));
+
+const listProjectsMock = vi.mocked(listProjects);
+const getDraftMock = vi.mocked(getDraft);
+const putDraftMock = vi.mocked(putDraft);
 
 function pile(overrides: Partial<ChargingPile> = {}): ChargingPile {
   return {
@@ -60,10 +73,45 @@ function form(overrides: Partial<ChargingPileFormData> = {}): ChargingPileFormDa
   };
 }
 
+function draftPoint(name: string, pixelX: number, pixelY: number) {
+  return {
+    name,
+    type: 'HALT_POSITION' as const,
+    pose: {
+      position: { x: pixelX * 100, y: pixelY * 100, z: 0 },
+      orientationAngle: 0,
+    },
+    layout: { pixelX, pixelY },
+    properties: {},
+  };
+}
+
+function draftPayload(points = ['P-CHARGE-A01', 'P-CHARGE-B01']) {
+  return {
+    v: 2,
+    points: points.map((name, index) => draftPoint(name, 100 + index * 40, 200)),
+    paths: [],
+    locationTypes: [],
+    locations: [],
+    blocks: [],
+    vehicles: [],
+    selection: null,
+  };
+}
+
 describe('charging piles store', () => {
   beforeEach(() => {
+    localStorage.clear();
     setActivePinia(createPinia());
     vi.restoreAllMocks();
+    listProjectsMock.mockReset().mockResolvedValue([
+      { id: 'project-hz27', name: 'HZ27', updatedAt: '2026-08-31 09:00:00', hasDraft: true },
+    ]);
+    getDraftMock.mockReset().mockResolvedValue({
+      version: 1,
+      payload: draftPayload(),
+    });
+    putDraftMock.mockReset().mockResolvedValue(undefined);
     vi.mocked(listChargingPiles).mockReset().mockResolvedValue([pile()]);
     vi.mocked(createChargingPile).mockReset().mockImplementation(async (payload) => ({
       ...payload,
@@ -114,6 +162,35 @@ describe('charging piles store', () => {
     );
     expect(created.id).toBe('cp-002');
     expect(store.piles[0]?.id).toBe('cp-002');
+    expect(putDraftMock).toHaveBeenCalledWith(
+      'project-hz27',
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          locationTypes: [
+            expect.objectContaining({
+              name: 'CHARGER',
+              allowedOperations: ['CHARGE'],
+            }),
+          ],
+          locations: [
+            expect.objectContaining({
+              name: 'CP-B01',
+              typeName: 'CHARGER',
+              locked: false,
+              links: [{ pointName: 'P-CHARGE-B01', allowedOperations: ['CHARGE'] }],
+            }),
+          ],
+          blocks: [
+            expect.objectContaining({
+              name: 'Block-CP-B01',
+              type: 'SINGLE_VEHICLE_ONLY',
+              memberNames: ['P-CHARGE-B01', 'CP-B01'],
+            }),
+          ],
+        }),
+      }),
+      { toastOnError: false },
+    );
   });
 
   it('rejects duplicated names before calling the API', async () => {
@@ -129,6 +206,30 @@ describe('charging piles store', () => {
       ),
     ).rejects.toThrow('充电桩名称 CP-A01 已存在');
     expect(createChargingPile).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stale bound point from the latest server draft before creating', async () => {
+    const projects = useProjectsStore();
+    const projectStore = useProjectStore();
+    projects.currentId = 'project-hz27';
+    projectStore.hydrateDraftPayload(draftPayload(['Point-34']));
+    getDraftMock.mockResolvedValueOnce({
+      version: 1,
+      payload: draftPayload(['P-OTHER']),
+    });
+    const store = useChargingPilesStore();
+
+    await expect(
+      store.create(
+        form({
+          name: 'CP-34',
+          boundPointName: 'Point-34',
+        }),
+      ),
+    ).rejects.toThrow('绑定点位 Point-34 不存在于工程 HZ27');
+
+    expect(createChargingPile).not.toHaveBeenCalled();
+    expect(putDraftMock).not.toHaveBeenCalled();
   });
 
   it('toggles enabled state and deletes records through the API', async () => {
@@ -147,6 +248,20 @@ describe('charging piles store', () => {
     );
     expect(store.piles[0]?.enabled).toBe(false);
     expect(store.piles[0]?.occupancyStatus).toBe('DISABLED');
+    expect(putDraftMock).toHaveBeenLastCalledWith(
+      'project-hz27',
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          locations: [
+            expect.objectContaining({
+              name: 'CP-A01',
+              locked: true,
+            }),
+          ],
+        }),
+      }),
+      { toastOnError: false },
+    );
 
     await store.remove('cp-001');
     expect(deleteChargingPile).toHaveBeenCalledWith('cp-001');

@@ -15,6 +15,7 @@ vi.mock('@/api/endpoints/projects', () => ({
   listProjects: vi.fn(),
   getProject: vi.fn(),
   getDraft: vi.fn(),
+  putDraft: vi.fn(),
 }));
 
 import {
@@ -23,7 +24,7 @@ import {
   listChargingPiles,
   updateChargingPile,
 } from '@/api/endpoints/charging';
-import { getDraft, listProjects } from '@/api/endpoints/projects';
+import { getDraft, listProjects, putDraft } from '@/api/endpoints/projects';
 import ChargingPilesView from './ChargingPilesView.vue';
 
 const listChargingPilesMock = vi.mocked(listChargingPiles);
@@ -32,6 +33,20 @@ const updateChargingPileMock = vi.mocked(updateChargingPile);
 const deleteChargingPileMock = vi.mocked(deleteChargingPile);
 const listProjectsMock = vi.mocked(listProjects);
 const getDraftMock = vi.mocked(getDraft);
+const putDraftMock = vi.mocked(putDraft);
+
+function draftPoint(name: string, pixelX: number, pixelY: number) {
+  return {
+    name,
+    type: 'HALT_POSITION' as const,
+    pose: {
+      position: { x: pixelX * 100, y: pixelY * 100, z: 0 },
+      orientationAngle: 0,
+    },
+    layout: { pixelX, pixelY },
+    properties: {},
+  };
+}
 
 function pile(overrides: Partial<ChargingPile> = {}): ChargingPile {
   return {
@@ -72,17 +87,36 @@ describe('ChargingPilesView', () => {
         return {
           version: 1,
           payload: {
-            points: [{ name: 'P-CHARGE-B01' }, { name: 'P-CHARGE-B02' }],
+            points: [
+              draftPoint('P-CHARGE-B01', 180, 260),
+              draftPoint('P-CHARGE-B02', 220, 260),
+            ],
+            paths: [],
+            locationTypes: [],
+            locations: [],
+            blocks: [],
+            vehicles: [],
+            selection: null,
           },
         };
       }
       return {
         version: 1,
         payload: {
-          points: [{ name: 'P-CHARGE-A01' }, { name: 'P-CHARGE-A02' }],
+          points: [
+            draftPoint('P-CHARGE-A01', 120, 240),
+            draftPoint('P-CHARGE-A02', 160, 240),
+          ],
+          paths: [],
+          locationTypes: [],
+          locations: [],
+          blocks: [],
+          vehicles: [],
+          selection: null,
         },
       };
     });
+    putDraftMock.mockReset().mockResolvedValue(undefined);
     listChargingPilesMock.mockReset().mockResolvedValue([
       pile(),
       pile({
