@@ -9,6 +9,8 @@ import static org.opentcs.bff.TestConfigurations.bff;
 
 import io.javalin.testtools.JavalinTest;
 import org.junit.jupiter.api.Test;
+import org.opentcs.bff.charging.ChargingPileHandler;
+import org.opentcs.bff.charging.ChargingPileStore;
 import org.opentcs.bff.events.KernelEventPoller;
 import org.opentcs.bff.events.SseEventBridge;
 import org.opentcs.bff.health.HealthHandler;
@@ -230,6 +232,7 @@ class BffApplicationTest {
         new ProjectsHandler(projectStore),
         new ProjectAssetsHandler(projectStore),
         new WarehouseHandler(new WarehouseStore(workspace)),
+        new ChargingPileHandler(new ChargingPileStore(workspace)),
         org.mockito.Mockito.mock(org.opentcs.bff.publish.PublishHandler.class),
         new OpenApiSpecHandler(),
         sseEventBridge,
@@ -239,5 +242,3 @@ class BffApplicationTest {
     );
   }
 }
-
-

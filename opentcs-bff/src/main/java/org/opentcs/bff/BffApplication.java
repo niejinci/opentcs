@@ -20,6 +20,10 @@ import io.javalin.http.staticfiles.Location;
 import io.javalin.json.JavalinJackson;
 import jakarta.inject.Inject;
 import org.opentcs.access.KernelRuntimeException;
+import org.opentcs.bff.charging.ChargingPileConflictException;
+import org.opentcs.bff.charging.ChargingPileFileException;
+import org.opentcs.bff.charging.ChargingPileHandler;
+import org.opentcs.bff.charging.ChargingPileNotFoundException;
 import org.opentcs.bff.error.ErrorResponses;
 import org.opentcs.bff.events.KernelEventPoller;
 import org.opentcs.bff.events.SseEventBridge;
@@ -120,6 +124,8 @@ public class BffApplication {
    * @param projectAssetsHandler The handler bundle serving
    * {@code /api/v1/projects/{id}/assets} endpoints.
    * @param warehouseHandler The handler bundle serving warehouse JSON CRUD endpoints.
+   * @param chargingPileHandler The handler bundle serving charging pile registry CRUD endpoints.
+   * @param publishHandler The handler serving {@code POST /api/v1/plant-models/publish}.
    * @param openApiSpecHandler The handler serving the OpenAPI specification.
    * @param sseEventBridge The bridge that broadcasts kernel events to connected SSE clients.
    * @param ssePingHandler The handler serving {@code GET /api/v1/sse/ping}.
@@ -141,6 +147,7 @@ public class BffApplication {
       ProjectsHandler projectsHandler,
       ProjectAssetsHandler projectAssetsHandler,
       WarehouseHandler warehouseHandler,
+      ChargingPileHandler chargingPileHandler,
       PublishHandler publishHandler,
       OpenApiSpecHandler openApiSpecHandler,
       SseEventBridge sseEventBridge,
@@ -163,6 +170,7 @@ public class BffApplication {
     requireNonNull(projectsHandler, "projectsHandler");
     requireNonNull(projectAssetsHandler, "projectAssetsHandler");
     requireNonNull(warehouseHandler, "warehouseHandler");
+    requireNonNull(chargingPileHandler, "chargingPileHandler");
     requireNonNull(publishHandler, "publishHandler");
     requireNonNull(openApiSpecHandler, "openApiSpecHandler");
     requireNonNull(ssePingHandler, "ssePingHandler");
@@ -256,6 +264,14 @@ public class BffApplication {
               });
             });
           });
+          path("/charging-piles", () -> {
+            get(chargingPileHandler.list());
+            post(chargingPileHandler.create());
+            path("/{" + ChargingPileHandler.ID_PARAM + "}", () -> {
+              put(chargingPileHandler.update());
+              delete(chargingPileHandler.delete());
+            });
+          });
           sse("/sse", sseEventBridge::register);
           get("/sse/ping", ssePingHandler);
         });
@@ -314,6 +330,27 @@ public class BffApplication {
             ctx,
             HttpStatus.INTERNAL_SERVER_ERROR,
             "WAREHOUSE_FILE_ERROR",
+            e.getMessage()
+        );
+      });
+      cfg.routes.exception(ChargingPileNotFoundException.class, (e, ctx) -> {
+        ErrorResponses.write(
+            ctx, HttpStatus.NOT_FOUND, "CHARGING_PILE_NOT_FOUND", e.getMessage()
+        );
+      });
+      cfg.routes.exception(ChargingPileConflictException.class, (e, ctx) -> {
+        ErrorResponses.write(
+            ctx, HttpStatus.CONFLICT, "CHARGING_PILE_CONFLICT", e.getMessage()
+        );
+      });
+      cfg.routes.exception(ChargingPileFileException.class, (e, ctx) -> {
+        LOG.warn(
+            "Charging pile file operation failed (trace {})", ErrorResponses.traceIdFor(ctx), e
+        );
+        ErrorResponses.write(
+            ctx,
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "CHARGING_PILE_FILE_ERROR",
             e.getMessage()
         );
       });
@@ -401,4 +438,3 @@ public class BffApplication {
     return javalin;
   }
 }
-

@@ -12,6 +12,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.opentcs.bff.charging.ChargingPileHandler;
+import org.opentcs.bff.charging.ChargingPileStore;
 import org.opentcs.bff.events.KernelEventPoller;
 import org.opentcs.bff.events.SseEventBridge;
 import org.opentcs.bff.health.HealthHandler;
@@ -58,6 +60,7 @@ class WarehouseHandlerTest {
         new ProjectsHandler(projectStore),
         new ProjectAssetsHandler(projectStore),
         new WarehouseHandler(warehouseStore),
+        new ChargingPileHandler(new ChargingPileStore(workspace)),
         org.mockito.Mockito.mock(org.opentcs.bff.publish.PublishHandler.class),
         new OpenApiSpecHandler(),
         sse,
