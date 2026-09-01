@@ -42,6 +42,7 @@ onBeforeUnmount(() => live.stop());
         <RouterLink to="/editor">画布编辑器</RouterLink>
         <RouterLink to="/agv-registry">AGV注册</RouterLink>
         <RouterLink to="/warehouse">货架管理</RouterLink>
+        <RouterLink to="/charging-piles">充电桩管理</RouterLink>
         <RouterLink to="/debug">BFF 调试</RouterLink>
       </nav>
     </header>

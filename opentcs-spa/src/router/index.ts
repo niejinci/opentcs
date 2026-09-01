@@ -64,6 +64,12 @@ const routes: RouteRecordRaw[] = [
     ],
   },
   {
+    path: '/charging-piles',
+    name: 'charging-piles',
+    component: () => import('@/views/ChargingPilesView.vue'),
+    meta: { title: '充电桩管理' },
+  },
+  {
     path: '/debug',
     name: 'debug',
     component: () => import('@/views/DebugView.vue'),

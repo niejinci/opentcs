@@ -11,6 +11,9 @@ export type { BackoffOptions, SseClientOptions, SseConnectionState } from './sse
 export type {
   BffErrorResponse,
   Destination,
+  ChargingPile,
+  ChargingPileOccupancyStatus,
+  ChargingPileRuntimeStatus,
   HealthResponse,
   SseEventEnvelope,
   SseEventName,

@@ -238,6 +238,32 @@ export interface WarehouseRack {
   updatedAt: string;
 }
 
+export type ChargingPileRuntimeStatus = 'UNKNOWN' | 'IDLE' | 'CHARGING' | 'FAULT' | 'OFFLINE';
+
+export type ChargingPileOccupancyStatus = 'FREE' | 'OCCUPIED' | 'DISABLED';
+
+export interface ChargingPile {
+  id?: string;
+  name: string;
+  region: string;
+  mapName: string;
+  boundPointName: string;
+  locationName?: string;
+  locationTypeName?: string;
+  operation?: string;
+  chargerType?: string;
+  sn?: string;
+  ip?: string;
+  enabled: boolean;
+  runtimeStatus?: ChargingPileRuntimeStatus;
+  occupancyStatus?: ChargingPileOccupancyStatus;
+  occupiedByVehicle?: string;
+  activeOrderName?: string;
+  chargingSince?: string;
+  requiresPublish?: boolean;
+  updatedAt?: string;
+}
+
 /* ------------------------------------------------------------------ */
 /* SSE                                                                 */
 /* ------------------------------------------------------------------ */
