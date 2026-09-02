@@ -47,6 +47,7 @@ import org.opentcs.strategies.basic.dispatching.selection.RechargeVehicleSelecti
 import org.opentcs.strategies.basic.dispatching.selection.ReparkVehicleSelectionFilter;
 import org.opentcs.strategies.basic.dispatching.selection.TransportOrderSelectionFilter;
 import org.opentcs.strategies.basic.dispatching.selection.VehicleSelectionFilter;
+import org.opentcs.strategies.basic.dispatching.selection.candidates.IsChargeDestinationAvailable;
 import org.opentcs.strategies.basic.dispatching.selection.candidates.CompositeAssignmentCandidateSelectionFilter;
 import org.opentcs.strategies.basic.dispatching.selection.candidates.IsProcessable;
 import org.opentcs.strategies.basic.dispatching.selection.orders.CompositeTransportOrderSelectionFilter;
@@ -90,6 +91,8 @@ public class DefaultDispatcherModule
         .addBinding().to(IsIdleAndDegraded.class);
     Multibinder.newSetBinder(binder(), AssignmentCandidateSelectionFilter.class)
         .addBinding().to(IsProcessable.class);
+    Multibinder.newSetBinder(binder(), AssignmentCandidateSelectionFilter.class)
+        .addBinding().to(IsChargeDestinationAvailable.class);
 
     bind(CompositeParkVehicleSelectionFilter.class)
         .in(Singleton.class);
