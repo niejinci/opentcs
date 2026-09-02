@@ -21,6 +21,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.opentcs.access.KernelRuntimeException;
+import org.opentcs.bff.charging.ChargingPileRuntimeProjector;
 import org.opentcs.bff.kernel.KernelClient;
 import org.opentcs.data.TCSObjectEvent;
 import org.opentcs.data.model.Vehicle;
@@ -32,13 +33,15 @@ class KernelEventPollerTest {
 
   private KernelClient kernelClient;
   private SseEventBridge bridge;
+  private ChargingPileRuntimeProjector projector;
   private KernelEventPoller poller;
 
   @BeforeEach
   void setUp() {
     kernelClient = mock(KernelClient.class);
     bridge = new SseEventBridge();
-    poller = new KernelEventPoller(kernelClient, bridge);
+    projector = mock(ChargingPileRuntimeProjector.class);
+    poller = new KernelEventPoller(kernelClient, bridge, projector);
   }
 
   @AfterEach
@@ -55,6 +58,7 @@ class KernelEventPollerTest {
     Thread.sleep(150);
 
     verify(kernelClient, never()).fetchEvents(anyLong());
+    verify(projector, never()).apply(org.mockito.ArgumentMatchers.any(TCSObjectEvent.class));
   }
 
   @Test
@@ -72,16 +76,17 @@ class KernelEventPollerTest {
 
     poller.start();
     waitFor(() -> {
-      try {
-        verify(client, atLeastOnce())
-            .sendEvent(
-                org.mockito.ArgumentMatchers.eq(SseEventTypes.EVENT_TYPE_VEHICLES),
-                org.mockito.ArgumentMatchers.any()
-            );
-        return true;
-      }
-      catch (AssertionError e) {
-        return false;
+        try {
+          verify(client, atLeastOnce())
+              .sendEvent(
+                  org.mockito.ArgumentMatchers.eq(SseEventTypes.EVENT_TYPE_VEHICLES),
+                  org.mockito.ArgumentMatchers.any()
+              );
+          verify(projector, atLeastOnce()).apply(org.mockito.ArgumentMatchers.any(TCSObjectEvent.class));
+          return true;
+        }
+        catch (AssertionError e) {
+          return false;
       }
     }, 3000);
   }

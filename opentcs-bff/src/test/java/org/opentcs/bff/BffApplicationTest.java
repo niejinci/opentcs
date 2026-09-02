@@ -237,7 +237,11 @@ class BffApplicationTest {
         new OpenApiSpecHandler(),
         sseEventBridge,
         ssePingHandler,
-        new KernelEventPoller(kernelClient, sseEventBridge),
+        new KernelEventPoller(
+            kernelClient,
+            sseEventBridge,
+            org.mockito.Mockito.mock(org.opentcs.bff.charging.ChargingPileRuntimeProjector.class)
+        ),
         sseHeartbeatScheduler
     );
   }

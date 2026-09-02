@@ -57,7 +57,11 @@ export const useChargingPilesStore = defineStore('chargingPiles', () => {
   const lastError = ref<string | null>(null);
 
   const piles = computed(() =>
-    projectChargingPileRecords(basePiles.value, live.activeOrders, live.vehicleList),
+    projectChargingPileRecords(
+      basePiles.value,
+      live.activeOrders,
+      live.vehicleList,
+    ),
   );
   const enabledCount = computed(() => piles.value.filter((item) => item.enabled).length);
   const occupiedCount = computed(

@@ -65,7 +65,11 @@ class WarehouseHandlerTest {
         new OpenApiSpecHandler(),
         sse,
         new org.opentcs.bff.events.SsePingHandler(sse),
-        new KernelEventPoller(kernelClient, sse),
+        new KernelEventPoller(
+            kernelClient,
+            sse,
+            org.mockito.Mockito.mock(org.opentcs.bff.charging.ChargingPileRuntimeProjector.class)
+        ),
         new org.opentcs.bff.events.SseHeartbeatScheduler(sse)
     );
   }

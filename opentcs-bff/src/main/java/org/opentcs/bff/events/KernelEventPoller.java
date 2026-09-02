@@ -8,6 +8,7 @@ import com.google.inject.Singleton;
 import jakarta.inject.Inject;
 import java.util.List;
 import org.opentcs.access.KernelRuntimeException;
+import org.opentcs.bff.charging.ChargingPileRuntimeProjector;
 import org.opentcs.bff.kernel.KernelClient;
 import org.opentcs.data.TCSObjectEvent;
 import org.slf4j.Logger;
@@ -27,6 +28,9 @@ import org.slf4j.LoggerFactory;
  * <p>Errors raised by the kernel call (e.g. the kernel went away) are logged and the poller backs
  * off for {@link #ERROR_SLEEP_MS} ms before retrying. {@link KernelClient#fetchEvents(long)}
  * automatically invalidates the cached portal on error, so the next iteration will reconnect.
+ *
+ * <p>Each kernel event is also forwarded to the charging-pile runtime projector so the BFF's
+ * persisted charging state stays in sync with the kernel.
  */
 @Singleton
 public class KernelEventPoller {
@@ -48,6 +52,7 @@ public class KernelEventPoller {
 
   private final KernelClient kernelClient;
   private final SseEventBridge bridge;
+  private final ChargingPileRuntimeProjector chargingPileRuntimeProjector;
   private final Object lifecycleLock = new Object();
   private volatile boolean running;
   private Thread thread;
@@ -57,11 +62,18 @@ public class KernelEventPoller {
    *
    * @param kernelClient The kernel client used to fetch events.
    * @param bridge The SSE bridge that broadcasts received events.
+   * @param chargingPileRuntimeProjector Keeps charging-pile runtime state persisted.
    */
   @Inject
-  public KernelEventPoller(KernelClient kernelClient, SseEventBridge bridge) {
+  public KernelEventPoller(
+      KernelClient kernelClient,
+      SseEventBridge bridge,
+      ChargingPileRuntimeProjector chargingPileRuntimeProjector
+  ) {
     this.kernelClient = requireNonNull(kernelClient, "kernelClient");
     this.bridge = requireNonNull(bridge, "bridge");
+    this.chargingPileRuntimeProjector
+        = requireNonNull(chargingPileRuntimeProjector, "chargingPileRuntimeProjector");
   }
 
   /**
@@ -126,6 +138,12 @@ public class KernelEventPoller {
         List<Object> events = kernelClient.fetchEvents(FETCH_TIMEOUT_MS);
         for (Object event : events) {
           if (event instanceof TCSObjectEvent objectEvent) {
+            try {
+              chargingPileRuntimeProjector.apply(objectEvent);
+            }
+            catch (RuntimeException e) {
+              LOG.warn("Failed to project charging-pile runtime state; continuing.", e);
+            }
             try {
               bridge.dispatch(objectEvent);
             }

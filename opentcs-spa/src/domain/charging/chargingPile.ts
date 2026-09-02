@@ -304,13 +304,11 @@ export function projectChargingPileRecord(
   }
 
   if (!record.enabled || record.occupancyStatus === 'DISABLED') {
-    return {
-      ...record,
-      occupancyStatus: 'DISABLED',
-    };
+    return record;
   }
 
   const normalizedLocationName = locationName.toLowerCase();
+  const normalizedBoundPointName = normalizeText(record.boundPointName).toLowerCase();
   const activeOrder = activeOrders.find((order) =>
     order.destinations.some(
       (destination) =>
@@ -321,23 +319,46 @@ export function projectChargingPileRecord(
   const chargingVehicle = vehicles.find(
     (vehicle) =>
       vehicle.state === 'CHARGING' &&
-      normalizeText(vehicle.currentPosition).toLowerCase() === normalizedLocationName,
+      matchesChargingVehiclePosition(
+          normalizeText(vehicle.currentPosition).toLowerCase(),
+          normalizedLocationName,
+          normalizedBoundPointName,
+      ),
   );
+  const occupied = Boolean(activeOrder || chargingVehicle);
 
-  if (!activeOrder && !chargingVehicle) {
+  if (!occupied) {
+    return {
+      ...record,
+    };
+  }
+
+  const occupiedByVehicle =
+    normalizeText(chargingVehicle?.name) ||
+    normalizeText(activeOrder?.processingVehicle) ||
+    normalizeText(activeOrder?.intendedVehicle) ||
+    normalizeText(record.occupiedByVehicle);
+  const activeOrderName = normalizeText(activeOrder?.name) || normalizeText(record.activeOrderName);
+  const chargingSince = hasText(record.chargingSince) ? normalizeText(record.chargingSince) : formatChargingTimestamp();
+  const runtimeStatus = chargingVehicle ? 'CHARGING' : idleRuntimeStatus(record.runtimeStatus);
+
+  if (
+    record.occupancyStatus === 'OCCUPIED' &&
+    runtimeStatus === record.runtimeStatus &&
+    occupiedByVehicle === normalizeText(record.occupiedByVehicle) &&
+    activeOrderName === normalizeText(record.activeOrderName) &&
+    chargingSince === normalizeText(record.chargingSince)
+  ) {
     return record;
   }
 
   return {
     ...record,
+    runtimeStatus,
     occupancyStatus: 'OCCUPIED',
-    occupiedByVehicle:
-      normalizeText(chargingVehicle?.name) ||
-      normalizeText(activeOrder?.processingVehicle) ||
-      normalizeText(activeOrder?.intendedVehicle) ||
-      record.occupiedByVehicle,
-    activeOrderName: normalizeText(activeOrder?.name) || record.activeOrderName,
-    runtimeStatus: chargingVehicle ? 'CHARGING' : record.runtimeStatus,
+    occupiedByVehicle,
+    activeOrderName,
+    chargingSince,
   };
 }
 
@@ -374,6 +395,45 @@ function requireText(value: string | undefined, field: string): string {
 
 function normalizeText(value: string | null | undefined): string {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function hasText(value: string | null | undefined): boolean {
+  return normalizeText(value) !== '';
+}
+
+function matchesChargingVehiclePosition(
+  currentPosition: string,
+  locationName: string,
+  boundPointName: string,
+): boolean {
+  return currentPosition === locationName || currentPosition === boundPointName;
+}
+
+function idleRuntimeStatus(status: ChargingPileRuntimeStatus): ChargingPileRuntimeStatus {
+  switch (status) {
+    case 'FAULT':
+    case 'OFFLINE':
+      return status;
+    default:
+      return 'IDLE';
+  }
+}
+
+function formatChargingTimestamp(date: Date = new Date()): string {
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return [
+    date.getFullYear(),
+    '-',
+    pad(date.getMonth() + 1),
+    '-',
+    pad(date.getDate()),
+    ' ',
+    pad(date.getHours()),
+    ':',
+    pad(date.getMinutes()),
+    ':',
+    pad(date.getSeconds()),
+  ].join('');
 }
 
 function normalizeRuntimeStatus(

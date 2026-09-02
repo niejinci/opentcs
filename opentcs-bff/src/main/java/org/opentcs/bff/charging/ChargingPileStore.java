@@ -174,6 +174,19 @@ public class ChargingPileStore {
     writeEnvelope(new ChargingPilesEnvelope(current));
   }
 
+  /**
+   * Replaces the full registry content with the given records.
+   *
+   * <p>Used by the runtime projector to persist occupancy/runtime state without touching the
+   * mapping metadata managed by the CRUD endpoints.
+   *
+   * @param records The replacement registry content.
+   */
+  synchronized void replaceAllRecords(List<ChargingPileDto> records) {
+    requireNonNull(records, "records");
+    writeEnvelope(new ChargingPilesEnvelope(List.copyOf(records)));
+  }
+
   private ChargingPilesEnvelope readEnvelope() {
     ensureFile();
     try {

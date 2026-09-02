@@ -168,6 +168,28 @@ describe('charging piles store', () => {
     expect(store.piles[0]?.occupancyStatus).toBe('OCCUPIED');
   });
 
+  it('keeps persisted occupied piles when live data is empty', async () => {
+    vi.mocked(listChargingPiles).mockResolvedValue([
+      pile({
+        occupancyStatus: 'OCCUPIED',
+        runtimeStatus: 'IDLE',
+        occupiedByVehicle: 'AGV-01',
+        activeOrderName: 'TO-01',
+        chargingSince: '2026-08-31 08:00:00',
+      }),
+    ]);
+    const live = useLiveStatusStore();
+    live.runtimeSnapshotReady = true;
+    live.transportOrders = {};
+    live.vehicles = {};
+    const store = useChargingPilesStore();
+
+    await store.refresh();
+
+    expect(store.piles[0]?.occupancyStatus).toBe('OCCUPIED');
+    expect(store.piles[0]?.runtimeStatus).toBe('IDLE');
+  });
+
   it('creates charging piles with local defaults and inserts the created record first', async () => {
     vi.mocked(listChargingPiles).mockResolvedValue([]);
     const store = useChargingPilesStore();

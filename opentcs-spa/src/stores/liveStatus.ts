@@ -82,6 +82,9 @@ export const useLiveStatusStore = defineStore('liveStatus', () => {
   /** Append-only timeline of order state changes (newest first). */
   const orderTimeline = ref<OrderTimelineEntry[]>([]);
 
+  /** Whether the store has already observed at least one runtime event. */
+  const runtimeSnapshotReady = ref(false);
+
   /** SSE client state — surfaced for the "重连中…" pill. */
   const sseState = ref<SseConnectionState>('idle');
 
@@ -106,6 +109,7 @@ export const useLiveStatusStore = defineStore('liveStatus', () => {
   function applyVehicleEnvelope(env: SseEventEnvelope<Vehicle>): void {
     const cur = env.currentObjectState;
     const prev = env.previousObjectState;
+    runtimeSnapshotReady.value = true;
     if (cur) {
       vehicles.value = { ...vehicles.value, [cur.name]: cur };
     } else if (prev) {
@@ -118,6 +122,7 @@ export const useLiveStatusStore = defineStore('liveStatus', () => {
   function applyTransportOrderEnvelope(env: SseEventEnvelope<TransportOrder>): void {
     const cur = env.currentObjectState;
     const prev = env.previousObjectState;
+    runtimeSnapshotReady.value = true;
     if (cur) {
       const existing = transportOrders.value[cur.name];
       transportOrders.value = { ...transportOrders.value, [cur.name]: cur };
@@ -287,6 +292,7 @@ export const useLiveStatusStore = defineStore('liveStatus', () => {
     vehicles.value = {};
     transportOrders.value = {};
     orderTimeline.value = [];
+    runtimeSnapshotReady.value = false;
     sseState.value = 'idle';
     errorCount.value = 0;
     initialVehiclesLoaded.value = false;
@@ -295,6 +301,7 @@ export const useLiveStatusStore = defineStore('liveStatus', () => {
   /** Manually insert an order returned by `POST /transport-orders` so the
    *  sidebar shows it immediately, even if the SSE tick is delayed. */
   function recordCreatedOrder(order: TransportOrder): void {
+    runtimeSnapshotReady.value = true;
     transportOrders.value = { ...transportOrders.value, [order.name]: order };
     pushTimelineEntry({
       seq: nextSeq++,
@@ -329,6 +336,7 @@ export const useLiveStatusStore = defineStore('liveStatus', () => {
     sseState,
     errorCount,
     initialVehiclesLoaded,
+    runtimeSnapshotReady,
     // getters
     vehicleList,
     activeOrders,
