@@ -11,28 +11,41 @@
 
 dd-opentcs 是基于 openTCS 二次开发的汽车工厂 AGV 调度系统。系统以 openTCS Kernel 为调度核心，通过 BFF 层向浏览器 SPA 暴露面向前端的 HTTP/SSE 接口，通过 VDA5050 通信适配器将内核中的运输订单、车辆状态和路线信息转换为 VDA5050 2.0.0 MQTT 报文，与厂区 AGV 车载客户端完成双向通信。
 
+
 整体链路如下：
 
 ```text
+user
+  -> http(5173)
 opentcs-spa（浏览器 Vue3 + TypeScript）
-  -> HTTP/REST + SSE
+  -> HTTP/REST(8090) + SSE
 opentcs-bff（前后端缓冲适配层）
-  -> Java RMI
+  -> Java RMI(1099)
 opentcs-kernel（调度内核）
   <-> opentcs-commadapter-vda5050（VDA5050 通信适配器）
-  -> MQTT / VDA5050 2.0.0 JSON
+  -> MQTT(1883) / VDA5050 2.0.0 JSON
 Mosquitto MQTT Broker
   -> 工业 Wi-Fi / 5G 专网
 AGV 车载 VDA5050 客户端
 ```
 
+**VDA5050 跟 MQTT 的关系**
+- **MQTT：底层消息传输协议**，解决：连接、发布‑订阅、消息投递、QoS、心跳保活，只搬运字节载荷，**不懂AGV业务**。
+- **VDA5050：AGV应用层业务协议**，定义AGV‑调度器之间的报文结构、字段、状态机、交互时序；报文本体是JSON。
+- 标准推荐：**VDA5050业务JSON放在MQTT的payload中传输，MQTT作为VDA5050的传输载体**。
+> 关系：**VDA5050 基于 MQTT 做传输，MQTT承载VDA5050消息**；VDA5050规范没有强制锁死MQTT，但工业落地几乎全部用MQTT。
+
+数据流：
+`VDA5050 JSON业务报文` → MQTT Payload → MQTT Broker → 调度系统/opentcs驱动解析VDA5050业务
+
+
 ### 1.2 四大核心模块定位
 
 | 模块 | 本地路径 | 定位 | 核心能力 |
 | :--- | :--- | :--- | :--- |
-| `opentcs-kernel` | `D:\byd_agv_njc\opentcs\opentcs-kernel` | 调度内核服务进程 | 维护工厂模型、车辆对象、运输订单、调度状态；执行路径规划、交通管制、任务分配；通过 RMI 扩展向外提供内核服务访问能力。 |
-| `opentcs-bff` | `D:\byd_agv_njc\opentcs\opentcs-bff` | 面向 SPA 的后端缓冲层 | 对前端提供 HTTP REST、SSE、OpenAPI/Swagger；向下通过 Java RMI 连接 Kernel；封装车辆、运输订单、工程草稿、地图资产等前端所需接口。 |
-| `opentcs-spa` | `D:\byd_agv_njc\opentcs\opentcs-spa` | 操作员可视化前端 | 提供工厂地图导入、画布编辑、工程管理、模型发布、运输订单创建、车辆实时状态和订单生命周期展示。 |
+| `opentcs-kernel` | `D:\byd_agv_njc\opentcs\opentcs-kernel` | 调度内核服务进程 | **维护**工厂模型、车辆对象、运输订单、调度状态；**执行**路径规划、交通管制、任务分配；通过 RMI 扩展向外**提供**内核服务访问能力。 |
+| `opentcs-bff` | `D:\byd_agv_njc\opentcs\opentcs-bff` | 面向 SPA 的后端缓冲层 | 对前端**提供** HTTP REST、SSE、OpenAPI/Swagger；向下通过 Java RMI **连接** Kernel；**封装**车辆、运输订单、工程草稿、地图资产等前端所需接口。 |
+| `opentcs-spa` | `D:\byd_agv_njc\opentcs\opentcs-spa` | 操作员可视化前端 | **提供**工厂地图导入、画布编辑、工程管理、模型发布、运输订单创建、车辆实时状态和订单生命周期展示。 |
 | `opentcs-commadapter-vda5050` | `D:\byd_agv_njc\opentcs-commadapter-vda5050` | VDA5050 车辆通信适配器 | 内置 MQTT 客户端；处理 VDA5050 2.0.0 JSON 报文；完成 openTCS 内部对象与 AGV order/state/connection 等 MQTT 主题报文之间的双向转换。 |
 
 ### 1.3 模块上下游依赖与通信方式
@@ -517,10 +530,10 @@ opentcs-bff/src/main/resources/org/opentcs/bff/distribution/config/opentcs-bff-d
 | 配置项 | 默认值 | 说明 |
 | :--- | :--- | :--- |
 | `bff.bindAddress` | `0.0.0.0` | HTTP 服务绑定地址。 |
-| `bff.bindPort` | `8090` | HTTP 服务端口。 |
+| `bff.bindPort` | **`8090`** | HTTP 服务端口。 |
 | `bff.security.accessKey` | 空字符串 | 为空表示关闭 API access-key 鉴权；非空时 `/api/*` 必须携带 `X-Api-Access-Key`。 |
 | `bff.kernel.host` | `localhost` | Kernel RMI 主机。 |
-| `bff.kernel.port` | `1099` | Kernel RMI 端口。 |
+| `bff.kernel.port` | **`1099`** | Kernel RMI 端口。 |
 | `bff.kernel.userName` | `Alice` | Kernel 登录用户名。 |
 | `bff.kernel.password` | `xyz` | Kernel 登录密码。 |
 | `bff.workspace.dir` | `./data/bff-workspace` | SPA 工程草稿和地图资产存储根目录。 |
@@ -878,7 +891,7 @@ SSE 数据在 HTTP 响应体中的典型格式如下：
 
 ```text
 event: /events/vehicles
-data: {"currentObjectState":{"name":"Vehicle-1","state":"UNKNOWN","procState":"IDLE","integrationLevel":"TO_BE_RESPECTED","paused":false,"energyLevel":100,"currentPosition":null,"precisePosition":null,"orientationAngle":null},"previousObjectState":{"name":"Vehicle-1","state":"UNKNOWN","procState":"IDLE","integrationLevel":"TO_BE_RESPECTED","paused":false,"energyLevel":100,"currentPosition":null,"precisePosition":null,"orientationAngle":null}}
+data: {"currentObjectState":{"name":"Vehicle-1","state":"IDLE","procState":"IDLE","integrationLevel":"TO_BE_RESPECTED","operatingMode":"AUTOMATIC","lastStateAt":"2026-07-01T08:53:03.023696700Z","paused":false,"energyLevel":85,"currentPosition":null,"precisePosition":{"x":10652,"y":-10213,"z":0},"orientationAngle":177.71202824078546,"properties":{"vda5050:manufacturer":"BYD_11","vda5050:runtimeClientId":"192.168.1.105-192.168.10.110-192.168.2.105-10.136.73.43-172.17.0.1_DP0055","vda5050:runtimeClientEventAt":"2026-07-01T08:49:08.144Z","vda5050:runtimeClientPeerName":"10.136.73.43:46522","ip":"10.136.73.43","vda5050:actionStates":"[ ]","vda5050:runtimeClientEvent":"connected","vda5050:topicPrefix":"VDA/V2.0.0/BYD_11/DP0055","vda5050:mapId":"HZ27","vda5050:maxStepsHorizon":"0","vda5050:serialNumber":"DP0055","vda5050:paused":"false","vda5050:version":"2.0","vda5050:runtimeClientIpSource":"emqx","vda5050:lastStateAt":"2026-07-01T08:53:03.023696700Z","vda5050:information.debug":"","vda5050:runtimeClientIp":"10.136.73.43","tcs:preferredAdapterClass":"org.opentcs.commadapter.vehicle.vda5050.CommAdapterFactoryImpl","vda5050:errors.warning":"","vda5050:errors.fatal":"","vda5050:information.info":"","vda5050:operatingMode":"AUTOMATIC"}},"previousObjectState":{"name":"Vehicle-1","state":"IDLE","procState":"IDLE","integrationLevel":"TO_BE_RESPECTED","operatingMode":"AUTOMATIC","lastStateAt":"2026-07-01T08:53:01.972779200Z","paused":false,"energyLevel":85,"currentPosition":null,"precisePosition":{"x":10652,"y":-10213,"z":0},"orientationAngle":177.71202824078546,"properties":{"vda5050:manufacturer":"BYD_11","vda5050:runtimeClientId":"192.168.1.105-192.168.10.110-192.168.2.105-10.136.73.43-172.17.0.1_DP0055","vda5050:runtimeClientEventAt":"2026-07-01T08:49:08.144Z","vda5050:runtimeClientPeerName":"10.136.73.43:46522","ip":"10.136.73.43","vda5050:actionStates":"[ ]","vda5050:runtimeClientEvent":"connected","vda5050:topicPrefix":"VDA/V2.0.0/BYD_11/DP0055","vda5050:mapId":"HZ27","vda5050:maxStepsHorizon":"0","vda5050:serialNumber":"DP0055","vda5050:paused":"false","vda5050:version":"2.0","vda5050:runtimeClientIpSource":"emqx","vda5050:lastStateAt":"2026-07-01T08:53:01.972779200Z","vda5050:information.debug":"","vda5050:runtimeClientIp":"10.136.73.43","tcs:preferredAdapterClass":"org.opentcs.commadapter.vehicle.vda5050.CommAdapterFactoryImpl","vda5050:errors.warning":"","vda5050:errors.fatal":"","vda5050:information.info":"","vda5050:operatingMode":"AUTOMATIC"}}}
 
 event: /events/transportOrders
 data: {"currentObjectState":null,"previousObjectState":{"name":"spa-178166620206201KV9S9GHB1708PQGFESHGVK42","type":"-","state":"RAW","intendedVehicle":"Vehicle-1","processingVehicle":null,"destinations":[{"locationName":"Point-49","operation":"MOVE","properties":null},{"locationName":"Point-34","operation":"PARK","properties":null}]}}
@@ -3440,6 +3453,147 @@ State 是 AGV 上行报文，适配器不向 MQTT 发布新的 state 报文。
 6. `MovementCommand` 完成依赖 `nodeStates` / `edgeStates` / `actionStates` 从 state 中消失或进入终态，AGV 必须按 VDA5050 规范维护这些字段。
 7. 适配器也订阅 `visualization` 和 `factsheet`。其中 visualization 可更新车辆 pose，factsheet 当前主要记录并忽略，不属于本阶段三类主报文分析范围。
 
+### 6.9 VDA5050通信适配器特性与配置参数说明
+
+本节基于 `D:\byd_agv_njc\opentcs-commadapter-vda5050` 当前 `develop-from-v0.32.0` 分支源码与提交记录整理，重点覆盖 VDA5050 v2_0 适配器的路径姿态角、报文重发和协议固定字段。涉及角度的配置值除特别说明外，路径属性中配置为角度制，写入 VDA5050 报文前转换为弧度制；openTCS 点坐标单位为 mm，VDA5050 `NodePosition.x/y` 单位为 m。
+
+#### 6.9.1 路径节点与行驶边姿态角度计算规则
+
+**功能名称：正向行驶边速度与 orientation 计算**
+1. 控制配置项分类
+    - 静态配置：无。
+    - 动态车辆属性：无；车辆的 `vda5050:version=2.0` 仅决定适配器版本，不参与本计算。
+    - 动态路径/边属性：`vda5050:vehicleOrientation`、`vda5050:orientation.forward`、`vda5050:orientationType.forward`、`vda5050:rotationAllowed.forward`，以及 openTCS `Path.maxVelocity`。
+2. 默认行为：未配置任何路径自定义属性时，`Route.Step.getVehicleOrientation()` 为 `FORWARD` 的路段按正向行驶处理，`Edge.maxSpeed = Path.maxVelocity / 1000.0`，`Edge.orientation` 先为空；随后 `OrderMapper.adjustEdgeOrientations()` 按起点到终点坐标自动补算边朝向，并将 `orientationType` 写为 `GLOBAL`。
+3. 完整计算/执行规则：
+    - 若 `vda5050:vehicleOrientation` 未配置、为空或为 `AUTO`，使用 Kernel 路由给出的 `Route.Step.getVehicleOrientation()`。
+    - 若 `vda5050:vehicleOrientation=FORWARD`，强制按正向分支处理，即使 `Route.Step` 原始方向不是正向。
+    - 若进入正向分支，`EdgeMapping.maxSpeed()` 取 `Path.maxVelocity / 1000.0`，单位从 mm/s 转为 m/s。
+    - 若配置 `vda5050:orientation.forward`，`EdgeMapping.edgeOrientation()` 将角度值通过 `Math.toRadians()` 转为弧度后写入 `Edge.orientation`。
+    - 若未配置 `vda5050:orientation.forward`，`Edge.orientation` 在 `EdgeMapping` 阶段保持为空；发布订单前由 `OrderMapper.adjustEdgeOrientations()` 在 `orientationType` 为空或 `GLOBAL` 时按 `atan2(end.y - start.y, end.x - start.x)` 补算，并写入 `orientationType=GLOBAL`。
+    - 若配置 `vda5050:orientationType.forward`，`EdgeMapping.edgeOrientationType()` 原样写入 `Edge.orientationType`；当该值不是 `GLOBAL` 且 `Edge.orientation` 为空时，`OrderMapper.adjustEdgeOrientations()` 不再补算该边。
+    - 若配置 `vda5050:rotationAllowed.forward`，`EdgeMapping.rotationAllowed()` 将字符串转为布尔值写入 `Edge.rotationAllowed`；未配置则该字段为空。
+4. 计算示例（仅数值计算类特性必填）：
+    - 示例 A：点 A=(1000, 3000) mm，点 B=(3000, 3000) mm，`Path.maxVelocity=1000` mm/s，未配置 `orientation.forward`。VDA5050 节点坐标为 A=(1.0, 3.0) m，B=(3.0, 3.0) m；`maxSpeed=1000/1000=1.0` m/s；`orientation=atan2(3.0-3.0, 3.0-1.0)=0.000000` rad，`orientationType=GLOBAL`。
+    - 示例 B：同一路段配置 `vda5050:orientation.forward=45`，则 `Edge.orientation=45*pi/180=0.785398` rad。若同时配置 `vda5050:orientationType.forward=GLOBAL`，节点 theta 会按 0.785398 rad 对齐；若未配置 orientationType，报文中 orientationType 为空，节点 theta 按 TANGENTIAL 规则取路径切线角加 0.785398 rad。
+5. 代码溯源：`EdgeMapping.toBaseEdge()`、`EdgeMapping.toHorizonEdge()`、`EdgeMapping.maxSpeed()`、`EdgeMapping.edgeOrientation()`、`EdgeMapping.edgeOrientationType()`；发布前统一修正位于 `OrderMapper.adjustEdgeOrientations()` 和 `OrderMapper.adjustNodeThetas()`。相关提交：`4a73b5a`、`483b29a`。
+6. 报文/业务影响：该规则最终填充 VDA5050 `order.edges[].maxSpeed`、`order.edges[].orientation`、`order.edges[].orientationType`、`order.edges[].rotationAllowed`。AGV 将据此限制正向行驶速度并确定边上车体朝向；前端或运维侧查看订单报文时，应以 MQTT 下发报文中的弧度值为准。
+
+**功能名称：倒车/后退行驶边速度与 orientation 计算**
+1. 控制配置项分类
+    - 静态配置：无。
+    - 动态车辆属性：无。
+    - 动态路径/边属性：`vda5050:vehicleOrientation`、`vda5050:orientation.reverse`、`vda5050:orientationType.reverse`、`vda5050:rotationAllowed.reverse`，以及 openTCS `Path.maxReverseVelocity`。
+2. 默认行为：无自定义配置时，是否倒车由 `Route.Step.getVehicleOrientation()` 决定；若该值为 `BACKWARD`，速度取 `Path.maxReverseVelocity / 1000.0`。未配置 `orientation.reverse` 时，只有在 `vda5050:orientationType.reverse=GLOBAL` 时才按倒车反向朝向自动补算；否则后续通用边补算会按起点到终点的几何方向写入 `GLOBAL` 朝向。
+3. 完整计算/执行规则：
+    - 优先读取路径属性 `vda5050:vehicleOrientation`：`BACKWARD` 或 `REVERSE` 强制按倒车分支处理；`FORWARD` 强制按正向分支处理；未配置、空值或 `AUTO` 则回退到 `Route.Step.getVehicleOrientation()`。
+    - 倒车分支中，`EdgeMapping.maxSpeed()` 写入 `Path.maxReverseVelocity / 1000.0`。
+    - 若配置 `vda5050:orientation.reverse`，该角度优先级最高，直接转弧度写入 `Edge.orientation`。
+    - 若未配置 `vda5050:orientation.reverse`，但 `vda5050:orientationType.reverse=GLOBAL`，`EdgeMapping.calculatedReverseOrientation()` 计算 `normalizeAngle(atan2(deltaY, deltaX) + pi)`，即在全局坐标系中将车体朝向反转 180 度。
+    - 若未配置 `vda5050:orientation.reverse`，且 `orientationType.reverse` 不是 `GLOBAL` 或未配置，则倒车专用反向朝向不生效；后续 `OrderMapper.adjustEdgeOrientations()` 仅在 `orientationType` 为空或 `GLOBAL` 时按几何方向补算。
+    - 若配置 `vda5050:rotationAllowed.reverse`，按布尔值写入倒车边的 `rotationAllowed`；未配置则为空。
+4. 计算示例（仅数值计算类特性必填）：
+    - 示例 A：点 A=(9395, -7174) mm，点 B=(11400, -7200) mm，`Path.maxReverseVelocity=350` mm/s，配置 `vda5050:vehicleOrientation=BACKWARD`、`vda5050:orientationType.reverse=GLOBAL`，未配置 `orientation.reverse`。`maxSpeed=350/1000=0.35` m/s；路径几何角 `atan2(-7200 - (-7174), 11400 - 9395)=atan2(-26, 2005)=-0.012967` rad；倒车全局朝向 `-0.012967 + pi = 3.128626` rad，即 179.257 度。
+    - 示例 B：同一路段若增加 `vda5050:orientation.reverse=12.34`，则显式配置优先，`orientation=12.34*pi/180=0.215374` rad，不再采用 3.128626 rad 的自动反向结果。
+5. 代码溯源：`EdgeMapping.vehicleOrientation()` 解析路径方向覆盖；`EdgeMapping.maxSpeed()` 选择正/反向速度；`EdgeMapping.edgeOrientation()` 先取 `orientation.reverse`，再调用 `calculatedReverseOrientation()`；`EdgeMapping.usesGlobalReverseOrientation()` 只在 `orientationType.reverse=GLOBAL` 时启用自动反向。相关提交：`dde988d`、`947f183`。
+6. 报文/业务影响：该规则决定倒车订单中 `order.edges[].maxSpeed` 和车体全局朝向。配置正确时，AGV 可以沿 A 到 B 的路径后退行驶，但车头保持反向；配置缺失时，报文可能只表达路径几何方向，是否按倒车车体姿态执行取决于车辆端对 orientation/orientationType 的解释。
+
+**功能名称：节点 theta、边 orientation 自动补算与一致性对齐**
+1. 控制配置项分类
+    - 静态配置：无。
+    - 动态车辆属性：`vda5050:mapId`、`vda5050:deviationXY`、`vda5050:deviationTheta` 参与 `NodePosition` 其他字段，不直接控制本节 theta/orientation 主逻辑。
+    - 动态路径/边属性：`vda5050:orientation.forward`、`vda5050:orientation.reverse`、`vda5050:orientationType.forward`、`vda5050:orientationType.reverse`、`vda5050:vehicleOrientation`。
+2. 默认行为：`NodeMapping.toNodePosition()` 先将点坐标从 mm 转 m，并在点自身有 orientationAngle 时写入初始 theta；随后 `OrderMapper.mapOrder()` 调用 `adjustOrientations()`，先补边 orientation，再补节点 theta。最终节点 theta 优先与相邻边的绝对朝向一致，而不是保留点模型中的原始朝向。
+3. 完整计算/执行规则：
+    - `OrderMapper.adjustEdgeOrientations()` 遍历所有边；若边已有显式 `orientation`，直接跳过，不覆盖。
+    - 若边没有对应的终点节点、起点或终点 `NodePosition` 缺失，跳过补算。
+    - 若边的 `orientationType` 非空且不是 `GLOBAL`，跳过补算，避免将 TANGENTIAL 或其他非全局语义误改为 GLOBAL。
+    - 其余情况下写入 `orientation=atan2(end.y - start.y, end.x - start.x)`，并强制 `orientationType=GLOBAL`。
+    - `OrderMapper.adjustNodeThetas()` 遍历节点；若节点无 `NodePosition`，跳过。
+    - 对每个节点，优先从相邻边求绝对朝向：先看入边，再看出边。
+    - 相邻边 `orientationType=GLOBAL` 时，节点 theta 直接等于边 `orientation`。
+    - 相邻边 `orientationType` 为空或 `TANGENTIAL` 时，节点 theta 等于 `normalizeAngle(边几何角 + edge.orientation)`。
+    - 若相邻边无法提供绝对朝向，首节点用车辆当前 pose 到该节点的方向；车辆 pose 为空时取 0.0。非首节点用前一节点到当前节点的方向。
+    - `NodePosition.setTheta()` 校验 theta 必须位于 `[-pi, pi]` 区间；通用归一化逻辑也将角度规整到该范围。
+4. 计算示例（仅数值计算类特性必填）：
+    - 示例 A：车辆当前 pose=(1000, 1000) mm，单节点目标=(3000, 3000) mm，无相邻边。VDA5050 坐标为车辆=(1.0, 1.0) m、节点=(3.0, 3.0) m，首节点 `theta=atan2(3.0-1.0, 3.0-1.0)=0.785398` rad，即 45 度。
+    - 示例 B：点 A=(11407, -7193) mm，点 B=(9400, -7188) mm，边未显式配置 orientation，但 `orientationType.forward=GLOBAL`。补算 `orientation=atan2(-7.188 - (-7.193), 9.400 - 11.407)=3.139101` rad，即 179.857 度；A、B 两个节点的 theta 均从相邻 GLOBAL 边取 3.139101 rad。
+    - 示例 C：点 A=(1.0, 1.0) m，点 B=(5.0, 4.0) m，边 `orientationType=TANGENTIAL` 且 `orientation=0.785398` rad。边几何角为 `atan2(3,4)=0.643501` rad，节点绝对 theta 为 `normalizeAngle(0.643501 + 0.785398)=1.428899` rad，即 81.870 度。
+5. 代码溯源：`NodeMapping.toNodePosition()` 完成坐标单位转换和初始 theta；`OrderMapper.mapOrder()` 调用 `adjustOrientations()`；核心方法为 `OrderMapper.adjustEdgeOrientations()`、`OrderMapper.adjustNodeThetas()`、`OrderMapper.nodeThetaFromAdjacentEdge()`、`OrderMapper.absoluteEdgeOrientation()`。相关提交：`4a73b5a`、`483b29a`。
+6. 报文/业务影响：该逻辑统一 Kernel 路径、Plant 模型点朝向和 VDA5050 订单报文中的角度表达，最终影响 `order.nodes[].nodePosition.theta` 与 `order.edges[].orientation`。修正后，AGV 接收的节点目标姿态与边行驶朝向一致，前端展示或排障时也可按同一套坐标角度理解订单。
+
+#### 6.9.2 订单&即时动作重发机制
+
+**功能名称：运输订单 Order 确认匹配与重发节流**
+1. 控制配置项分类
+    - 静态配置：`commadapter.vehicle.vda5050.orderResendTimeoutMs`，含义为未确认订单再次发送前的最小间隔，代码中小于 0 的值会按 0 处理。
+    - 动态车辆属性：`vda5050:maxIgnoredRejections` 控制连续拒单 state 可忽略次数；`vda5050:operatingMode` 由 state 同步到车辆属性，但重发判断直接使用当前 state 的 `operatingMode`。
+    - 动态路径/边属性：无。
+2. 默认行为：`orderResendTimeoutMs=0` 时不做时间节流，保持旧逻辑，即每收到一帧未确认且未超过拒单限制的 state，都可以再次发送当前订单。`vda5050:maxIgnoredRejections` 未配置时默认 0，首次检测到拒单 state 后不再重发当前订单。
+3. 完整计算/执行规则：
+    - `CommAdapterImpl.sendCommand()` 将 `MovementCommand` 映射为 VDA5050 `Order`，调用 `MessageResponseMatcher.enqueueCommand()` 入队。
+    - 请求队列只发送队首元素；若已有未确认请求，新订单只排队等待。
+    - `MessageResponseMatcher.onStateMessage()` 每收到 state 都更新 `sendingAllowed`：仅 `AUTOMATIC` 或 `SEMIAUTOMATIC` 允许发送订单；`MANUAL`、`SERVICE`、`TEACHIN` 下订单留在队列中等待。
+    - 确认条件为 `State.orderId == Order.orderId` 且 `State.orderUpdateId == Order.orderUpdateId`。确认后移除队首，调用 `orderAcceptedCallback`，再尝试发送下一条请求。
+    - 若 `StateMappings.vehicleRejectsOrder(state)` 为真，连续拒单计数加 1；计数大于 `maxIgnoredRejectionsCount` 后，不再重发，等待撤回订单或新的初始订单处理。
+    - 若未确认且未超过拒单限制，则执行重发判断：若当前请求不是上次发送的请求，允许立即发送；若是同一请求且 `orderResendTimeoutMs=0`，允许立即发送；若 `elapsedMs >= orderResendTimeoutMs`，允许重发；否则跳过本次 state。
+    - 每次真正发送都经 `CommAdapterImpl.sendOrder()` 和 `sendMessage()` 发布到 MQTT，订单业务字段保持同一 `orderId/orderUpdateId`，但报文头 `headerId` 和 `timestamp` 会重新生成。
+4. 计算示例（仅数值计算类特性必填）：非角度/坐标类特性，不适用。
+5. 代码溯源：`CommAdapterConfiguration.orderResendTimeoutMs()` 定义静态配置；`CommAdapterImpl` 构造 `MessageResponseMatcher` 时传入该配置；`MessageResponseMatcher.enqueueCommand()`、`onStateMessage()`、`sendNextOrder()`、`orderResendAllowed()` 实现队列确认和重发节流。相关提交：`20092fd`。
+6. 报文/业务影响：AGV 未在 state 中回显订单 ID 和更新 ID 时，适配器会重复发布同一业务订单，避免 MQTT 丢包或车辆漏收导致任务停滞；配置节流后可降低高频 state 场景下重复 order 报文对 AGV 的压力。
+
+**功能名称：即时动作 InstantActions 确认、重发、超时丢弃机制**
+1. 控制配置项分类
+    - 静态配置：无。
+    - 动态车辆属性：`vda5050:instantActions.resendEnabled`、`vda5050:instantActions.resendIntervalMs`、`vda5050:instantActions.maxSendAttempts`、`vda5050:instantActions.ackTimeoutMs`、`vda5050:actionStates`。
+    - 动态路径/边属性：无。
+2. 默认行为：未配置车辆属性时，`resendEnabled=false`、`resendIntervalMs=5000`、`maxSendAttempts=1`、`ackTimeoutMs=30000`。即默认只发送一次即时动作，不因普通未确认 state 重发；若 30 秒内仍未确认，则丢弃该即时动作并继续队列后续消息。
+3. 完整计算/执行规则：
+    - 即时动作可由通用消息 `vda5050:sendInstantAction`、`vda5050:sendInstantActions` 或适配器内部 `cancelOrder` 触发，最终都调用 `MessageResponseMatcher.enqueueAction()` 入队。
+    - 即时动作与订单共用同一个请求队列，队首未确认时后续订单或即时动作均等待。
+    - 与订单不同，`sendNextOrder()` 只对 `OrderAssociation` 检查 `sendingAllowed`；`InstantActions` 可绕过操作模式限制，在 `MANUAL`、`SERVICE`、`TEACHIN` 下也可发送。
+    - 普通即时动作确认条件为：该 `InstantActions` 中每个 `Action.actionId` 都能在 state 的 `actionStates[].actionId` 中找到。
+    - `cancelOrder` 的确认条件更严格：除 actionId 出现在 state 中外，`actionStatus` 必须为 `FINISHED` 或 `FAILED`，避免车辆尚未完成取消动作时下发新订单。
+    - 若当前即时动作未确认且 `ackTimeoutMs > 0`，从第一次发送时间起达到该阈值后，适配器移除队首、重置即时动作追踪状态，并尝试发送下一条请求。
+    - 若未超时，重发需同时满足：当前请求等于上次发送请求、`resendEnabled=true`、当前发送次数小于 `maxSendAttempts`、距离上次发送时间达到 `resendIntervalMs`。`maxSendAttempts` 包含首次发送，例如配置为 3 表示最多 1 次首发加 2 次重发。
+    - 每次发送经 `CommAdapterImpl.sendInstantAction()` 和 `sendMessage()` 发布到 MQTT；业务 actionId 不变，报文头 `headerId` 和 `timestamp` 每次刷新。
+4. 计算示例（仅数值计算类特性必填）：非角度/坐标类特性，不适用。
+5. 代码溯源：车辆属性常量位于 `ObjectProperties`；默认值在 `CommAdapterImpl` 构造 `MessageResponseMatcher` 时给出；核心执行位于 `MessageResponseMatcher.enqueueAction()`、`sendNextOrder()`、`instantActionsResendAllowed()`、`instantActionsTimedOut()`、`instantActionsAcknowledged()`、`cancelOrderAcceptedAndCompleted()`；通用消息映射位于 `CommAdapterMessageMapper.toInstantActions()`。相关提交：`e7401ef`、`b289408`、`a6e3997`。
+6. 报文/业务影响：适配器可以可靠下发需要车辆回显 action 状态的即时动作；启用重发后，AGV 需按相同 `actionId` 幂等处理重复 `instantActions` 报文。超时丢弃可避免未确认即时动作永久阻塞后续订单或动作。
+
+#### 6.9.3 其他报文、协议固定配置特性汇总
+
+**功能名称：VDA5050 报文头 version 固定为 2.0.0**
+1. 控制配置项分类
+    - 静态配置：无独立开关；适配器启用版本由 `commadapter.vehicle.vda5050.enabledVersions` 控制。
+    - 动态车辆属性：`vda5050:version=2.0` 用于选择 v2_0 适配器；`vda5050:manufacturer`、`vda5050:serialNumber` 填入报文头。
+    - 动态路径/边属性：无。
+2. 默认行为：所有通过 v2_0 `CommAdapterImpl.sendMessage()` 下发给 AGV 的 `Order` 和 `InstantActions` 报文，其 header `version` 固定写为 `2.0.0`，不从车辆属性 `vda5050:version` 读取 patch 版本。
+3. 完整计算/执行规则：
+    - `MqttSetting.VERSION_MAJOR=2`、`VERSION_MINOR=0`、`VERSION_PATCH=0` 是代码常量。
+    - `CommAdapterImpl.sendMessage()` 每次发布前设置 `headerId`、`timestamp`、`version`、`manufacturer`、`serialNumber`。
+    - `version` 的赋值表达式为 `VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_PATCH`，因此实际字符串恒为 `2.0.0`。
+    - `manufacturer` 与 `serialNumber` 来自 `MqttSetting.forVehicle()` 读取的车辆属性 `vda5050:manufacturer`、`vda5050:serialNumber`。
+    - 同一 MQTT topic 的 `headerId` 从 0 开始递增；不同 topic 分别维护计数。
+4. 计算示例（仅数值计算类特性必填）：非角度/坐标类特性，不适用。
+5. 代码溯源：固定版本常量定义在 `MqttSetting.VERSION_MAJOR`、`VERSION_MINOR`、`VERSION_PATCH`；报文头填充在 `CommAdapterImpl.sendMessage()`；相关注释提交为 `04a81d3`。
+6. 报文/业务影响：MQTT 下行 `order` 与 `instantActions` 报文始终声明 VDA5050 `2.0.0`。现场排查时，即使车辆属性配置为 `vda5050:version=2.0`，下发 JSON header 仍会包含 patch 位 `2.0.0`。
+
+**功能名称：MQTT topic 前缀与 order/instantActions 默认发布主题**
+1. 控制配置项分类
+    - 静态配置：无。
+    - 动态车辆属性：`vda5050:topicPrefix`、`vda5050:interfaceName`、`vda5050:manufacturer`、`vda5050:serialNumber`、`vda5050:topicOrderName`、`vda5050:topicOrderQos`、`vda5050:topicInstantActionsName`、`vda5050:topicInstantActionsQos`。
+    - 动态路径/边属性：无。
+2. 默认行为：若车辆未配置 `vda5050:topicPrefix`，适配器用 `vda5050:interfaceName/v2/vda5050:manufacturer/vda5050:serialNumber` 派生前缀；`order` 发布主题默认后缀为 `order`，`instantActions` 发布主题默认后缀为 `instantActions`；发布 QoS 默认 `AT_MOST_ONCE`。
+3. 完整计算/执行规则：
+    - `MqttSetting.hasRequiredProperties()` 要求 `topicPrefix` 或 `interfaceName` 至少一个存在，并且 `manufacturer`、`serialNumber` 存在。
+    - 若配置 `vda5050:topicPrefix`，直接作为所有 topic 的公共前缀。
+    - 若未配置 `topicPrefix` 但配置 `interfaceName`，派生前缀为 `<interfaceName>/v2/<manufacturer>/<serialNumber>`，其中 `v2` 来自 `MqttSetting.VERSION_MAJOR=2`。
+    - `vda5050:topicOrderName` 未配置或为空时，订单发布到 `<prefix>/order`；`vda5050:topicInstantActionsName` 未配置或为空时，即时动作发布到 `<prefix>/instantActions`。
+    - QoS 字符串支持 `AT_MOST_ONCE/0`、`AT_LEAST_ONCE/1`、`EXACTLY_ONCE/2`；非法值回退到默认 `AT_MOST_ONCE`。
+4. 计算示例（仅数值计算类特性必填）：非角度/坐标类特性，不适用。
+5. 代码溯源：`ObjectProperties` 定义车辆 topic 属性；`MqttSetting.forVehicle()` 计算前缀、topic 名称和 QoS；`CommAdapterImpl.sendOrder()`、`CommAdapterImpl.sendInstantAction()` 分别使用 `mqttSetting.orderTopicName()` 与 `mqttSetting.instantActionsTopicName()` 发布。相关基线提交包括 `0e6e4af`。
+6. 报文/业务影响：该规则决定 AGV 实际订阅的下行 MQTT topic。未显式配置 topicPrefix 的现场，需确保 interfaceName/manufacturer/serialNumber 与 AGV 端 topic 约定一致，否则报文内容正确也无法被车辆接收。
 ## 章节7：端到端全链路数据流转分析
 
 ### 7.1 链路总览
