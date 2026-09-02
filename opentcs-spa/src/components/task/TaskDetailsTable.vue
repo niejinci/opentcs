@@ -4,6 +4,7 @@ import {
   operationForTask,
   TASK_TYPE_OPTIONS,
   taskTypeLabel,
+  targetSupportsTask,
   type CreateTaskType,
   type TargetOption,
   type TaskRow,
@@ -98,10 +99,20 @@ function operationsText(operations: readonly string[], separator = ' / '): strin
 }
 
 function targetSupportsRow(row: TaskRow, target: TargetOption): boolean {
-  return target.allowedOperations.includes(operationForTask(row));
+  return targetSupportsTask(row, target);
 }
 
 function unsupportedText(row: TaskRow, target: TargetOption): string {
+  if (row.type === 'charge') {
+    const displayName = target.chargingPileName || target.name;
+    if (target.kind !== 'location' || !target.isChargingPile) {
+      return `${target.name} 不是可用充电桩`;
+    }
+    if (target.chargeUnavailableReason) {
+      return `${displayName} ${target.chargeUnavailableReason}`;
+    }
+  }
+
   return `${target.name} 不支持 ${operationForTask(row)}，可用操作：${operationsText(
     target.allowedOperations,
     '、',

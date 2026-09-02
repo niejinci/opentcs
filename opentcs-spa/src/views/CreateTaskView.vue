@@ -8,16 +8,22 @@ import TaskDetailsTable from '@/components/task/TaskDetailsTable.vue';
 import TaskMapPanel from '@/components/task/TaskMapPanel.vue';
 import TaskParamDialog from '@/components/task/TaskParamDialog.vue';
 import { useBackgroundMap } from '@/composables/useBackgroundMap';
+import {
+  chargingPileAvailabilityError,
+  chargingPileByLocationName,
+} from '@/domain/charging/chargingPile';
 import { allowedOperationsForTarget, resolveOrderTargetInfos } from '@/domain/model/orderTargets';
 import {
   buildTransportOrderRequest,
   createTaskRow,
   operationForTask,
+  targetSupportsTask,
   validateTaskRows,
   type TargetOption,
   type TaskParams,
   type TaskRow,
 } from '@/domain/tasks/createTask';
+import { useChargingPilesStore } from '@/stores/chargingPiles';
 import { useLiveStatusStore } from '@/stores/liveStatus';
 import { useProjectStore } from '@/stores/project';
 import { useProjectsStore } from '@/stores/projects';
@@ -32,6 +38,7 @@ const router = useRouter();
 const live = useLiveStatusStore();
 const project = useProjectStore();
 const projects = useProjectsStore();
+const chargingPiles = useChargingPilesStore();
 const { background } = useBackgroundMap();
 
 const routeProjectId = computed(() =>
@@ -39,6 +46,7 @@ const routeProjectId = computed(() =>
 );
 
 const projectName = ref('');
+const lastPublishedAt = ref<string | null>(null);
 const loadingProject = ref(false);
 const submitting = ref(false);
 const intendedVehicle = ref('');
@@ -54,16 +62,24 @@ const targetModel = computed(() =>
   }),
 );
 
+const chargingPileByLocation = computed(() => chargingPileByLocationName(chargingPiles.piles));
+
 const targetOptions = computed<TargetOption[]>(() => {
   const locations = project.locations
     .filter((location) => !location.locked)
-    .map((location) => ({
-      name: location.name,
-      kind: 'location' as const,
-      allowedOperations: allowedOperationsForTarget(
-        targetModel.value.targetInfoByName.get(location.name),
-      ),
-    }));
+    .map((location) => {
+      const pile = chargingPileByLocation.value.get(location.name);
+      return {
+        name: location.name,
+        kind: 'location' as const,
+        allowedOperations: allowedOperationsForTarget(
+          targetModel.value.targetInfoByName.get(location.name),
+        ),
+        isChargingPile: Boolean(pile),
+        chargingPileName: pile?.name,
+        chargeUnavailableReason: pile ? chargingPileAvailabilityError(pile) : null,
+      };
+    });
   const points = project.points.map((point) => ({
     name: point.name,
     kind: 'point' as const,
@@ -119,8 +135,10 @@ async function activateProject(): Promise<void> {
   try {
     const meta = await projects.setCurrent(routeProjectId.value);
     projectName.value = meta.name;
+    lastPublishedAt.value = meta.lastPublishedAt ?? null;
     const env = await projects.loadCurrentDraft();
     project.hydrateDraftPayload(env?.payload ?? null);
+    await refreshChargingPileStatus(false);
   } catch {
     toastError('加载创建任务工程失败', '创建任务');
     void router.replace({ name: 'projects' });
@@ -144,12 +162,24 @@ function allowedOperationsText(operations: readonly string[]): string {
 }
 
 function targetOperationSupportError(row: TaskRow, targetName: string): string | null {
-  const info = targetModel.value.targetInfoByName.get(targetName);
-  if (!info) return null;
+  const target = targetOptions.value.find((item) => item.name === targetName);
+  if (!target) return `${targetName} 不可作为当前任务目标`;
+  if (targetSupportsTask(row, target)) return null;
+
+  if (row.type === 'charge') {
+    const displayName = target.chargingPileName || targetName;
+    if (target.kind !== 'location' || !target.isChargingPile) {
+      return `${targetName} 不是可用充电桩`;
+    }
+    if (target.chargeUnavailableReason) {
+      return `${displayName} ${target.chargeUnavailableReason}`;
+    }
+  }
+
   const operation = operationForTask(row);
-  const allowed = allowedOperationsForTarget(info);
-  if (allowed.includes(operation)) return null;
-  return `${targetName} 不支持 ${operation}，可用操作：${allowedOperationsText(allowed)}`;
+  return `${targetName} 不支持 ${operation}，可用操作：${allowedOperationsText(
+    target.allowedOperations,
+  )}`;
 }
 
 function onMapTargetClick(target: { kind: 'point' | 'location'; name: string }): void {
@@ -192,6 +222,46 @@ function validationErrors(): string[] {
   return [...validateTaskRows(rows.value), ...operationSupportErrors()];
 }
 
+function chargePublishErrors(): string[] {
+  const errors: string[] = [];
+
+  rows.value.forEach((row, index) => {
+    if (row.type !== 'charge') return;
+
+    const targetName = row.targetName.trim();
+    if (!targetName) return;
+
+    const pile = chargingPileByLocation.value.get(targetName);
+    const displayName = pile?.name || targetName;
+    const label = `第 ${index + 1} 行`;
+
+    if (!lastPublishedAt.value) {
+      errors.push(`${label} ${displayName} 尚未发布到 Kernel，请先发布工程模型`);
+    }
+  });
+
+  return errors;
+}
+
+function hasChargeRows(): boolean {
+  return rows.value.some((row) => row.type === 'charge');
+}
+
+async function refreshChargingPileStatus(showError: boolean): Promise<boolean> {
+  try {
+    await chargingPiles.refresh({ toastOnError: false });
+    return true;
+  } catch (err) {
+    if (showError) {
+      const message = err instanceof Error ? err.message : String(err);
+      toastError(`充电桩状态刷新失败，无法创建充电任务\n${message}`, '创建任务校验失败');
+    } else {
+      toastWarning('充电桩状态加载失败，充电任务暂不可创建', '创建任务');
+    }
+    return false;
+  }
+}
+
 function goBack(): void {
   if (routeProjectId.value) {
     void router.push({ name: 'realtime-monitor', params: { projectId: routeProjectId.value } });
@@ -211,19 +281,23 @@ function orderFailureMessage(err: unknown): string {
 }
 
 async function submit(): Promise<void> {
-  const errors = validationErrors();
-  if (errors.length > 0) {
-    toastError(errors.slice(0, 4).join('\n'), '创建任务校验失败');
-    return;
-  }
-
   submitting.value = true;
-  const request = buildTransportOrderRequest({
-    rows: rows.value,
-    intendedVehicle: intendedVehicle.value,
-  });
-
   try {
+    if (hasChargeRows()) {
+      const refreshed = await refreshChargingPileStatus(true);
+      if (!refreshed) return;
+    }
+
+    const errors = [...validationErrors(), ...chargePublishErrors()];
+    if (errors.length > 0) {
+      toastError(errors.slice(0, 4).join('\n'), '创建任务校验失败');
+      return;
+    }
+
+    const request = buildTransportOrderRequest({
+      rows: rows.value,
+      intendedVehicle: intendedVehicle.value,
+    });
     const order = await createTransportOrder(request, { toastOnError: false });
     live.recordCreatedOrder(order);
     toastSuccess(`已创建任务 ${order.name}`, '创建任务');

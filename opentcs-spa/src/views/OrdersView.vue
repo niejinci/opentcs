@@ -34,10 +34,16 @@ import {
   type VehicleIntegrationLevel,
 } from '@/api/types/bff';
 import {
+  CHARGE_OPERATION,
+  chargingPileAvailabilityError,
+  chargingPileByLocationName,
+} from '@/domain/charging/chargingPile';
+import {
   allowedOperationsForTarget,
   resolveOrderTargetInfos,
   type TargetInfo,
 } from '@/domain/model/orderTargets';
+import { useChargingPilesStore } from '@/stores/chargingPiles';
 import { useLiveStatusStore } from '@/stores/liveStatus';
 import { toastError, toastSuccess } from '@/ui/toast/toastBus';
 
@@ -62,6 +68,7 @@ interface RecentOrderSnapshot {
 const route = useRoute();
 const router = useRouter();
 const live = useLiveStatusStore();
+const chargingPiles = useChargingPilesStore();
 
 const projectId = computed(() => String(route.params.projectId ?? '').trim());
 const projectName = ref<string>('');
@@ -476,6 +483,53 @@ function moveRow(id: number, delta: -1 | 1): void {
   destRows.value = copy;
 }
 
+function hasChargeDestinations(destinations: readonly Destination[]): boolean {
+  return destinations.some((destination) => destination.operation === CHARGE_OPERATION);
+}
+
+function chargePublishErrors(destinations: readonly Destination[]): string[] {
+  const errors: string[] = [];
+  const pilesByLocation = chargingPileByLocationName(chargingPiles.piles);
+
+  destinations.forEach((destination, index) => {
+    if (destination.operation !== CHARGE_OPERATION) return;
+
+    const targetName = destination.locationName.trim();
+    const pile = pilesByLocation.get(targetName);
+    const displayName = pile?.name || targetName;
+    const label = `第 ${index + 1} 步`;
+
+    if (!lastPublishedAt.value) {
+      errors.push(`${label} ${displayName} 尚未发布到 Kernel，请先发布工程模型`);
+    }
+  });
+
+  return errors;
+}
+
+function validateChargeDestinations(destinations: readonly Destination[]): string[] {
+  const errors: string[] = [];
+  const pilesByLocation = chargingPileByLocationName(chargingPiles.piles);
+
+  destinations.forEach((destination, index) => {
+    if (destination.operation !== CHARGE_OPERATION) return;
+
+    const targetName = destination.locationName.trim();
+    const pile = pilesByLocation.get(targetName);
+    if (!pile) {
+      errors.push(`第 ${index + 1} 步 ${targetName} 不是已登记充电桩`);
+      return;
+    }
+
+    const availabilityError = chargingPileAvailabilityError(pile);
+    if (availabilityError) {
+      errors.push(`第 ${index + 1} 步 ${pile.name} ${availabilityError}`);
+    }
+  });
+
+  return errors;
+}
+
 async function submit(): Promise<void> {
   if (!canSubmit.value) return;
   submitting.value = true;
@@ -490,6 +544,31 @@ async function submit(): Promise<void> {
     destinations,
   };
   try {
+    if (hasChargeDestinations(destinations)) {
+      const publishErrors = chargePublishErrors(destinations);
+      if (publishErrors.length > 0) {
+        toastError(publishErrors.slice(0, 4).join('\n'), '订单创建校验失败');
+        return;
+      }
+
+      try {
+        await chargingPiles.refresh({ toastOnError: false });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        toastError(`充电桩状态刷新失败，无法创建充电订单\n${message}`, '订单创建校验失败');
+        return;
+      }
+
+      const chargeErrors = [
+        ...validateChargeDestinations(destinations),
+        ...chargePublishErrors(destinations),
+      ];
+      if (chargeErrors.length > 0) {
+        toastError(chargeErrors.slice(0, 4).join('\n'), '订单创建校验失败');
+        return;
+      }
+    }
+
     const order = await createTransportOrder(request, { toastOnError: false });
     live.recordCreatedOrder(order);
     rememberRecentOrder(order.name, request);

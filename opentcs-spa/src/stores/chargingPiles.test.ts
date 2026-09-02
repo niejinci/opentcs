@@ -13,6 +13,7 @@ import {
   updateChargingPile,
 } from '@/api/endpoints/charging';
 import { getDraft, listProjects, putDraft } from '@/api/endpoints/projects';
+import { useLiveStatusStore } from '@/stores/liveStatus';
 import { useProjectStore } from '@/stores/project';
 import { useProjectsStore } from '@/stores/projects';
 import { useChargingPilesStore } from './chargingPiles';
@@ -140,6 +141,31 @@ describe('charging piles store', () => {
     expect(store.piles[0]?.occupancyStatus).toBe('OCCUPIED');
     expect(store.enabledCount).toBe(1);
     expect(store.occupiedCount).toBe(1);
+  });
+
+  it('projects live charge orders onto charging-pile occupancy', async () => {
+    vi.mocked(listChargingPiles).mockResolvedValue([pile({ occupancyStatus: 'FREE' })]);
+    const live = useLiveStatusStore();
+    const store = useChargingPilesStore();
+
+    await store.refresh();
+    expect(store.piles[0]?.occupancyStatus).toBe('FREE');
+
+    live.recordCreatedOrder({
+      name: 'TO-CHARGE-01',
+      type: '-',
+      state: 'RAW',
+      intendedVehicle: 'AGV-01',
+      processingVehicle: null,
+      destinations: [{ locationName: 'CP-A01', operation: 'CHARGE' }],
+    });
+
+    expect(store.piles[0]?.occupancyStatus).toBe('OCCUPIED');
+    expect(store.piles[0]?.occupiedByVehicle).toBe('AGV-01');
+    expect(store.piles[0]?.activeOrderName).toBe('TO-CHARGE-01');
+
+    await store.refresh();
+    expect(store.piles[0]?.occupancyStatus).toBe('OCCUPIED');
   });
 
   it('creates charging piles with local defaults and inserts the created record first', async () => {

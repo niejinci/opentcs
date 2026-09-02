@@ -31,10 +31,12 @@ import {
   isChargingPileNameUsed,
   isChargingPileSnUsed,
   normalizeChargingPileForm,
+  projectChargingPileRecords,
   validateChargingPileForm,
   type ChargingPileFormData,
   type ChargingPileRecord,
 } from '@/domain/charging/chargingPile';
+import { useLiveStatusStore } from '@/stores/liveStatus';
 import { useProjectStore } from '@/stores/project';
 import { useProjectsStore } from '@/stores/projects';
 
@@ -48,11 +50,15 @@ const DRAFT_ENVELOPE_VERSION = 1;
 const PENDING_CHARGING_PILE_ID = '__pending_charging_pile__';
 
 export const useChargingPilesStore = defineStore('chargingPiles', () => {
-  const piles = ref<ChargingPileRecord[]>([]);
+  const live = useLiveStatusStore();
+  const basePiles = ref<ChargingPileRecord[]>([]);
   const loading = ref(false);
   const loaded = ref(false);
   const lastError = ref<string | null>(null);
 
+  const piles = computed(() =>
+    projectChargingPileRecords(basePiles.value, live.activeOrders, live.vehicleList),
+  );
   const enabledCount = computed(() => piles.value.filter((item) => item.enabled).length);
   const occupiedCount = computed(
     () => piles.value.filter((item) => item.occupancyStatus === 'OCCUPIED').length,
@@ -61,7 +67,7 @@ export const useChargingPilesStore = defineStore('chargingPiles', () => {
   async function refresh(options?: RequestOptions): Promise<void> {
     loading.value = true;
     try {
-      piles.value = (await listChargingPiles(options)).map(chargingPileDtoToRecord);
+      basePiles.value = (await listChargingPiles(options)).map(chargingPileDtoToRecord);
       loaded.value = true;
       lastError.value = null;
     } catch (err) {
@@ -90,7 +96,7 @@ export const useChargingPilesStore = defineStore('chargingPiles', () => {
       draftContext,
       upsertChargingPileDraftArtifacts(draftContext.payload, created),
     );
-    piles.value = [created, ...piles.value.filter((item) => item.id !== created.id)];
+    basePiles.value = [created, ...basePiles.value.filter((item) => item.id !== created.id)];
     return created;
   }
 
@@ -129,7 +135,7 @@ export const useChargingPilesStore = defineStore('chargingPiles', () => {
         upsertChargingPileDraftArtifacts(nextDraftContext.payload, updated),
       );
     }
-    piles.value = [updated, ...piles.value.filter((item) => item.id !== id)];
+    basePiles.value = [updated, ...basePiles.value.filter((item) => item.id !== id)];
     return updated;
   }
 
@@ -149,26 +155,26 @@ export const useChargingPilesStore = defineStore('chargingPiles', () => {
         removeChargingPileDraftArtifacts(draftContext.payload, current),
       );
     }
-    piles.value = piles.value.filter((item) => item.id !== id);
+    basePiles.value = basePiles.value.filter((item) => item.id !== id);
   }
 
   function findById(id: string): ChargingPileRecord | null {
-    return piles.value.find((item) => item.id === id) ?? null;
+    return basePiles.value.find((item) => item.id === id) ?? null;
   }
 
   function validateForm(form: ChargingPileFormData, exceptId?: string): ChargingPileFormData {
     const normalized = normalizeChargingPileForm(form);
     validateChargingPileForm(normalized);
-    if (isChargingPileNameUsed(piles.value, normalized.name, exceptId)) {
+    if (isChargingPileNameUsed(basePiles.value, normalized.name, exceptId)) {
       throw new Error(`充电桩名称 ${normalized.name} 已存在`);
     }
-    if (isChargingPileBoundPointUsed(piles.value, normalized.boundPointName, exceptId)) {
+    if (isChargingPileBoundPointUsed(basePiles.value, normalized.boundPointName, exceptId)) {
       throw new Error(`绑定点位 ${normalized.boundPointName} 已被其他充电桩占用`);
     }
-    if (isChargingPileSnUsed(piles.value, normalized.sn, exceptId)) {
+    if (isChargingPileSnUsed(basePiles.value, normalized.sn, exceptId)) {
       throw new Error(`充电桩 SN ${normalized.sn} 已存在`);
     }
-    if (isChargingPileIpUsed(piles.value, normalized.ip, exceptId)) {
+    if (isChargingPileIpUsed(basePiles.value, normalized.ip, exceptId)) {
       throw new Error(`充电桩 IP ${normalized.ip} 已存在`);
     }
     return normalized;

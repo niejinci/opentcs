@@ -1,4 +1,10 @@
 import type { Destination, TransportOrderRequest } from '@/api/types/bff';
+import {
+  CHARGE_OPERATION as CHARGING_PILE_CHARGE_OPERATION,
+  chargingPileAvailabilityError,
+  chargingPileByLocationName,
+  type ChargingPileRecord,
+} from '@/domain/charging/chargingPile';
 
 export type CreateTaskType = 'charge' | 'unload' | 'load' | 'move';
 export type TargetKind = 'point' | 'location' | '';
@@ -27,6 +33,9 @@ export interface TargetOption {
   name: string;
   kind: Exclude<TargetKind, ''>;
   allowedOperations: readonly string[];
+  isChargingPile?: boolean;
+  chargingPileName?: string;
+  chargeUnavailableReason?: string | null;
 }
 
 export const TASK_TYPE_OPTIONS: readonly TaskTypeOption[] = Object.freeze([
@@ -37,7 +46,7 @@ export const TASK_TYPE_OPTIONS: readonly TaskTypeOption[] = Object.freeze([
 ]);
 
 export const DESTINATION_ACTION_PROPERTY_PREFIX = 'vda5050:destinationAction';
-export const CHARGE_OPERATION = 'startCharging';
+export const CHARGE_OPERATION = CHARGING_PILE_CHARGE_OPERATION;
 export const CHARGE_DURATION_PROPERTY_KEY = `${DESTINATION_ACTION_PROPERTY_PREFIX}.parameter.time`;
 export const MIN_CHARGE_DURATION_MINUTES = 1;
 export const MAX_CHARGE_DURATION_MINUTES = 480;
@@ -83,6 +92,53 @@ export function operationForTask(row: Pick<TaskRow, 'type'>): string {
 
 export function taskRequiresLocation(type: CreateTaskType): boolean {
   return type === 'charge' || type === 'unload' || type === 'load';
+}
+
+export function targetSupportsTask(
+  row: Pick<TaskRow, 'type'>,
+  target: TargetOption,
+): boolean {
+  const operation = operationForTask(row);
+
+  if (row.type === 'charge') {
+    return (
+      target.kind === 'location' &&
+      target.isChargingPile === true &&
+      !target.chargeUnavailableReason &&
+      target.allowedOperations.includes(operation)
+    );
+  }
+
+  return target.allowedOperations.includes(operation);
+}
+
+export function validateChargeTaskTargets(
+  rows: readonly TaskRow[],
+  chargingPiles: readonly ChargingPileRecord[],
+): string[] {
+  const errors: string[] = [];
+  const pilesByLocation = chargingPileByLocationName(chargingPiles);
+
+  rows.forEach((row, index) => {
+    if (row.type !== 'charge') return;
+
+    const label = `第 ${index + 1} 行`;
+    const targetName = row.targetName.trim();
+    if (!targetName) return;
+
+    const pile = pilesByLocation.get(targetName);
+    if (!pile) {
+      errors.push(`${label} ${targetName} 不是已登记充电桩`);
+      return;
+    }
+
+    const availabilityError = chargingPileAvailabilityError(pile);
+    if (availabilityError) {
+      errors.push(`${label} ${pile.name} ${availabilityError}`);
+    }
+  });
+
+  return errors;
 }
 
 function destinationActionParameterKey(parameter: string): string {

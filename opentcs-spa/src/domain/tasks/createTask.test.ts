@@ -4,12 +4,16 @@ import {
   buildTransportOrderRequest,
   CHARGE_DURATION_PROPERTY_KEY,
   CHARGE_DURATION_VALIDATION_MESSAGE,
+  CHARGE_OPERATION,
   createTaskRow,
   DESTINATION_ACTION_PROPERTY_PREFIX,
   destinationProperties,
   isValidChargeDurationMinutes,
   operationForTask,
+  targetSupportsTask,
+  validateChargeTaskTargets,
   validateTaskRows,
+  type TargetOption,
   type TaskRow,
 } from './createTask';
 
@@ -30,7 +34,8 @@ describe('create task order mapping', () => {
   it('maps fixed task types to kernel destination operations', () => {
     expect(operationForTask(row({ type: 'load' }))).toBe('pick');
     expect(operationForTask(row({ type: 'unload' }))).toBe('drop');
-    expect(operationForTask(row({ type: 'charge' }))).toBe('startCharging');
+    expect(operationForTask(row({ type: 'charge' }))).toBe(CHARGE_OPERATION);
+    expect(CHARGE_OPERATION).toBe('CHARGE');
     expect(operationForTask(row({ type: 'move' }))).toBe('MOVE');
   });
 
@@ -54,7 +59,7 @@ describe('create task order mapping', () => {
     });
   });
 
-  it('builds VDA5050 startCharging duration parameter for charge rows', () => {
+  it('builds VDA5050 CHARGE duration parameter for charge rows', () => {
     const props = destinationProperties(
       row({
         type: 'charge',
@@ -180,5 +185,92 @@ describe('create task order mapping', () => {
     expect(validateTaskRows([row({ type: 'unload', targetKind: 'point' })])).toContain(
       '第 1 行 下料 任务请选择 Location 站点',
     );
+  });
+
+  it('allows charge tasks only on available charging pile Location targets', () => {
+    const targets: TargetOption[] = [
+      { name: 'Work-1', kind: 'location', allowedOperations: ['NOP', 'CHARGE'] },
+      {
+        name: 'CP-A01',
+        kind: 'location',
+        allowedOperations: ['NOP', 'CHARGE'],
+        isChargingPile: true,
+      },
+      {
+        name: 'CP-A02',
+        kind: 'location',
+        allowedOperations: ['NOP', 'CHARGE'],
+        isChargingPile: true,
+        chargeUnavailableReason: '已被车辆 AGV-01 占用充电',
+      },
+      { name: 'Point-1', kind: 'point', allowedOperations: ['MOVE', 'PARK'] },
+    ];
+
+    const chargeRow = row({ type: 'charge' });
+
+    expect(targetSupportsTask(chargeRow, targets[0])).toBe(false);
+    expect(targetSupportsTask(chargeRow, targets[1])).toBe(true);
+    expect(targetSupportsTask(chargeRow, targets[2])).toBe(false);
+    expect(targetSupportsTask(chargeRow, targets[3])).toBe(false);
+  });
+
+  it('validates charge task target occupancy before creating orders', () => {
+    expect(
+      validateChargeTaskTargets(
+        [
+          row({ id: 1, type: 'charge', targetName: 'CP-A01' }),
+          row({ id: 2, type: 'charge', targetName: 'CP-A02' }),
+          row({ id: 3, type: 'charge', targetName: 'CP-A03' }),
+        ],
+        [
+          {
+            id: 'cp-001',
+            name: '充电桩-A01',
+            region: '深圳焊装',
+            mapName: 'HZ27',
+            boundPointName: 'Point-1',
+            locationName: 'CP-A01',
+            locationTypeName: 'CHARGER',
+            operation: 'CHARGE',
+            chargerType: '',
+            sn: '',
+            ip: '',
+            enabled: true,
+            runtimeStatus: 'CHARGING',
+            occupancyStatus: 'OCCUPIED',
+            occupiedByVehicle: 'AGV-01',
+            activeOrderName: 'TO-01',
+            chargingSince: '',
+            requiresPublish: false,
+            updatedAt: '',
+          },
+          {
+            id: 'cp-002',
+            name: '充电桩-A02',
+            region: '深圳焊装',
+            mapName: 'HZ27',
+            boundPointName: 'Point-2',
+            locationName: 'CP-A02',
+            locationTypeName: 'CHARGER',
+            operation: 'CHARGE',
+            chargerType: '',
+            sn: '',
+            ip: '',
+            enabled: false,
+            runtimeStatus: 'IDLE',
+            occupancyStatus: 'DISABLED',
+            occupiedByVehicle: '',
+            activeOrderName: '',
+            chargingSince: '',
+            requiresPublish: false,
+            updatedAt: '',
+          },
+        ],
+      ),
+    ).toEqual([
+      '第 1 行 充电桩-A01 已被车辆 AGV-01 占用充电（订单 TO-01）',
+      '第 2 行 充电桩-A02 已禁用',
+      '第 3 行 CP-A03 不是已登记充电桩',
+    ]);
   });
 });

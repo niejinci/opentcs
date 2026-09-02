@@ -2,6 +2,8 @@ import type {
   ChargingPile,
   ChargingPileOccupancyStatus,
   ChargingPileRuntimeStatus,
+  TransportOrder,
+  Vehicle,
 } from '@/api/types/bff';
 
 export type ChargingPileEnabledFilter = 'all' | 'enabled' | 'disabled';
@@ -23,7 +25,8 @@ export const CHARGING_PILE_OCCUPANCY_STATUS_OPTIONS = [
 export const DEFAULT_CHARGING_PILE_REGION = '深圳焊装';
 export const DEFAULT_CHARGING_PILE_MAP = 'HZ27';
 export const DEFAULT_CHARGING_PILE_LOCATION_TYPE = 'CHARGER';
-export const DEFAULT_CHARGING_PILE_OPERATION = 'CHARGE';
+export const CHARGE_OPERATION = 'CHARGE';
+export const DEFAULT_CHARGING_PILE_OPERATION = CHARGE_OPERATION;
 
 export interface ChargingPileRecord {
   id: string;
@@ -245,6 +248,99 @@ export function isChargingPileIpUsed(
   return records.some((record) => record.id !== exceptId && record.ip.trim().toLowerCase() === normalized);
 }
 
+export function chargingPileTargetLocationName(record: ChargingPileRecord): string {
+  return record.locationName.trim() || record.name.trim();
+}
+
+export function chargingPileAvailabilityError(record: ChargingPileRecord): string | null {
+  if (!record.enabled || record.occupancyStatus === 'DISABLED') {
+    return '已禁用';
+  }
+
+  if (record.occupancyStatus === 'OCCUPIED') {
+    const vehicle = record.occupiedByVehicle.trim()
+      ? `车辆 ${record.occupiedByVehicle.trim()}`
+      : '其他车辆';
+    const order = record.activeOrderName.trim() ? `（订单 ${record.activeOrderName.trim()}）` : '';
+    return `已被${vehicle} 占用充电${order}`;
+  }
+
+  return null;
+}
+
+export function isChargingPileAvailableForCharge(record: ChargingPileRecord): boolean {
+  return chargingPileAvailabilityError(record) === null;
+}
+
+export function chargingPileByLocationName(
+  records: readonly ChargingPileRecord[],
+): Map<string, ChargingPileRecord> {
+  const result = new Map<string, ChargingPileRecord>();
+  for (const record of records) {
+    const locationName = chargingPileTargetLocationName(record);
+    if (locationName && !result.has(locationName)) {
+      result.set(locationName, record);
+    }
+  }
+  return result;
+}
+
+export function projectChargingPileRecords(
+  records: readonly ChargingPileRecord[],
+  activeOrders: readonly TransportOrder[],
+  vehicles: readonly Vehicle[],
+): ChargingPileRecord[] {
+  return records.map((record) => projectChargingPileRecord(record, activeOrders, vehicles));
+}
+
+export function projectChargingPileRecord(
+  record: ChargingPileRecord,
+  activeOrders: readonly TransportOrder[],
+  vehicles: readonly Vehicle[],
+): ChargingPileRecord {
+  const locationName = chargingPileTargetLocationName(record);
+  if (!locationName) {
+    return record;
+  }
+
+  if (!record.enabled || record.occupancyStatus === 'DISABLED') {
+    return {
+      ...record,
+      occupancyStatus: 'DISABLED',
+    };
+  }
+
+  const normalizedLocationName = locationName.toLowerCase();
+  const activeOrder = activeOrders.find((order) =>
+    order.destinations.some(
+      (destination) =>
+        normalizeText(destination.locationName).toLowerCase() === normalizedLocationName &&
+        normalizeText(destination.operation) === CHARGE_OPERATION,
+    ),
+  );
+  const chargingVehicle = vehicles.find(
+    (vehicle) =>
+      vehicle.state === 'CHARGING' &&
+      normalizeText(vehicle.currentPosition).toLowerCase() === normalizedLocationName,
+  );
+
+  if (!activeOrder && !chargingVehicle) {
+    return record;
+  }
+
+  return {
+    ...record,
+    occupancyStatus: 'OCCUPIED',
+    occupiedByVehicle:
+      normalizeText(chargingVehicle?.name) ||
+      normalizeText(activeOrder?.processingVehicle) ||
+      normalizeText(activeOrder?.intendedVehicle) ||
+      record.occupiedByVehicle,
+    activeOrderName: normalizeText(activeOrder?.name) || record.activeOrderName,
+    runtimeStatus: chargingVehicle ? 'CHARGING' : record.runtimeStatus,
+  };
+}
+
 export function normalizeChargingPileForm(form: ChargingPileFormData): ChargingPileFormData {
   return {
     ...form,
@@ -276,7 +372,7 @@ function requireText(value: string | undefined, field: string): string {
   return text;
 }
 
-function normalizeText(value: string | undefined): string {
+function normalizeText(value: string | null | undefined): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
